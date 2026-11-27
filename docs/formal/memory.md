@@ -231,6 +231,40 @@ host-environment hooks (`Accounting`, `HostEnv`, `VmHooks`):
   introduces no IR, typing, effect, region, or ownership-semantics contract
   change; all Lean proofs in `formal/` remain unaffected.
 
+### Tier-1 register bytecode executor (`flick-vm/src/tier1/`)
+
+`flick_vm::tier1` compiles functions reachable from an entry global in
+`flick_ir::memory::Program` to a flat register bytecode with intra-block
+peephole fusion (`Compute`, `CompareBranch`, `ProjectOwned`, `MatchFlag`/
+`MatchBranch`, `ReadCell`/`WriteCell`/`UpdateCell`, `ReturnUnit`, and small
+static `TailCall`/`TailApply` frame reuse), compact captureless closures, and
+one dedicated `translate_*` function per IR operation (`prepare_ops.rs` and
+`prepare_ops_data.rs`) to support direct per-operation refinement proofs
+(`#980`).
+
+- **Shared primitive & heap boundary**: tier 1 executes directly over
+  `tier0::Heap` and delegates all binary operations, unary operations, and
+  standard-library intrinsics to `flick_vm::stdlib` without duplicating
+  primitives. `Heap::finish` verifies zero live slots on every normal,
+  raised, defect, and `OutOfFuel` outcome identically to tier 0.
+- **Explicit unsupported-operation boundary (no silent fallback)**: tier 1
+  currently covers pure synchronous execution (literals, fixed-width and
+  `BigInt` arithmetic, constructors/aggregates/FBIP reuse, records/updates,
+  patterns, closures, dictionaries/methods/structure, frame-local `let mut`
+  vars, `loop`/`LoopExit`, `Option?`, typed-error `try`/`RecoveryResult`, and
+  direct `Host.Console.{stdout_line, stdout_write, stderr_line}` output). Any
+  reachable `Handle`, non-console `Perform`, `Task`, `Await`, `Within`,
+  `WithOwnerEvidence`, `GenerateStrict`/`GenerateLazy`/`Yield`/`SeqOpen`/
+  `SeqNext`, `ForeignCall`, or unsupported effect/async/layer/scope/arena
+  intrinsic fails `tier1::prepare` with `PrepareError::Unsupported` naming the
+  operation and its `MemorySpan` from `Program::op_spans`. The CLI renders
+  this failure as `FLICK-P012` without falling back to tier 0.
+- **Lean impact**: adding the optional backward-compatible `Program::op_spans`
+  sidecar and the tier-1 executor does not change typing, effects, regions, or
+  the reference memory-IR ownership semantics; existing Lean proofs in
+  `formal/` remain unaffected (bytecode translation refinement is tracked in
+  `#980`).
+
 ## 2. Owned tokens and objects
 
 An immediate value has no heap object. A string, arbitrary-sized integer or constructed value has

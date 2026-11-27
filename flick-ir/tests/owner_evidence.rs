@@ -156,6 +156,7 @@ fn memory_evidence_consumes_owner_and_arguments_without_borrowing() {
                 },
             ),
         ]),
+        op_spans: BTreeMap::new(),
     };
     assert_eq!(memory::validate_program(&program), Ok(()));
     program

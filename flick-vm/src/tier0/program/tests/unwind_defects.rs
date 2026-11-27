@@ -53,6 +53,7 @@ fn language_die_does_not_commit_a_pending_modify_result() {
                 ),
             ),
         ]),
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let mut machine = fixture_machine(&program, &mut heap);
@@ -105,6 +106,7 @@ fn cleanup_error_replacement_releases_the_owned_failed_outcome() {
     let program = Program {
         functions: BTreeMap::new(),
         globals: vec![],
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let external = heap
@@ -203,6 +205,7 @@ fn die_retires_scope_and_provider_during_unwind_before_final_cleanup() {
                 ),
             ),
         ]),
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let mut machine = fixture_machine(&program, &mut heap);

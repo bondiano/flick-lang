@@ -1,4 +1,4 @@
-//! Built-in in-process VM target (`--target vm`) on `flick_vm::tier0`.
+//! Built-in in-process VM target (`--target vm`) on `flick_vm::{tier0, tier1}`.
 
 #[cfg(feature = "vm")]
 mod lower;
@@ -35,6 +35,8 @@ use crate::report;
 pub(crate) enum VmTier {
     /// Reference counted tier-0 executor (`flick_vm::tier0`).
     Tier0,
+    /// Register bytecode tier-1 executor (`flick_vm::tier1`).
+    Tier1,
 }
 
 #[cfg(any(test, feature = "vm"))]
@@ -42,6 +44,7 @@ impl VmTier {
     fn parse(raw: &str) -> Option<Self> {
         match raw {
             "0" | "tier0" => Some(Self::Tier0),
+            "1" | "tier1" => Some(Self::Tier1),
             _ => None,
         }
     }
@@ -84,11 +87,12 @@ pub(crate) fn resolve_tier(
                             codes::P058,
                             format!(
                                 "invalid value `{text}` for option `tier` of `flick/vm`; \
-                                 expected one of: `0`, `tier0`"
+                                 expected one of: `0`, `tier0`, `1`, `tier1`"
                             ),
                             entry.value_span,
                         );
-                        if let Some(closest) = suggest::closest(text, ["0", "tier0"]) {
+                        if let Some(closest) = suggest::closest(text, ["0", "tier0", "1", "tier1"])
+                        {
                             diag = diag
                                 .did_you_mean(entry.value_span, || Some(format!("\"{closest}\"")));
                         }
@@ -98,7 +102,8 @@ pub(crate) fn resolve_tier(
                 _ => {
                     diagnostics.push(Diagnostic::error(
                         codes::P058,
-                        "option `tier` of `flick/vm` expects a string (`\"0\"` or `\"tier0\"`)",
+                        "option `tier` of `flick/vm` expects a string \
+                         (`\"0\"`, `\"tier0\"`, `\"1\"`, or `\"tier1\"`)",
                         entry.value_span,
                     ));
                 }
@@ -115,10 +120,11 @@ pub(crate) fn resolve_tier(
                     codes::P058,
                     Severity::Error,
                     format!(
-                        "invalid VM tier `{raw}` for `--vm-tier`; expected one of: `0`, `tier0`"
+                        "invalid VM tier `{raw}` for `--vm-tier`; \
+                         expected one of: `0`, `tier0`, `1`, `tier1`"
                     ),
                 );
-                if let Some(closest) = suggest::closest(raw, ["0", "tier0"]) {
+                if let Some(closest) = suggest::closest(raw, ["0", "tier0", "1", "tier1"]) {
                     diag = diag
                         .with_fix(|| (format!("did you mean `--vm-tier {closest}`?"), Vec::new()));
                 }
@@ -206,7 +212,7 @@ pub(crate) fn doctor_lines() -> Vec<(Option<bool>, String, String)> {
         vec![(
             Some(true),
             "backend".to_owned(),
-            "flick/vm (in-process, tier 0)".to_owned(),
+            "flick/vm (in-process, tier 0 / tier 1)".to_owned(),
         )]
     }
     #[cfg(not(feature = "vm"))]
@@ -278,6 +284,15 @@ mod tests {
         assert_eq!(resolve_tier(None, Some(&proj)), Ok(VmTier::Tier0));
         assert_eq!(resolve_tier(Some("0"), Some(&proj)), Ok(VmTier::Tier0));
         assert_eq!(resolve_tier(Some("tier0"), None), Ok(VmTier::Tier0));
+        assert_eq!(resolve_tier(Some("1"), Some(&proj)), Ok(VmTier::Tier1));
+        assert_eq!(resolve_tier(Some("tier1"), None), Ok(VmTier::Tier1));
+
+        let proj_t1 = project_from(
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\ntarget = \"vm\"\n\
+             [target.vm]\ntier = \"tier1\"\n",
+        );
+        assert_eq!(resolve_tier(None, Some(&proj_t1)), Ok(VmTier::Tier1));
+        assert_eq!(resolve_tier(Some("0"), Some(&proj_t1)), Ok(VmTier::Tier0));
 
         let bad_cli = resolve_tier(Some("tier9"), None).expect_err("bad cli tier");
         assert_eq!(bad_cli[0].code, codes::P058);

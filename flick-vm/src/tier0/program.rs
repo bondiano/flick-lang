@@ -143,6 +143,12 @@ fn success_only(heap: &mut Heap, report: ExecutionReport) -> Result<Executed, Er
 
 static NEXT_EXECUTION: AtomicUsize = AtomicUsize::new(0);
 
+pub(crate) fn next_execution_id() -> usize {
+    NEXT_EXECUTION
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .expect("fewer than usize::MAX VM executions")
+}
+
 /// Evaluates a global once, then applies the supplied unary arguments.
 /// All accepted argument tokens are transferred into this execution.
 /// Runtime failure and exhausted fuel release its real roots, including

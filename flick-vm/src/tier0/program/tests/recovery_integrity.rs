@@ -10,6 +10,7 @@ fn ordinary_store_and_entry_reject_markers_without_losing_owned_selected_edges()
             0,
             function(vec![], vec![bind(0, Operation::Literal(Lit::Unit))], 0),
         )]),
+        op_spans: BTreeMap::new(),
     };
     for entry in [false, true] {
         for fuel in 0..3 {
@@ -120,6 +121,7 @@ fn interrupted_recovery_cleanup_keeps_no_accepted_owned_roots(mode: u8) {
     let program = Program {
         globals: vec![],
         functions: BTreeMap::from([(0, function(vec![0, 1], vec![], 1))]),
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let external = heap

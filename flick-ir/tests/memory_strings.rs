@@ -32,6 +32,7 @@ fn both_string_predicates_consume_exactly_two_owned_tokens() {
         let program = Program {
             functions: BTreeMap::from([(3, valid)]),
             globals: vec![],
+            op_spans: BTreeMap::new(),
         };
         assert_eq!(memory::validate_program(&program), Ok(()));
 
@@ -45,6 +46,7 @@ fn both_string_predicates_consume_exactly_two_owned_tokens() {
         let program = Program {
             functions: BTreeMap::from([(3, invalid)]),
             globals: vec![],
+            op_spans: BTreeMap::new(),
         };
         assert_eq!(
             memory::validate_program(&program),

@@ -87,7 +87,7 @@ let main () =
     );
     assert_eq!(stdout(&default_run), "hello from vm project\n");
 
-    for tier in ["0", "tier0"] {
+    for tier in ["0", "tier0", "1", "tier1"] {
         let out = flick_no_path(&dir, &["run", "--target", "vm", "--vm-tier", tier]);
         assert!(
             out.status.success(),
@@ -425,5 +425,58 @@ fn build_target_vm_refuses_cleanly_and_doctor_reports_vm() {
         stdout(&doctor_out).contains("flick/vm"),
         "expected flick/vm in doctor output:\n{}",
         stdout(&doctor_out)
+    );
+}
+
+#[test]
+fn run_tier1_executes_pure_cases_and_reports_p012_with_span_for_unsupported() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    for rel in [
+        "tests/run/bootstrap/hello.fl",
+        "tests/run/codegen/ints.fl",
+        "tests/run/codegen/fixed_width.fl",
+    ] {
+        let path = repo.join(rel);
+        let expected = fs::read_to_string(path.with_extension("stdout"))
+            .unwrap_or_else(|e| panic!("read expected stdout for {rel}: {e}"));
+        let out = flick_no_path(&repo, &["run", "--target", "vm", "--vm-tier", "1", rel]);
+        assert!(
+            out.status.success(),
+            "{rel} (--vm-tier 1) failed:\n{}",
+            stderr(&out)
+        );
+        assert_eq!(
+            stdout(&out),
+            expected,
+            "{rel} (--vm-tier 1) stdout mismatch"
+        );
+    }
+
+    let unsupported = "\
+module App.Main exposing (main)
+
+effect Ask =
+  ask : Unit ->{} Int
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let n =
+    try Ask.ask () with
+    | Ask.ask () -> 7
+  Platform.stdout_line (show n)
+";
+    let dir = project(
+        "vm_tier1_unsupported_span",
+        &[("flick.toml", APP), ("src/App/Main.fl", unsupported)],
+    );
+    let out = flick_no_path(&dir, &["run", "--target", "vm", "--vm-tier", "tier1"]);
+    assert!(
+        !out.status.success(),
+        "expected tier1 to reject Handle: {out:?}"
+    );
+    let err = stderr(&out);
+    assert!(
+        err.contains("FLICK-P012") && err.contains("Handle") && err.contains("src/App/Main.fl"),
+        "expected FLICK-P012 with operation name and source span, got:\n{err}"
     );
 }

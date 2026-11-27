@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: c0bd9a173ac4e01b
+source_hash: 7328828ed0002772
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -99,7 +99,7 @@ max-params = 5
 | `target.js.ui` | спецификатор модуля, который рисует и монтирует представления вместо React (экспортирует все имена, которые `Ui` и `Action` берут из `@flick-lang/effect-ts/ui` и `@flick-lang/effect-ts/ui/react`; относительный путь — от корня проекта) | React |
 | `target.go.cgo` | логическое значение; включить cgo (`CGO_ENABLED=1`) при сборке исполняемых файлов Go | `false` |
 | `target.go.kind` | `"app"` или `"library"` (режим `"library"` объявлен, но пока отклоняется `flick/go` с `FLICK-P012`) | `"app"` |
-| `target.vm.tier` | `"0"` или `"tier0"`; уровень исполнения встроенной ВМ (`flick run` / `flick test`); переопределяется флагом `--vm-tier` | `"0"` |
+| `target.vm.tier` | `"0"`, `"tier0"`, `"1"` или `"tier1"`; уровень исполнения встроенной ВМ (`flick run` / `flick test`); переопределяется флагом `--vm-tier` | `"0"` |
 
 `flick new` берёт файлы шаблона у выбранного целевого бэкенда (`--target js` по умолчанию создаёт проект на RT с `[tools] "flick/js" = ["pnpm"]`, зависимостью от `@flick-lang/runtime` и без Effect; `--target go` создаёт проект под Go с `[build] target = "go"`, `[tools] "flick/go" = ["go"]` и без `package.json`) либо у стороннего пакета через `--from`. Передайте `--runtime rt` командам `build`, `run`, `dev`, `test` или `inspect`, чтобы выбрать RT для одного вызова в проекте на Effect. Если проекту нужен адаптер Effect, явно задайте `[target.js] runtime = "effect"` и добавьте зависимость `@flick-lang/effect-ts`.
 

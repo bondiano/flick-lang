@@ -104,6 +104,7 @@ pub mod memory_stage5_host;
 pub mod memory_string_predicates;
 pub mod memory_structural_dictionaries;
 pub mod memory_tasks_refs;
+pub mod memory_tier1_diff;
 pub mod opaque;
 pub mod owner_evidence;
 pub mod owner_scheme_preservation;

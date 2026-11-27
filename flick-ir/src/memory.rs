@@ -51,11 +51,56 @@ pub struct Global {
     pub initializer: CodeId,
 }
 
+/// Source span associated with a lowered memory-IR operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct MemorySpan {
+    pub file: u32,
+    pub start: u32,
+    pub end: u32,
+}
+
+mod op_spans_serde {
+    use std::collections::BTreeMap;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::{CodeId, MemorySpan};
+
+    pub(super) fn serialize<S>(
+        spans: &BTreeMap<(CodeId, usize), MemorySpan>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let entries: Vec<((CodeId, usize), MemorySpan)> =
+            spans.iter().map(|(&key, &span)| (key, span)).collect();
+        entries.serialize(serializer)
+    }
+
+    pub(super) fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<BTreeMap<(CodeId, usize), MemorySpan>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let entries = Vec::<((CodeId, usize), MemorySpan)>::deserialize(deserializer)?;
+        Ok(entries.into_iter().collect())
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Program {
     pub functions: BTreeMap<CodeId, Function>,
     /// A vector avoids encoding structured identities as JSON map keys.
     pub globals: Vec<Global>,
+    /// Optional source-span sidecar keyed by `(CodeId, pre_order_instruction_index)`.
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        with = "op_spans_serde"
+    )]
+    pub op_spans: BTreeMap<(CodeId, usize), MemorySpan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

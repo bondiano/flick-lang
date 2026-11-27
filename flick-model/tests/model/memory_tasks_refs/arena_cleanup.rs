@@ -330,6 +330,7 @@ fn direct_task_main_is_awaited_once() {
             name: Name::new("Main", "main"),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let ran = execute_main_program(&mut heap, &p, &Name::new("Main", "main"), 100)

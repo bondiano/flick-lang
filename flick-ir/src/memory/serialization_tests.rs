@@ -40,6 +40,10 @@ fn scoped_ownership_operations_round_trip() {
 fn code_and_qualified_globals_round_trip_without_flattening_identities() {
     let program = forwarding_program();
     let json = serde_json::to_string(&program).expect("serializable memory program");
+    assert!(
+        !json.contains("op_spans"),
+        "empty op_spans sidecar should be omitted for backward compatibility: {json}"
+    );
     let back: Program = serde_json::from_str(&json).expect("readable memory program");
     assert_eq!(back, program);
     assert_eq!(validate_program(&back), Ok(()));
@@ -49,6 +53,26 @@ fn code_and_qualified_globals_round_trip_without_flattening_identities() {
         ciborium::into_writer(&program, &mut bytes).expect("serializable program");
         let back: Program = ciborium::from_reader(bytes.as_slice()).expect("readable program");
         assert_eq!(back, program);
+    }
+
+    let mut spanned = forwarding_program();
+    spanned.op_spans.insert(
+        (2, 0),
+        MemorySpan {
+            file: 3,
+            start: 10,
+            end: 25,
+        },
+    );
+    let json = serde_json::to_string(&spanned).expect("serializable spanned program");
+    let back: Program = serde_json::from_str(&json).expect("readable spanned program");
+    assert_eq!(back, spanned);
+    #[cfg(feature = "cbor")]
+    {
+        let mut bytes = Vec::new();
+        ciborium::into_writer(&spanned, &mut bytes).expect("serializable spanned program");
+        let back: Program = ciborium::from_reader(bytes.as_slice()).expect("readable spanned");
+        assert_eq!(back, spanned);
     }
 }
 

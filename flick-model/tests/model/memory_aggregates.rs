@@ -383,6 +383,7 @@ fn program_box_unbox_shared_and_unique_paths_preserve_aliases_with_zero_leaks() 
                 },
             },
         )]),
+        op_spans: BTreeMap::new(),
     };
     memory::validate_program(&program).expect("valid program");
     let mut heap = Heap::new();

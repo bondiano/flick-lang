@@ -403,6 +403,7 @@ fn guard_failure_with_same_payload_is_fresh_d_not_a_miss_on_original_c() {
                 2,
             ),
         )]),
+        op_spans: BTreeMap::new(),
     };
     let mut complete = false;
     for fuel in 0..1000 {

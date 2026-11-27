@@ -390,8 +390,8 @@ Removed legacy flags (`FLICK-P057`) for `flick/go`:
 Selected by `--target vm`, `[build] target = "vm"`, or `[build] environment = "vm/native"`.
 Runs compiled Flick programs and test suites directly in process on the built-in virtual machine without spawning `node` or `go`.
 
-- **Options (`[target.vm]`)**: `--vm-tier <tier>` (`run`, `test`; accepts `0` or `tier0`, default `0`; also configurable via `[target.vm] tier = "0"` in `flick.toml`).
-- **Running (`run`)**: executes a project entry (`flick run --target vm`) or a standalone source file (`flick run --target vm path/to/file.fl`) in process on the tier-0 reference VM, supporting `--profile debug` and `--profile release`.
+- **Options (`[target.vm]`)**: `--vm-tier <tier>` (`run`, `test`; accepts `0`, `tier0`, `1`, or `tier1`, default `0`; also configurable via `[target.vm] tier = "0" | "tier0" | "1" | "tier1"` in `flick.toml`).
+- **Running (`run`)**: executes a project entry (`flick run --target vm`) or a standalone source file (`flick run --target vm path/to/file.fl`) in process on the tier-0 reference VM (default) or the tier-1 register bytecode VM (`--vm-tier 1|tier1`), supporting `--profile debug` and `--profile release`. On tier 1, any reachable operation outside its pure synchronous subset fails with `FLICK-P012` naming the operation and its source span (no silent fallback to tier 0).
 - **Testing (`test`)**: executes project test suites in process (`flick test --target vm`), supporting `--filter`, `--list`, `--seed`, `--reporter human|json`, and `--profile`.
 - **Current scope**: `flick build --target vm` (standalone VM images, tracked in `#988`), `flick dev --target vm`, and `flick inspect --emit output --target vm` are not supported yet and exit with `FLICK-P012`.
 - **Environment checks (`doctor`)**: reports the built-in VM availability and active tier without checking Node.js or Go.

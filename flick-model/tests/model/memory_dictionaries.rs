@@ -11,6 +11,7 @@ use flick_core::opt::perceus;
 use flick_vm::tier0::{
     Error, Heap, ProgramOutcome, Value, execute_program, execute_program_outcome,
 };
+use std::collections::BTreeMap;
 
 fn let_(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }
@@ -34,6 +35,7 @@ fn program(body: Function, extras: Vec<(u32, Function)>) -> Program {
             name: entry(),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     }
 }
 fn entry() -> Name {

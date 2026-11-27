@@ -10,10 +10,29 @@ enum UpdateSource {
     Replacement(usize),
 }
 
-pub(super) fn update(
+pub(crate) fn update(
     heap: &mut Heap,
     operands: &mut Vec<Value>,
     fields: &[(String, Local)],
+    fuel: &mut u64,
+) -> Result<Value, Error> {
+    update_inner(heap, operands, fields, |(name, _)| name.as_str(), fuel)
+}
+
+pub(crate) fn update_labels(
+    heap: &mut Heap,
+    operands: &mut Vec<Value>,
+    labels: &[String],
+    fuel: &mut u64,
+) -> Result<Value, Error> {
+    update_inner(heap, operands, labels, String::as_str, fuel)
+}
+
+fn update_inner<T>(
+    heap: &mut Heap,
+    operands: &mut Vec<Value>,
+    fields: &[T],
+    label_of: impl Fn(&T) -> &str,
     fuel: &mut u64,
 ) -> Result<Value, Error> {
     let Value::Object(token) = &operands[0] else {
@@ -23,7 +42,8 @@ pub(super) fn update(
     let Data::Record(base) = &heap.object(object)?.data else {
         return Err(Error::ExpectedRecord);
     };
-    for (name, _) in fields {
+    for field in fields {
+        let name = label_of(field);
         let mut found = false;
         for (label, _) in base {
             charge(
@@ -36,13 +56,14 @@ pub(super) fn update(
             }
         }
         if !found {
-            return Err(Error::MissingNamedField(name.clone()));
+            return Err(Error::MissingNamedField(name.to_owned()));
         }
     }
     let mut sources = Vec::new();
     for (index, (label, _)) in base.iter().enumerate() {
         let mut source = UpdateSource::Existing(index);
-        for (replacement, (name, _)) in fields.iter().enumerate().rev() {
+        for (replacement, field) in fields.iter().enumerate().rev() {
+            let name = label_of(field);
             charge(
                 fuel,
                 name.len().saturating_add(label.len()).saturating_add(1),

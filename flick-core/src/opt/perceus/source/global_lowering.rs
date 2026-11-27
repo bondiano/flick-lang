@@ -5,11 +5,15 @@ impl Lower<'_> {
         Ok(code)
     }
 
-    fn finish(&mut self, code: CodeId, function: &Function) -> Result<(), LowerError> {
+    fn finish(&mut self, code: CodeId, function: &SpannedFunction) -> Result<(), LowerError> {
         self.finish_with_hints(code, function, &BTreeMap::new())
     }
 
-    fn finish_closure(&mut self, code: CodeId, function: &Function) -> Result<(), LowerError> {
+    fn finish_closure(
+        &mut self,
+        code: CodeId,
+        function: &SpannedFunction,
+    ) -> Result<(), LowerError> {
         let hints = BTreeMap::from([(0, CandidateShape::Never)]);
         self.finish_with_hints(code, function, &hints)
     }
@@ -17,15 +21,34 @@ impl Lower<'_> {
     fn finish_with_hints(
         &mut self,
         code: CodeId,
-        function: &Function,
+        spanned: &SpannedFunction,
         hints: &BTreeMap<Local, CandidateShape>,
     ) -> Result<(), LowerError> {
+        let raw = Function {
+            params: spanned.params.clone(),
+            body: spanned.body.block.clone(),
+        };
         let function = if self.enable_reuse {
-            insert_fbip_with_hints(function, hints)
+            insert_fbip_with_hints(&raw, hints)
         } else {
-            insert_without_reuse(function)
+            insert_without_reuse(&raw)
         }
         .map_err(|error| LowerError::Ownership { code, error })?;
+        let mut instr_idx = 0usize;
+        let mut emit_idx = 0usize;
+        record_block_op_spans(
+            code,
+            &function.body,
+            &spanned.body.spans,
+            &mut instr_idx,
+            &mut emit_idx,
+            &mut self.program.op_spans,
+        );
+        debug_assert_eq!(
+            emit_idx,
+            spanned.body.spans.len(),
+            "span count mismatch for memory code {code}"
+        );
         self.program.functions.insert(code, function);
         Ok(())
     }
@@ -238,6 +261,31 @@ impl Lower<'_> {
             },
             span,
         )
+    }
+}
+
+fn record_block_op_spans(
+    code: CodeId,
+    block: &Block,
+    spans: &[MemorySpan],
+    instr_idx: &mut usize,
+    emit_idx: &mut usize,
+    out: &mut BTreeMap<(CodeId, usize), MemorySpan>,
+) {
+    for instruction in &block.instructions {
+        let current = *instr_idx;
+        *instr_idx += 1;
+        if let Instruction::Let { value, .. } = instruction
+            && !matches!(value, Operation::DropReuse(_))
+            && let Some(&span) = spans.get(*emit_idx)
+        {
+            out.insert((code, current), span);
+            *emit_idx += 1;
+        }
+    }
+    if let Exit::Branch { then_, else_, .. } = &block.exit {
+        record_block_op_spans(code, then_, spans, instr_idx, emit_idx, out);
+        record_block_op_spans(code, else_, spans, instr_idx, emit_idx, out);
     }
 }
 

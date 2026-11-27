@@ -222,13 +222,13 @@ impl DefectSpec {
 }
 
 /// Classification is used at the running operation boundary, never on final Err.
-pub(super) enum StepFailure {
+pub(crate) enum StepFailure {
     Language(DefectSpec),
     Evaluator(Error),
 }
 
 impl StepFailure {
-    pub(super) fn classify(error: Error) -> Self {
+    pub(crate) fn classify(error: Error) -> Self {
         let code = match error {
             Error::NoMatch => DefectCode::NoMatch,
             Error::MissingHandler { effect, op } => DefectCode::MissingHandler { effect, op },
@@ -345,14 +345,14 @@ impl Heap {
         Ok(spec)
     }
 
-    pub(super) fn ordinary_failure(&self, cause: &CauseToken) -> Result<Option<&Value>, Error> {
+    pub(crate) fn ordinary_failure(&self, cause: &CauseToken) -> Result<Option<&Value>, Error> {
         Ok(match self.cause_data(cause)? {
             [StoredReason::Fail(value)] => Some(value),
             _ => None,
         })
     }
 
-    pub(super) fn first_fail(
+    pub(crate) fn first_fail(
         &self,
         cause: &CauseToken,
         fuel: &mut u64,
@@ -366,7 +366,7 @@ impl Heap {
         Ok(None)
     }
 
-    pub(super) fn elect_failure(
+    pub(crate) fn elect_failure(
         &mut self,
         cause: &CauseToken,
         fuel: &mut u64,

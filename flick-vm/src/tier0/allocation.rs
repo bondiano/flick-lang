@@ -113,7 +113,7 @@ impl Heap {
         }
     }
 
-    pub(super) fn var_contents<'a>(
+    pub(crate) fn var_contents<'a>(
         &'a self,
         execution: usize,
         var: &VarHandle,
@@ -144,7 +144,7 @@ impl Heap {
         contents.as_ref().ok_or(Error::ClosedVar)
     }
 
-    pub(super) fn var_contents_mut<'a>(
+    pub(crate) fn var_contents_mut<'a>(
         &'a mut self,
         execution: usize,
         var: &VarHandle,

@@ -148,7 +148,7 @@ use flick_ir::{Constructor, Dict, Foreign, InstanceInfo, Shape, TypeRef};
 use crate::iface::Interface;
 use crate::ir::memory::{
     self, Block, CodeId, Exit, Function, Global, HostPrimitive, Instruction, Intrinsic, Local,
-    Name, Operation, Program, ValueRep,
+    MemorySpan, Name, Operation, Program, ValueRep,
 };
 use crate::ir::{
     Arm, BinOp, Expr, ExprKind, ExprLang, Item, ItemKind, Lit, Module, Param, Pat, Stage, Stmt,
@@ -494,12 +494,25 @@ struct Lower<'a> {
     in_for_each_body: BTreeSet<String>,
 }
 
+/// A lowered memory-IR block paired with pre-order source spans for each `emit`.
+struct SpannedBlock {
+    block: Block,
+    spans: Vec<MemorySpan>,
+}
+
+/// A lowered memory-IR function paired with pre-order source spans for each `emit`.
+struct SpannedFunction {
+    params: Vec<Local>,
+    body: SpannedBlock,
+}
+
 /// One ANF function under construction. Branches get their own builders,
 /// never copies of the caller's continuation.
 struct Code {
     params: Vec<Local>,
     next: Local,
     instructions: Vec<Instruction>,
+    spans: Vec<MemorySpan>,
 }
 
 impl Code {
@@ -513,6 +526,7 @@ impl Code {
             params,
             next,
             instructions: Vec::new(),
+            spans: Vec::new(),
         }
     }
 
@@ -520,16 +534,45 @@ impl Code {
         let binding = self.next;
         self.next = self.next.checked_add(1).ok_or(LowerError::Limit(span))?;
         self.instructions.push(Instruction::Let { binding, value });
+        self.spans.push(MemorySpan {
+            file: span.file.index(),
+            start: span.start,
+            end: span.end,
+        });
         Ok(binding)
     }
 
-    fn finish(self, value: Local) -> Function {
-        Function {
+    fn finish(self, value: Local) -> SpannedFunction {
+        SpannedFunction {
             params: self.params,
-            body: Block {
-                instructions: self.instructions,
-                exit: Exit::Return(value),
+            body: SpannedBlock {
+                block: Block {
+                    instructions: self.instructions,
+                    exit: Exit::Return(value),
+                },
+                spans: self.spans,
             },
+        }
+    }
+
+    fn branch(
+        mut self,
+        condition: Local,
+        then_: SpannedBlock,
+        else_: SpannedBlock,
+    ) -> SpannedBlock {
+        self.spans.extend(then_.spans);
+        self.spans.extend(else_.spans);
+        SpannedBlock {
+            block: Block {
+                instructions: self.instructions,
+                exit: Exit::Branch {
+                    condition,
+                    then_: Box::new(then_.block),
+                    else_: Box::new(else_.block),
+                },
+            },
+            spans: self.spans,
         }
     }
 
@@ -540,6 +583,7 @@ impl Code {
             params: self.params.clone(),
             next: self.next,
             instructions: vec![],
+            spans: vec![],
         }
     }
 }

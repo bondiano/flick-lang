@@ -8,6 +8,7 @@ use flick_core::ir::{
 };
 use flick_core::opt::perceus;
 use flick_vm::tier0::{Heap, ProgramOutcome, Value, execute_program, execute_program_outcome};
+use std::collections::BTreeMap;
 
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }
@@ -63,6 +64,7 @@ pub(super) fn broken_cycle_raw_program() -> (Name, Program) {
             name: name.clone(),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     };
     (name, program)
 }
@@ -157,6 +159,7 @@ fn broken_cycle_frees_old_payload_mid_execution_while_unbroken_retains_until_tea
                     name,
                     initializer: 0,
                 }],
+                op_spans: BTreeMap::new(),
             },
         )
     };
@@ -232,6 +235,7 @@ fn external_alias_stored_in_cyclic_ref_survives_teardown_untouched() {
             name: name.clone(),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     };
 
     let mut completed = false;

@@ -170,7 +170,15 @@ fn execute_suites(
     options: &TestArguments,
     global: &GlobalArguments,
 ) -> ExitCode {
-    let VmTier::Tier0 = tier;
+    if tier == VmTier::Tier1 {
+        let diag = Diagnostic::new(
+            codes::P012,
+            Severity::Error,
+            "tier 1 VM does not support `flick test --target vm` yet; use `--vm-tier 0`",
+        );
+        report::render(global, &SourceMap::default(), &[diag]);
+        return ExitCode::from(1);
+    }
     let started = Instant::now();
     #[allow(clippy::cast_possible_wrap)]
     let seed_i32 = seed as i32;

@@ -22,8 +22,8 @@ pub use causes::{CauseToken, DefectClass, DefectCode, DefectSpec, LanguageExit, 
 pub use crate::stdlib::{DRAW, HostBridge, HostMode, MILLIS, MONOTONIC_NANOS, NANOS};
 use crate::stdlib::{Unmetered, eval_binary, eval_neg, eval_not};
 
-mod patterns;
-mod program;
+pub(crate) mod patterns;
+pub(crate) mod program;
 mod record_update;
 pub use program::{
     Executed, ExecutionReport, ProgramOutcome, TestCaseResult, execute_main_program,
@@ -102,8 +102,8 @@ pub struct ArenaView {
 /// Nonowning handle to a frame-owned mutable local variable (`let mut`).
 #[derive(Debug, PartialEq, Eq)]
 pub struct VarHandle {
-    id: ObjectId,
-    execution: usize,
+    pub(crate) id: ObjectId,
+    pub(crate) execution: usize,
 }
 
 /// Nonowning handle to a root-owned single-flight `Lazy` cell.

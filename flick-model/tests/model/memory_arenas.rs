@@ -5,6 +5,7 @@ use flick_core::ir::memory::{
 };
 use flick_core::opt::perceus;
 use flick_vm::tier0::{Error, Heap, execute_program};
+use std::collections::BTreeMap;
 
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }
@@ -39,6 +40,7 @@ fn program(bodies: Vec<Function>) -> Program {
             name: Name::new("Main", "main"),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     }
 }
 fn scope_program(after: Vec<Instruction>, result: u32, read_inside: bool) -> Program {

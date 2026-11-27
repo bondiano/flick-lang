@@ -5,6 +5,7 @@ use flick_core::ir::{
     memory::{Block, Exit, Function, Global, Instruction, Name, Operation, Program, ValueRep},
 };
 use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute, execute_program_outcome};
+use std::collections::BTreeMap;
 
 use super::{compare_fbip_vs_baseline, sweep_fuel_prefixes};
 
@@ -291,6 +292,7 @@ fn reuse_token_escape_is_rejected_without_leaks_across_all_fuel_prefixes() {
                 name: name.clone(),
                 initializer: 0,
             }],
+            op_spans: BTreeMap::new(),
         };
         for shared in [false, true] {
             let mut saw_escape = false;

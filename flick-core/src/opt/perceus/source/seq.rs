@@ -4,8 +4,8 @@ use flick_ir::{Arith, Constructor, Foreign, ForeignMode, Num, Rep};
 
 use super::lazy_scope::has_standard_shape;
 use super::{
-    Arm, BinOp, Block, Code, Env, Exit, Expr, ExprKind, Function, Intrinsic, Lit, Local, Lower,
-    LowerError, Operation, Param, Pat, Span, Stage, Stmt, ValueRep,
+    Arm, BinOp, Code, Env, Expr, ExprKind, Intrinsic, Lit, Local, Lower, LowerError, Operation,
+    Param, Pat, Span, SpannedBlock, SpannedFunction, Stage, Stmt, ValueRep,
 };
 
 impl Lower<'_> {
@@ -155,8 +155,12 @@ impl Lower<'_> {
         Ok((matched, has_val))
     }
 
-    fn seq_zip_loop(loop_id: &str, with_fn: bool, span: Span) -> Result<Function, LowerError> {
-        let exit_loop = |mut branch: Code| -> Result<Block, LowerError> {
+    fn seq_zip_loop(
+        loop_id: &str,
+        with_fn: bool,
+        span: Span,
+    ) -> Result<SpannedFunction, LowerError> {
+        let exit_loop = |mut branch: Code| -> Result<SpannedBlock, LowerError> {
             let unit = branch.emit(Operation::Literal(Lit::Unit), span)?;
             let stop = branch.emit(
                 Operation::LoopExit {
@@ -220,26 +224,12 @@ impl Lower<'_> {
         };
         let yielded = on_both.emit(Operation::Yield(item), span)?;
         let exit_b = exit_loop(branch_a.successor())?;
-        let branch_a_block = Block {
-            instructions: branch_a.instructions,
-            exit: Exit::Branch {
-                condition: has_b,
-                then_: Box::new(on_both.finish(yielded).body),
-                else_: Box::new(exit_b),
-            },
-        };
+        let branch_a_block = branch_a.branch(has_b, on_both.finish(yielded).body, exit_b);
         let exit_a = exit_loop(step.successor())?;
 
-        Ok(Function {
+        Ok(SpannedFunction {
             params: loop_params,
-            body: Block {
-                instructions: step.instructions,
-                exit: Exit::Branch {
-                    condition: has_a,
-                    then_: Box::new(branch_a_block),
-                    else_: Box::new(exit_a),
-                },
-            },
+            body: step.branch(has_a, branch_a_block, exit_a),
         })
     }
 

@@ -8,6 +8,7 @@ use flick_core::ir::{
 };
 use flick_core::opt::perceus;
 use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
+use std::collections::BTreeMap;
 
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }
@@ -94,6 +95,7 @@ fn program(kind: Intrinsic) -> Program {
             .enumerate()
             .map(|(i, f)| (u32::try_from(i).expect("small"), f))
             .collect(),
+        op_spans: BTreeMap::new(),
     }
 }
 

@@ -1,4 +1,4 @@
-//! In-process `flick run --target vm` execution on `flick_vm::tier0`.
+//! In-process `flick run --target vm` execution on `flick_vm::{tier0, tier1}`.
 
 use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
@@ -8,11 +8,12 @@ use std::slice;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::memory::Name as MemoryName;
 use flick_core::project::{self, Compiled, Project};
-use flick_core::source::SourceMap;
+use flick_core::source::{FileId, SourceMap, Span};
 use flick_vm::tier0::{
-    Heap, HostMode, ProgramOutcome, Reason, execute_main_program_outcome_with_host,
-    execute_rooted_main_program_outcome_with_host,
+    ExecutionReport, Heap, HostMode, ProgramOutcome, Reason,
+    execute_main_program_outcome_with_host, execute_rooted_main_program_outcome_with_host,
 };
+use flick_vm::tier1;
 
 use super::{VmTier, lower, resolve_tier, target_override};
 use crate::args::{GlobalArguments, RunArguments};
@@ -207,7 +208,10 @@ pub(super) fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode 
             return ExitCode::from(1);
         }
     };
-    execute_tier0(tier, &lowered, &entry)
+    match tier {
+        VmTier::Tier0 => execute_tier0(&lowered, &entry),
+        VmTier::Tier1 => execute_tier1(&lowered, &entry, &sources, global),
+    }
 }
 
 fn find_entry_module(
@@ -247,8 +251,7 @@ fn find_entry_module(
     }
 }
 
-fn execute_tier0(tier: VmTier, lowered: &lower::LoweredProgram, entry: &MemoryName) -> ExitCode {
-    let VmTier::Tier0 = tier;
+fn execute_tier0(lowered: &lower::LoweredProgram, entry: &MemoryName) -> ExitCode {
     let mut heap = Heap::new();
     let report = match &lowered.root {
         Some(root) => execute_rooted_main_program_outcome_with_host(
@@ -267,6 +270,43 @@ fn execute_tier0(tier: VmTier, lowered: &lower::LoweredProgram, entry: &MemoryNa
             HostMode::LiveOs,
         ),
     };
+    finish_report(&mut heap, report)
+}
+
+fn execute_tier1(
+    lowered: &lower::LoweredProgram,
+    entry: &MemoryName,
+    sources: &SourceMap,
+    global: &GlobalArguments,
+) -> ExitCode {
+    let mut heap = Heap::new();
+    let report = match tier1::execute_main_program_outcome_with_host(
+        &mut heap,
+        &lowered.program,
+        entry,
+        u64::MAX,
+        HostMode::LiveOs,
+    ) {
+        Ok(report) => report,
+        Err(err) => {
+            let diagnostic = match err.span() {
+                Some(mem_span) if (mem_span.file as usize) < sources.files().count() => {
+                    Diagnostic::error(
+                        codes::P012,
+                        err.to_string(),
+                        Span::new(FileId::new(mem_span.file), mem_span.start, mem_span.end),
+                    )
+                }
+                _ => Diagnostic::new(codes::P012, Severity::Error, err.to_string()),
+            };
+            report::render(global, sources, &[diagnostic]);
+            return ExitCode::from(1);
+        }
+    };
+    finish_report(&mut heap, report)
+}
+
+fn finish_report(heap: &mut Heap, report: ExecutionReport) -> ExitCode {
     if !report.stdout.is_empty() {
         let mut stdout = io::stdout().lock();
         let _ = stdout.write_all(report.stdout.as_bytes());

@@ -9,6 +9,7 @@ use flick_core::{
     opt::perceus,
 };
 use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
+use std::collections::BTreeMap;
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }
 }
@@ -87,6 +88,7 @@ fn ordinary_selector() -> Program {
             ),
         ]
         .into(),
+        op_spans: BTreeMap::new(),
     }
 }
 include!("memory_recovery_selector/sealed_results.rs");

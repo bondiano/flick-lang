@@ -6,6 +6,7 @@ use flick_core::ir::{BinOp, Lit, Pat};
 use flick_core::opt::perceus;
 use flick_core::types::{Constructor, Rep};
 use flick_vm::tier0::{Error, Heap, Value, execute_program};
+use std::collections::BTreeMap;
 
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }
@@ -45,6 +46,7 @@ fn program(body: Function) -> Program {
             name: Name::new("Main", "main"),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     }
 }
 fn run(heap: &mut Heap, program: &Program, input: Value, fuel: u64) -> Result<Value, Error> {

@@ -221,7 +221,7 @@ impl Heap {
         Ok(())
     }
 
-    fn admit_reuse_candidate(&self, value: &Value) -> Result<(), Error> {
+    pub(crate) fn admit_reuse_candidate(&self, value: &Value) -> Result<(), Error> {
         if matches!(value, Value::Aggregate { .. }) {
             return Err(Error::AggregateReuseCandidate);
         }
@@ -233,7 +233,7 @@ impl Heap {
         Ok(())
     }
 
-    fn admit_not_reuse_token(&self, value: &Value) -> Result<(), Error> {
+    pub(crate) fn admit_not_reuse_token(&self, value: &Value) -> Result<(), Error> {
         let mut pending = vec![value];
         while let Some(current) = pending.pop() {
             match current {
@@ -262,7 +262,10 @@ impl Heap {
 
     /// Rejects duplicate operand handles unless the counted heap actually
     /// contains at least that many owned references.
-    fn ensure_owned<'a>(&self, values: impl IntoIterator<Item = &'a Value>) -> Result<(), Error> {
+    pub(crate) fn ensure_owned<'a>(
+        &self,
+        values: impl IntoIterator<Item = &'a Value>,
+    ) -> Result<(), Error> {
         let mut required = BTreeMap::new();
         let mut pending: Vec<&'a Value> = values.into_iter().collect();
         while let Some(value) = pending.pop() {
