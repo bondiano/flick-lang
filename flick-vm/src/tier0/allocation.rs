@@ -8,6 +8,10 @@ impl Heap {
             objects: Vec::new(),
             free_list: Vec::new(),
             stats: Stats::default(),
+            live_bytes: 0,
+            peak_live_bytes: 0,
+            byte_limit: None,
+            byte_limit_exceeded: false,
             reuse_enabled: true,
             service_tags: BTreeMap::new(),
             dropped_continuations: Vec::new(),
@@ -252,7 +256,7 @@ impl Heap {
             let value = Value::Object(ObjectToken { id });
             return self.dup(&value);
         }
-        let value = self.allocate(Data::ServiceTag { key: key.into() });
+        let value = self.try_allocate(Data::ServiceTag { key: key.into() })?;
         self.service_tags
             .insert(key.into(), value.object_id().expect("allocated tag"));
         Ok(value)
@@ -302,8 +306,8 @@ impl Heap {
             Lit::UInt64(value) => Value::UInt64(*value),
             Lit::Float(value) => Value::Float(*value),
             Lit::Float32(value) => Value::Float32(*value),
-            Lit::String(value) => self.allocate(Data::String(value.clone())),
-            Lit::BigInt(value) => self.allocate(Data::BigInt(value.clone())),
+            Lit::String(value) => self.try_allocate(Data::String(value.clone()))?,
+            Lit::BigInt(value) => self.try_allocate(Data::BigInt(value.clone()))?,
         })
     }
 
@@ -500,7 +504,7 @@ impl Heap {
             self.drop_values(fields.into_iter().map(|(_, value)| value).collect())?;
             return Err(error);
         }
-        Ok(self.allocate(Data::Record(fields)))
+        self.try_allocate(Data::Record(fields))
     }
 
     /// Borrows an actual record field. Constructor metadata is materialized

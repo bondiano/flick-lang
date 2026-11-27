@@ -1,5 +1,6 @@
 //! Phrase, declaration, `:handle`, and `:provide` evaluation on [`VmSession`].
 
+use std::slice;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
@@ -7,12 +8,33 @@ use flick_core::ir::memory::{Name, Program};
 
 use super::format::{describe_cause, extract_unhandled_effect, is_interrupt_cause, render_value};
 use super::{EvalOutcome, HandlerKind, InstalledHandler, InstalledLayer, VmSession};
+use crate::sandbox::{SandboxError, check_program_capabilities};
 use crate::tier0::{
     Error, ExecutionReport, ProgramOutcome, SessionHandlerKind, SessionRunSpec, Value,
     build_session_layer_value, execute_session_step,
 };
 
 impl VmSession {
+    fn check_link_capabilities(&self, incoming: &Program, roots: &[Name]) -> Option<EvalOutcome> {
+        match check_program_capabilities(incoming, Some(roots), self.sandbox.capabilities) {
+            Ok(()) => None,
+            Err(SandboxError::CapabilityDenied {
+                capability,
+                binding,
+                span,
+            }) => Some(EvalOutcome::CapabilityDenied {
+                capability,
+                binding,
+                span,
+                stdout: String::new(),
+            }),
+            Err(other) => Some(EvalOutcome::Fault {
+                message: other.to_string(),
+                stdout: String::new(),
+            }),
+        }
+    }
+
     /// Evaluates a phrase expression (`Repl.P<n>.it`), optionally auto-awaiting tasks
     /// under `Host.live`, installed `:provide` layers, and installed `:handle` handlers.
     pub fn eval_phrase(
@@ -23,6 +45,9 @@ impl VmSession {
         await_task: bool,
         interrupt: Option<Arc<AtomicBool>>,
     ) -> EvalOutcome {
+        if let Some(denied) = self.check_link_capabilities(incoming, slice::from_ref(entry)) {
+            return denied;
+        }
         self.program.load(incoming);
         if let Some(err_outcome) = self.ensure_root_layer(root, interrupt.clone()) {
             self.rollback_module(&entry.module);
@@ -35,6 +60,8 @@ impl VmSession {
             EvalOutcome::TypedError { .. }
                 | EvalOutcome::UnhandledEffect { .. }
                 | EvalOutcome::Interrupted { .. }
+                | EvalOutcome::CapabilityDenied { .. }
+                | EvalOutcome::LimitExceeded { .. }
                 | EvalOutcome::Fault { .. }
         ) {
             self.rollback_module(&entry.module);
@@ -51,6 +78,19 @@ impl VmSession {
         root: Option<&Name>,
         interrupt: Option<&Arc<AtomicBool>>,
     ) -> EvalOutcome {
+        let roots: Vec<Name> = if entries.is_empty() {
+            incoming
+                .globals
+                .iter()
+                .filter(|g| g.name.module == module)
+                .map(|g| g.name.clone())
+                .collect()
+        } else {
+            entries.to_vec()
+        };
+        if let Some(denied) = self.check_link_capabilities(incoming, &roots) {
+            return denied;
+        }
         self.program.load(incoming);
         if let Some(err_outcome) = self.ensure_root_layer(root, interrupt.cloned()) {
             self.rollback_module(module);
@@ -99,6 +139,9 @@ impl VmSession {
         handled_effects: Vec<String>,
         interrupt: Option<Arc<AtomicBool>>,
     ) -> EvalOutcome {
+        if let Some(denied) = self.check_link_capabilities(incoming, slice::from_ref(entry)) {
+            return denied;
+        }
         self.program.load(incoming);
         if let Some(err_outcome) = self.ensure_root_layer(root, interrupt.clone()) {
             self.rollback_module(&entry.module);
@@ -132,6 +175,9 @@ impl VmSession {
         provided_services: Vec<String>,
         interrupt: Option<Arc<AtomicBool>>,
     ) -> EvalOutcome {
+        if let Some(denied) = self.check_link_capabilities(incoming, slice::from_ref(entry)) {
+            return denied;
+        }
         self.program.load(incoming);
         if let Some(err_outcome) = self.ensure_root_layer(root, interrupt.clone()) {
             self.rollback_module(&entry.module);
@@ -152,6 +198,7 @@ impl VmSession {
             host_mode: self.host_mode,
             external_interrupt: interrupt,
             synthetic_codes: super::program::SessionProgram::synthetic_codes(),
+            sandbox: &self.sandbox,
         };
         let report = build_session_layer_value(
             &mut self.heap,
@@ -205,6 +252,7 @@ impl VmSession {
             host_mode: self.host_mode,
             external_interrupt: interrupt,
             synthetic_codes: super::program::SessionProgram::synthetic_codes(),
+            sandbox: &self.sandbox,
         };
         let report = execute_session_step(
             &mut self.heap,
@@ -249,6 +297,7 @@ impl VmSession {
             host_mode: self.host_mode,
             external_interrupt: interrupt,
             synthetic_codes: super::program::SessionProgram::synthetic_codes(),
+            sandbox: &self.sandbox,
         };
         let prev_mod = self.heap.set_allocation_module(Some(&entry.module));
         let report = execute_session_step(
@@ -312,6 +361,20 @@ impl VmSession {
             ProgramOutcome::Fault(Error::MissingHandler { effect, op }) => {
                 EvalOutcome::UnhandledEffect { effect, op, stdout }
             }
+            ProgramOutcome::Fault(Error::CapabilityDenied {
+                capability,
+                binding,
+            }) => EvalOutcome::CapabilityDenied {
+                capability,
+                binding,
+                span: None,
+                stdout,
+            },
+            ProgramOutcome::Fault(Error::LimitExceeded(kind)) => EvalOutcome::LimitExceeded {
+                kind,
+                message: format!("sandbox {kind}"),
+                stdout,
+            },
             ProgramOutcome::Fault(err) => EvalOutcome::Fault {
                 message: err.to_string(),
                 stdout,

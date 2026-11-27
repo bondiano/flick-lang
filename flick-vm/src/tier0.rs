@@ -19,6 +19,7 @@ use regex_automata::meta::Regex;
 pub(crate) mod causes;
 pub use causes::{CauseToken, DefectClass, DefectCode, DefectSpec, LanguageExit, Reason};
 
+pub use crate::sandbox::{Capability, LimitKind};
 pub use crate::stdlib::{DRAW, HostBridge, HostMode, HostServices, MILLIS, MONOTONIC_NANOS, NANOS};
 use crate::stdlib::{Unmetered, eval_binary, eval_neg, eval_not};
 
@@ -32,6 +33,7 @@ pub use program::{
     execute_main_with_bridge_and_inits, execute_program, execute_program_outcome,
     execute_rooted_main_program_outcome, execute_rooted_main_program_outcome_with_args,
     execute_rooted_main_program_outcome_with_bridge, execute_rooted_main_program_outcome_with_host,
+    execute_sandboxed_main_program_outcome, execute_sandboxed_program_outcome,
     execute_tests_program, execute_tests_program_with_bridge, execute_tests_program_with_host,
 };
 pub(crate) use program::{
@@ -284,6 +286,7 @@ pub struct Stats {
 
 include!("tier0/errors.rs");
 include!("tier0/representation.rs");
+include!("tier0/heap_limits.rs");
 include!("tier0/allocation.rs");
 include!("tier0/aggregates.rs");
 include!("tier0/ownership.rs");

@@ -1,3 +1,9 @@
+enum RunPoll {
+    Exit(LanguageExit),
+    Continue,
+    Step,
+}
+
 impl Machine<'_, '_> {
     fn finish(&mut self, result: Result<LanguageExit, Error>) -> ProgramOutcome {
         let outcome = match result.and_then(|exit| self.report_exit(exit)) {
@@ -6,8 +12,10 @@ impl Machine<'_, '_> {
         };
         if let Err(error) = self.cleanup() {
             let _ = outcome.release(self.heap);
+            self.restore_heap_limit();
             return ProgramOutcome::Fault(error);
         }
+        self.restore_heap_limit();
         outcome
     }
 
@@ -57,23 +65,7 @@ impl Machine<'_, '_> {
 
     fn run(&mut self) -> Result<LanguageExit, Error> {
         loop {
-            if let Some(owner) = self.pending_resume_close.take() {
-                self.resume_owner_close(owner)?;
-                continue;
-            }
-            if let Some(res) = self.pending_provide_result.take() {
-                match res {
-                    PendingProvideResult::Ready(pid, ctx) => {
-                        self.complete_dynamic_provide_ok(pid, ctx)?;
-                    }
-                    PendingProvideResult::Failed(pid, cause) => {
-                        self.complete_dynamic_provide_err(pid, cause)?;
-                    }
-                }
-                continue;
-            }
-            if let Some((layer, memo_id, sub_owner)) = self.pending_layer_build.take() {
-                self.begin_build_layer(layer, memo_id, sub_owner, false, LayerBuildTarget::Top)?;
+            if self.drain_pending_transitions()? {
                 continue;
             }
             self.poll_external_interrupt()?;
@@ -81,55 +73,22 @@ impl Machine<'_, '_> {
                 self.prepare_failure()?;
             }
             self.drain_dropped_continuations();
-            if self.discard.is_none()
-                && self.ready.is_none()
-                && self.failure.is_some()
-                && self.frames.is_empty()
-            {
-                let cause = self.failure.take().expect("failure root");
-                if self.active_fiber != 1 {
-                    self.complete_child_fiber(FiberOutcome::Failure(cause))?;
-                    continue;
-                }
-                let final_cause = self
-                    .combine_root_defects(Some(cause))?
-                    .expect("root failure");
-                return Ok(LanguageExit::Failure(final_cause));
+            match self.check_run_completion()? {
+                RunPoll::Exit(exit) => return Ok(exit),
+                RunPoll::Continue => continue,
+                RunPoll::Step => {}
             }
-            if self.discard.is_none()
-                && self.ready.is_none()
-                && self.frames.is_empty()
-                && self.arguments.is_empty()
-                && self.top.is_some()
-            {
-                if self.active_fiber != 1 {
-                    let val = self.top.take().expect("child fiber return");
-                    self.complete_child_fiber(FiberOutcome::Success(val))?;
-                    continue;
-                }
-                if self.main_stage != MainStage::Done {
-                    self.advance_main()?;
-                    continue;
-                }
-                let val = self.top.take().expect("completed top outcome");
-                if !self.root_defects.is_empty() {
-                    self.heap.drop_value(val)?;
-                    let cause = self.combine_root_defects(None)?.expect("root defects");
-                    return Ok(LanguageExit::Failure(cause));
-                }
-                return Ok(LanguageExit::Success(val));
-            }
-            if self.discard.is_none()
-                && self.ready.is_none()
-                && self.failure.is_none()
-                && self.frames.is_empty()
-                && self.top.is_none()
-            {
-                return Err(Error::UnsupportedOperation(
-                    "deadlock: no runnable fibers remain",
-                ));
+            if self.check_sandbox_pre_step()? {
+                continue;
             }
             if self.fuel == 0 {
+                if let Some(abort) = self.sandbox.abort.take() {
+                    return Err(abort.into_error());
+                }
+                if self.sandbox.fuel_limited {
+                    self.begin_sandbox_unwind(SandboxAbort::Limit(LimitKind::Fuel))?;
+                    continue;
+                }
                 return Err(Error::OutOfFuel);
             }
             self.fuel -= 1;
@@ -137,26 +96,113 @@ impl Machine<'_, '_> {
             if self.pending_resume_close.is_some() || self.pending_provide_result.is_some() {
                 continue;
             }
-            if self.discard.is_some() {
-                self.discard_step()?;
-            } else if let Some(id) = self.ready.take() {
-                self.invoke_step(id)?;
-            } else if self.failure.is_some() {
-                self.unwind()?;
-            } else if let Some(value) = self.top.take() {
-                self.scratch.push(value);
-                self.scratch.push(
-                    self.arguments
-                        .pop_front()
-                        .expect("top application has an argument"),
-                );
-                self.apply(Destination::Top)?;
-            } else if !self.frames.is_empty() {
-                self.step()?;
-            } else {
-                // Current fiber parked inside quantum preempt or has no frame; loop to re-check.
-            }
+            self.dispatch_run_step()?;
         }
+    }
+
+    fn drain_pending_transitions(&mut self) -> Result<bool, Error> {
+        if let Some(owner) = self.pending_resume_close.take() {
+            self.resume_owner_close(owner)?;
+            return Ok(true);
+        }
+        if let Some(res) = self.pending_provide_result.take() {
+            match res {
+                PendingProvideResult::Ready(pid, ctx) => {
+                    self.complete_dynamic_provide_ok(pid, ctx)?;
+                }
+                PendingProvideResult::Failed(pid, cause) => {
+                    self.complete_dynamic_provide_err(pid, cause)?;
+                }
+            }
+            return Ok(true);
+        }
+        if let Some((layer, memo_id, sub_owner)) = self.pending_layer_build.take() {
+            self.begin_build_layer(layer, memo_id, sub_owner, false, LayerBuildTarget::Top)?;
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    fn check_run_completion(&mut self) -> Result<RunPoll, Error> {
+        if self.discard.is_none()
+            && self.ready.is_none()
+            && self.failure.is_some()
+            && self.frames.is_empty()
+        {
+            let cause = self.failure.take().expect("failure root");
+            if self.active_fiber != 1 {
+                self.complete_child_fiber(FiberOutcome::Failure(cause))?;
+                return Ok(RunPoll::Continue);
+            }
+            if let Some(abort) = self.sandbox.abort.take() {
+                self.heap.drop_cause(cause)?;
+                return Err(abort.into_error());
+            }
+            let final_cause = self
+                .combine_root_defects(Some(cause))?
+                .expect("root failure");
+            return Ok(RunPoll::Exit(LanguageExit::Failure(final_cause)));
+        }
+        if self.discard.is_none()
+            && self.ready.is_none()
+            && self.frames.is_empty()
+            && self.arguments.is_empty()
+            && self.top.is_some()
+        {
+            if self.active_fiber != 1 {
+                let val = self.top.take().expect("child fiber return");
+                self.complete_child_fiber(FiberOutcome::Success(val))?;
+                return Ok(RunPoll::Continue);
+            }
+            if self.main_stage != MainStage::Done {
+                let res = self.advance_main();
+                self.handle_sandbox_step_result(res)?;
+                return Ok(RunPoll::Continue);
+            }
+            let val = self.top.take().expect("completed top outcome");
+            if !self.root_defects.is_empty() {
+                self.heap.drop_value(val)?;
+                let cause = self.combine_root_defects(None)?.expect("root defects");
+                return Ok(RunPoll::Exit(LanguageExit::Failure(cause)));
+            }
+            return Ok(RunPoll::Exit(LanguageExit::Success(val)));
+        }
+        if self.discard.is_none()
+            && self.ready.is_none()
+            && self.failure.is_none()
+            && self.frames.is_empty()
+            && self.top.is_none()
+        {
+            return Err(Error::UnsupportedOperation(
+                "deadlock: no runnable fibers remain",
+            ));
+        }
+        Ok(RunPoll::Step)
+    }
+
+    fn dispatch_run_step(&mut self) -> Result<(), Error> {
+        if self.discard.is_some() {
+            let res = self.discard_step();
+            self.handle_sandbox_step_result(res)?;
+        } else if let Some(id) = self.ready.take() {
+            let res = self.invoke_step(id);
+            self.handle_sandbox_step_result(res)?;
+        } else if self.failure.is_some() {
+            self.unwind()?;
+        } else if let Some(value) = self.top.take() {
+            self.scratch.push(value);
+            self.scratch.push(
+                self.arguments
+                    .pop_front()
+                    .expect("top application has an argument"),
+            );
+            let res = self.apply(Destination::Top);
+            self.handle_sandbox_step_result(res)?;
+        } else if !self.frames.is_empty() {
+            let res = self.step();
+            self.handle_sandbox_step_result(res)?;
+        }
+        Ok(())
     }
 
     fn poll_external_interrupt(&mut self) -> Result<(), Error> {

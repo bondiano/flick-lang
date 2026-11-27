@@ -34,6 +34,7 @@ pub(crate) struct SessionRunSpec<'a> {
     pub(crate) host_mode: HostMode,
     pub(crate) external_interrupt: Option<Arc<AtomicBool>>,
     pub(crate) synthetic_codes: SessionSyntheticCodes,
+    pub(crate) sandbox: &'a SandboxConfig,
 }
 
 /// Allocates a unique execution id shared by all phrases in one live session.
@@ -62,6 +63,7 @@ pub(crate) fn execute_session_step(
     let mut machine = Machine::new(heap, program, execution, vec![], spec.fuel, MainStage::Done);
     machine.host_mode = spec.host_mode;
     machine.external_interrupt.clone_from(&spec.external_interrupt);
+    machine.configure_sandbox(spec.sandbox);
     machine.load_persistent(persistent);
     let setup_res = machine.install_session_context(spec.root_layer, spec.provided_layers);
     let result = setup_res.and_then(|()| {
@@ -112,6 +114,7 @@ pub(crate) fn build_session_layer_value(
     let mut machine = Machine::new(heap, program, execution, vec![], spec.fuel, MainStage::Done);
     machine.host_mode = spec.host_mode;
     machine.external_interrupt.clone_from(&spec.external_interrupt);
+    machine.configure_sandbox(spec.sandbox);
     machine.load_persistent(persistent);
     let setup_res = machine.install_session_context(spec.root_layer, spec.provided_layers);
     let result = setup_res.and_then(|()| {
@@ -331,8 +334,10 @@ impl Machine<'_, '_> {
         self.save_persistent(persistent);
         if let Err(error) = self.cleanup() {
             let _ = outcome.release(self.heap);
+            self.restore_heap_limit();
             return ProgramOutcome::Fault(error);
         }
+        self.restore_heap_limit();
         outcome
     }
 }

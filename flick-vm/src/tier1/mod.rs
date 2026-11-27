@@ -22,7 +22,7 @@ mod machine_resources;
 mod machine_scopes;
 mod machine_state;
 mod machine_unwind;
-mod opcode;
+pub(crate) mod opcode;
 mod prepare;
 mod prepare_fuse;
 mod prepare_ops;
@@ -34,6 +34,7 @@ use flick_core::ir::memory::{Name, Program};
 pub use opcode::{PrepareError, Prepared, PreparedStats};
 pub use prepare::prepare;
 
+use crate::sandbox::verify_bytecode;
 use crate::tier0::{Error, Executed, ExecutionReport, Heap, HostMode, ProgramOutcome, Value};
 
 /// Prepares `program` for `entry` and executes it with caller-supplied
@@ -153,6 +154,14 @@ pub fn execute_prepared_outcome(
     fuel: u64,
     host_mode: HostMode,
 ) -> ExecutionReport {
+    if let Err(err) = verify_bytecode(image) {
+        let _ = heap.drop_values(arguments);
+        return ExecutionReport {
+            outcome: ProgramOutcome::Fault(Error::VerificationFailed(err.to_string())),
+            stdout: String::new(),
+            stderr: String::new(),
+        };
+    }
     machine::execute_prepared(heap, image, arguments, fuel, host_mode, Vec::new(), false)
 }
 
@@ -164,6 +173,13 @@ pub fn execute_prepared_main_outcome_with_host(
     fuel: u64,
     host_mode: HostMode,
 ) -> ExecutionReport {
+    if let Err(err) = verify_bytecode(image) {
+        return ExecutionReport {
+            outcome: ProgramOutcome::Fault(Error::VerificationFailed(err.to_string())),
+            stdout: String::new(),
+            stderr: String::new(),
+        };
+    }
     machine::execute_prepared(heap, image, Vec::new(), fuel, host_mode, Vec::new(), true)
 }
 

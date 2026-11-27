@@ -108,6 +108,7 @@ impl<'p> Machine<'p, '_> {
             top.evidence = self.current_evidence;
             return Ok(());
         }
+        self.check_stack_depth(1)?;
         let mut locals = Locals::new();
         for (&param, value) in function.params.iter().zip(self.scratch.drain(..)) {
             locals.insert_one(param, value);
@@ -187,7 +188,10 @@ impl<'p> Machine<'p, '_> {
                     }
                     return Err(Error::ResumeTwice);
                 };
-                if let Err(err) = self.transfer_fuel(captured.frames.len()) {
+                if let Err(err) = self
+                    .check_stack_depth(captured.frames.len())
+                    .and_then(|()| self.transfer_fuel(captured.frames.len()))
+                {
                     self.continuations.insert(id, Some(captured));
                     return Err(err);
                 }
