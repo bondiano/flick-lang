@@ -252,6 +252,7 @@ stdlib/effect/password
 stdlib/effect/platform
 stdlib/effect/pubsub
 stdlib/effect/queue
+stdlib/effect/queue_handoff
 stdlib/effect/record
 stdlib/effect/ref
 stdlib/effect/request

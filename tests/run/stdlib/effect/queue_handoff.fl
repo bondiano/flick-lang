@@ -1,0 +1,53 @@
+// `Queue`: a producer fiber hands 5000 items to the main fiber through a
+// bounded queue that is full almost all the time, with `offer` and with
+// `offer_all` of small batches. No offer may lose its wake-up.
+module App.Main exposing (main)
+
+type error Broken = Broken String
+
+unexpected : Failure e ->{Host.Console} Unit
+let unexpected failure =
+  Platform.stdout_line ("unexpected failure: " ++ RawCause.describe (Failure.inspect failure))
+
+produce : Bool -> Int -> Int -> Queue.Queue {Broken} Int ->{Async} Unit
+let rec produce batched i n q =
+  if i > n then
+    ()
+  else if batched then
+    let _ = Queue.offer_all (List.filter (fun k -> k <= n) [i, i + 1, i + 2]) q
+    produce batched (i + 3) n q
+  else
+    let _ = Queue.offer i q
+    produce batched (i + 1) n q
+
+consume : Int -> Int -> Queue.Queue {Broken} Int ->{Async; Broken} Int
+let rec consume left acc q =
+  if left == 0 then
+    acc
+  else
+    match Queue.take q with
+    | Some v -> consume (left - 1) (acc + v) q
+    | None -> acc
+
+handoff : Int -> Bool ->{Host.Console, Async; Broken} Unit
+let handoff capacity batched =
+  let n = 5000
+  let q : Queue.Queue {Broken} Int = Queue.bounded capacity
+  let total = scope s {
+    let producer = Fiber.spawn s unexpected (task { produce batched 1 n q })
+    let sum = consume n 0 q
+    Fiber.join producer
+    sum
+  }
+  let how = if batched then "offer_all" else "offer"
+  Platform.stdout_line ("bounded " ++ show capacity ++ ", " ++ how ++ ": sum " ++ show total)
+
+main : Unit ->{Host.Console, Async} Unit
+let main () =
+  try
+    handoff 1 false
+    handoff 1 true
+    handoff 2 false
+    handoff 2 true
+  with
+  | Broken why -> Platform.stdout_line ("broken " ++ why)
