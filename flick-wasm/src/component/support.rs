@@ -166,6 +166,8 @@ pub(super) fn build_shared_dts(
         foreign: &foreign,
         path: &module_path,
         rt: true,
+        // the playground selects every `@native` clause the JS backend has
+        natives: None,
     };
     let own = compilation.modules.iter().map(|m| &*m.ir);
     for module in own.chain(build::builtin_modules_of(true)) {

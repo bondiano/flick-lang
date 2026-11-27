@@ -12,7 +12,9 @@ use super::names;
 use crate::iface::{Interface, Namespace};
 use crate::syntax::ts_mark::{Form as TsForm, Import, Origin, Piece};
 use crate::types::lang::{self, Lang};
-use crate::types::{Elem, Form, Kind, ModuleRequirement, Type, TypeDef, passes_dictionary};
+use crate::types::{
+    Elem, Form, Kind, ModuleRequirement, NativeOverrideEnv, Type, TypeDef, passes_dictionary,
+};
 use projections::Forms;
 
 /// The runtime package generated code imports.
@@ -51,9 +53,19 @@ pub struct Projection<'a> {
     foreign: &'a dyn Fn(&str, &str) -> String,
     /// The projection of values compiled for Flick's own runtime.
     rt: bool,
+    /// The environment the build selected `@native` clauses in; without one,
+    /// the JS backend's default.
+    natives: Option<&'a NativeOverrideEnv>,
 }
 
 impl<'a> Projection<'a> {
+    /// With `natives` the environment the build selected `@native` clauses
+    /// in, which says which types are the backend's own.
+    #[must_use]
+    pub fn selecting(self, natives: Option<&'a NativeOverrideEnv>) -> Self {
+        Projection { natives, ..self }
+    }
+
     /// With `foreign(module, spec)` the specifier `module` writes for a
     /// file its source names beside it.
     #[must_use]
@@ -90,6 +102,7 @@ impl Projection<'_> {
             forms: RefCell::new(Vec::new()),
             foreign: &as_written,
             rt,
+            natives: None,
         }
     }
 
@@ -458,22 +471,30 @@ mod projections;
 mod typed;
 pub use typed::{Typed, Typing};
 #[cfg(all(test, feature = "native-js"))]
+mod native_tests;
+#[cfg(all(test, feature = "native-js"))]
 mod tests;
 
-/// Whether the JS backend has its own type for `def`: its `@native when …`
-/// holds for JS, so its values are the backend's, not its constructors.
-fn native_on_js(def: &TypeDef) -> bool {
-    use std::slice;
+impl Projection<'_> {
+    /// Whether the JS backend has its own type for `def`: its `@native when …`
+    /// holds where the build selected clauses, so its values are the
+    /// backend's, not its constructors. With `--no-native-overrides` none is.
+    fn native_on_js(&self, def: &TypeDef) -> bool {
+        use std::slice;
 
-    use crate::syntax::when;
-    use crate::types::{NativeOverrideEnv, OverrideSelection};
-    def.native
-        .as_deref()
-        .and_then(|c| when::parse(c).ok())
-        .is_some_and(|expr| {
-            matches!(
-                NativeOverrideEnv::default_js().select(slice::from_ref(&expr)),
-                OverrideSelection::Selected(0)
-            )
-        })
+        use crate::syntax::when;
+        use crate::types::OverrideSelection;
+        let env = self
+            .natives
+            .unwrap_or_else(|| NativeOverrideEnv::default_js());
+        !env.disable_native_overrides
+            && (def.native.as_deref())
+                .and_then(|c| when::parse(c).ok())
+                .is_some_and(|expr| {
+                    matches!(
+                        env.select(slice::from_ref(&expr)),
+                        OverrideSelection::Selected(0)
+                    )
+                })
+    }
 }

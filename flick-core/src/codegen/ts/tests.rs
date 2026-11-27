@@ -15,7 +15,7 @@ use crate::types;
 use crate::types::lang::Lang;
 
 /// The interface of `text`, and a lookup of it beside the built-in modules.
-fn checked(text: &str) -> (Interface, impl Fn(&str) -> Option<Interface>) {
+pub(super) fn checked(text: &str) -> (Interface, impl Fn(&str) -> Option<Interface>) {
     let (_, interface) = check_text("App.Shapes", text).expect("checks");
     let own = interface.clone();
     let lookup = move |m: &str| -> Option<Interface> {
@@ -404,6 +404,7 @@ fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_do
         foreign: &foreign,
         path: &path,
         rt: false,
+        natives: None,
     };
     let prepared = BTreeMap::from([("App".to_owned(), typing.typed("App", "App"))]);
     let emit = |typescript: bool| {

@@ -28,6 +28,8 @@ use crate::project::Compiled;
 use crate::project::target_preflight::prune_compilation_for_env;
 use crate::project::{Compilation, normalize};
 use crate::source::SourceMap;
+#[cfg(feature = "native-js")]
+use crate::types::NativeOverrideEnv;
 use crate::{ir, types};
 #[cfg(feature = "native-js")]
 use flick_backend_support::opt::eval::ReviewedPrimitives;
@@ -72,14 +74,8 @@ pub fn emit(
             Err(error) => return interface_failure(diagnostics, error),
         };
     let interface_of = |m: &str| published_interfaces.get(m).cloned();
-    let foreign = |module: &str, spec: &str| {
-        // a library's own file ships beside its module, so its spelling holds
-        if compilation.shipped_foreign(module, spec).is_some() {
-            spec.to_owned()
-        } else {
-            foreign_specifier(settings, &path, module, spec)
-        }
-    };
+    let foreign =
+        |module: &str, spec: &str| shipped_specifier(compilation, settings, &path, module, spec);
     let by_class = settings.backend == Backend::Rt;
     let any_interface = |m: &str| {
         interface_of(m).or_else(|| {
@@ -100,6 +96,7 @@ pub fn emit(
         foreign: &foreign,
         path: &path,
         rt: by_class,
+        natives: compilation.native_overrides.as_ref(),
     };
     // each module gets its own as the build writes it (see `typed_options`)
     #[cfg(not(target_arch = "wasm32"))]
@@ -143,6 +140,7 @@ pub fn emit(
         foreign: &foreign,
         published_interfaces: &published_interfaces,
         any_interface: &any_interface,
+        natives: compilation.native_overrides.as_ref(),
     };
     // a built-in runner is written like any module the program imports
     let mut imports: Vec<String> = settings.runners.iter().map(|(_, r)| r.clone()).collect();
@@ -294,6 +292,23 @@ pub fn foreign_inputs(compilation: &Compilation, settings: &Settings) -> Vec<Res
         }
     }
     out
+}
+
+/// The specifier `module` writes for its foreign file `spec`: a library's
+/// own file ships beside its module, so its spelling holds.
+#[cfg(feature = "native-js")]
+fn shipped_specifier(
+    compilation: &Compilation,
+    settings: &Settings,
+    path: &dyn Fn(&str) -> String,
+    module: &str,
+    spec: &str,
+) -> String {
+    if compilation.shipped_foreign(module, spec).is_some() {
+        spec.to_owned()
+    } else {
+        foreign_specifier(settings, path, module, spec)
+    }
 }
 
 pub fn foreign_specifier(
@@ -470,6 +485,8 @@ struct Context<'a> {
     foreign: &'a dyn Fn(&str, &str) -> String,
     published_interfaces: &'a BTreeMap<&'a str, Interface>,
     any_interface: &'a dyn Fn(&str) -> Option<Interface>,
+    /// The environment the build selected `@native` clauses in.
+    natives: Option<&'a NativeOverrideEnv>,
 }
 
 /// `js` with the options of `module`'s code: in TypeScript they hold the

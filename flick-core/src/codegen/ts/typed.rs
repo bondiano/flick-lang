@@ -9,6 +9,7 @@ use super::Projection;
 use crate::codegen::{names, prefix_key, relative};
 use crate::iface::{Interface, Namespace};
 use crate::ir::Module;
+use crate::types::NativeOverrideEnv;
 
 #[cfg(feature = "native-js")]
 pub use flick_backend_js::codegen::ts::Typed;
@@ -34,6 +35,8 @@ pub struct Typing<'a> {
     pub path: &'a dyn Fn(&str) -> String,
     /// The projection of values compiled for Flick's own runtime.
     pub rt: bool,
+    /// The environment the build selected `@native` clauses in.
+    pub natives: Option<&'a NativeOverrideEnv>,
 }
 
 impl Typing<'_> {
@@ -53,7 +56,8 @@ impl Typing<'_> {
     /// module itself or a part of it of its own.
     pub fn typed(&self, module: &str, physical: &str) -> Typed {
         let projection = Projection::for_runtime(physical, self.interface, self.package, self.rt)
-            .shipping(self.foreign);
+            .shipping(self.foreign)
+            .selecting(self.natives);
         let (mut declarations, mut annotations) = (Vec::new(), HashMap::new());
         if let Some(mut interface) = (self.interface)(module) {
             if physical != module {
