@@ -7,12 +7,12 @@
 //! sharing- and cycle-preserving snapshot of heap values reachable from those
 //! globals.
 
-mod format;
+pub(crate) mod format;
 mod heap_restore;
 mod heap_restore_extra;
 mod heap_snap;
 mod heap_snap_extra;
-mod heap_types;
+pub(crate) mod heap_types;
 mod heap_validate;
 mod load;
 mod save;
@@ -41,6 +41,8 @@ pub use unload::{
 
 use heap_types::HeapSnapshot;
 
+use crate::sandbox::SandboxError;
+
 /// Exact 32-byte SHA-256 digest used for compiler and memory-IR compatibility checks.
 pub type ImageHash = [u8; 32];
 
@@ -48,6 +50,10 @@ pub type ImageHash = [u8; 32];
 ///
 /// Images built by a different compiler version, interface schema, or image
 /// format version fail to load without attempting migration.
+///
+/// **Note**: This hash check is a *compatibility* check only, NOT a security
+/// boundary. Untrusted images are validated by [`crate::sandbox::verify_image`]
+/// and [`crate::sandbox::verify_bytecode`] before loading or execution.
 #[must_use]
 pub fn compiler_hash() -> ImageHash {
     let mut hasher = Sha256::new();
@@ -256,6 +262,8 @@ pub enum ImageError {
     },
     /// A module in the image is already loaded in the target VM.
     ModuleAlreadyLoaded(String),
+    /// A sandbox policy check (such as capability denial) rejected the image.
+    Sandbox(SandboxError),
     /// Underlying memory-IR validation or counted-heap error.
     Vm(String),
 }
@@ -304,8 +312,15 @@ impl fmt::Display for ImageError {
             Self::ModuleAlreadyLoaded(module) => {
                 write!(f, "module `{module}` is already loaded in the VM")
             }
+            Self::Sandbox(err) => write!(f, "VM image sandbox error: {err}"),
             Self::Vm(detail) => write!(f, "VM image error: {detail}"),
         }
+    }
+}
+
+impl From<SandboxError> for ImageError {
+    fn from(err: SandboxError) -> Self {
+        Self::Sandbox(err)
     }
 }
 

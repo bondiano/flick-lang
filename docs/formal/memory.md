@@ -317,6 +317,53 @@ entries, and a sharing- and cycle-preserving heap snapshot (`HeapSnapshot`).
   regions, or ownership-IR semantics; all Lean proofs in `formal/` remain
   unaffected.
 
+### VM sandbox, resource limits, and verifier (`flick-vm/src/sandbox/`)
+
+`flick_vm::sandbox` enforces host-controlled capabilities, execution resource
+budgets, and pre-execution structural verification across VM sessions, `.fvm`
+images, and tier-1 register bytecode (`#992`):
+
+- **Capabilities (`Capability`, `CapabilitySet`)**: covers `fs`, `net`,
+  `process`, `env`, `clock`, `random`, `ffi`, and `plugins`. Pure computation
+  and console output (`Host.Console`, `PrintLine`, `StdoutWrite`, `StderrLine`)
+  are always allowed; `CapabilitySet::default_untrusted()` / `pure()` denies
+  all eight host capabilities. Linking a `.fvm` image or `VmSession` phrase
+  that reaches a denied capability fails before execution with
+  `SandboxError::CapabilityDenied { capability, binding, span }` carrying the
+  preserved `Program::op_spans` span. Denied operations reached dynamically
+  through `HostContext`/`VmHooks` or the host bridge unwind cleanly (running
+  LIFO scope finalizers with zero leaks) and surface as typed capability
+  denials without corrupting the session.
+- **Resource limits (`ResourceLimits`)**: host-owned `fuel`, `heap_bytes`,
+  `wall_time_ms` (via a pluggable `WallClock` trait defaulting to
+  `std::time::Instant` on native targets and an embedder clock on `wasm32`),
+  and `max_stack_depth`. Exceeding any limit triggers an uncatchable unwind
+  that runs registered scope finalizers in LIFO order under a bounded cleanup
+  grace budget, releases all frame roots with zero leaks, restores the session
+  heap baseline, and reports `Error::LimitExceeded(LimitKind)` /
+  `EvalOutcome::LimitExceeded` while leaving the `VmSession` intact for
+  subsequent evaluations.
+- **Verifier security boundary (`verify_bytecode`, `verify_image`)**: `#988`'s
+  `compiler_hash` and `memory_ir_hash` header digests are *compatibility*
+  checks only, **not** a security boundary. `verify_image` /
+  `verify_image_bytes` (with iterative CBOR depth/item budgeting before
+  deserialization) and `verify_bytecode` (checking function/code/global/tag/
+  dictionary-field/loop/operation indices, register and var slot bounds,
+  branch targets, terminators, call/closure/host-service arities, and handler
+  frame invariants) form the security boundary. Any future native/JIT region
+  compiles exclusively from `verify_bytecode`-verified bytecode under the
+  64 MiB `NATIVE_REGION_ARENA_LIMIT` arena cap.
+- **Fuzzing & native/wasm32 parity**: `flick-vm/tests/fuzz_vm.rs` (wired into
+  `just fuzz` alongside `flick-core --test fuzz`) tests a checked-in corpus of
+  malformed images and bytecode plus multi-threaded mutation fuzzing
+  (`FLICK_FUZZ_ITERATIONS`). All modules under `flick-vm/src/sandbox/` avoid
+  OS-only assumptions so browser `flick-vm-wasm` (`#997`) shares the exact
+  same capability, limit, and verifier behavior.
+- **Lean impact**: sandboxing, resource metering, and pre-execution bytecode/
+  image verification introduce no new `Operation` or `Exit` form and do not
+  change typing, effects, regions, or ownership-IR semantics; all Lean proofs
+  in `formal/` remain unaffected.
+
 ## 2. Owned tokens and objects
 
 An immediate value has no heap object. A string, arbitrary-sized integer or constructed value has

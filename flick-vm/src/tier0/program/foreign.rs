@@ -188,6 +188,7 @@ impl<'p> Machine<'p, '_> {
         spec: &ForeignCallSpec,
         args: &[Local],
     ) -> Result<(), Error> {
+        self.check_foreign_call_capability(spec)?;
         self.ensure_bridge_open()?;
         self.flush_released_handles()?;
         self.stage(args.iter().copied())?;
@@ -274,6 +275,7 @@ impl<'p> Machine<'p, '_> {
         if execution != self.execution {
             return Err(Error::ForeignClosure);
         }
+        self.check_ffi_capability("HostBridge.call_handle")?;
         self.ensure_bridge_open()?;
         self.flush_released_handles()?;
         let arg_wire = wire::encode_value(
@@ -311,6 +313,7 @@ impl<'p> Machine<'p, '_> {
         destination: Destination<'p>,
         host_id: u64,
     ) -> Result<(), Error> {
+        self.check_ffi_capability("HostBridge.await_handle")?;
         self.ensure_bridge_open()?;
         self.flush_released_handles()?;
         let call_id = self.alloc_call_id();
@@ -346,6 +349,7 @@ impl<'p> Machine<'p, '_> {
                 "foreign handle from another execution".into(),
             ));
         }
+        self.check_ffi_capability("HostBridge.get_field")?;
         self.ensure_bridge_open()?;
         self.flush_released_handles()?;
         let call_id = self.alloc_call_id();

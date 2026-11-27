@@ -47,14 +47,14 @@ impl Heap {
             self.drop_value(Value::Object(token))?;
             return Ok(Value::ReuseNull);
         };
-        let old = mem::replace(
-            &mut self.object_mut(token.id)?.data,
+        let old = self.replace_object_data(
+            token.id,
             Data::ReuseToken {
                 kind,
                 capacity,
                 layout,
             },
-        );
+        )?;
         match old {
             Data::Tagged { fields, .. } => self.drop_values(fields)?,
             Data::Record(fields) => {
@@ -143,15 +143,15 @@ impl Heap {
             let Value::Object(id) = candidate else {
                 unreachable!("only objects are reusable")
             };
-            let old = mem::replace(
-                &mut self.object_mut(id.id)?.data,
+            let old = self.replace_object_data(
+                id.id,
                 Data::Tagged {
                     tag: tag.to_owned(),
                     ordinary_fields,
                     fields,
                     layout,
                 },
-            );
+            )?;
             self.stats.reuses += 1;
             if let Data::Tagged { fields, .. } = old {
                 self.drop_values(fields)?;
@@ -160,12 +160,12 @@ impl Heap {
         } else {
             self.stats.reuse_fallbacks += 1;
             self.drop_value(candidate)?;
-            Ok(self.allocate(Data::Tagged {
+            self.try_allocate(Data::Tagged {
                 tag: tag.to_owned(),
                 ordinary_fields,
                 fields,
                 layout,
-            }))
+            })
         }
     }
 
@@ -213,7 +213,7 @@ impl Heap {
             let Value::Object(id) = candidate else {
                 unreachable!("only objects are reusable")
             };
-            let old = mem::replace(&mut self.object_mut(id.id)?.data, Data::Record(fields));
+            let old = self.replace_object_data(id.id, Data::Record(fields))?;
             self.stats.reuses += 1;
             if let Data::Record(old_fields) = old {
                 self.drop_values(old_fields.into_iter().map(|(_, v)| v).collect())?;
@@ -222,7 +222,7 @@ impl Heap {
         } else {
             self.stats.reuse_fallbacks += 1;
             self.drop_value(candidate)?;
-            Ok(self.allocate(Data::Record(fields)))
+            self.try_allocate(Data::Record(fields))
         }
     }
 

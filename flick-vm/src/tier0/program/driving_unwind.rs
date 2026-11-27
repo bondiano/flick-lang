@@ -15,6 +15,9 @@ impl<'p> Machine<'p, '_> {
     }
 
     fn skip_interrupted_handler(&mut self) -> Result<bool, Error> {
+        if self.sandbox.abort.is_some() {
+            return Ok(true);
+        }
         let Some(by) = self.interrupt_requested else {
             return Ok(false);
         };
@@ -38,7 +41,13 @@ impl<'p> Machine<'p, '_> {
             Destination::Handle {
                 activation,
                 binding,
-            } => self.handler_failed(activation, binding),
+            } => {
+                if self.sandbox.abort.is_some() {
+                    self.handler_abort_unwind(activation)
+                } else {
+                    self.handler_failed(activation, binding)
+                }
+            }
             Destination::Catch { handler, binding } => {
                 if self.skip_interrupted_handler()? {
                     self.heap.drop_value(handler)?;

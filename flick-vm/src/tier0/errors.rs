@@ -149,6 +149,15 @@ pub enum Error {
     },
     HostBridge(String),
     LeakedForeignHandles(usize),
+    /// A sandbox resource limit (`fuel`, `heap_bytes`, `wall_time_ms`, or `max_stack_depth`) fired.
+    LimitExceeded(LimitKind),
+    /// A sandbox capability check denied a host or foreign operation.
+    CapabilityDenied {
+        capability: Capability,
+        binding: String,
+    },
+    /// Bytecode or image verification failed before execution.
+    VerificationFailed(String),
 }
 
 impl Error {
@@ -347,6 +356,12 @@ impl Error {
             Self::LeakedForeignHandles(count) => {
                 write!(f, "{count} host foreign handles are still live")
             }
+            Self::LimitExceeded(kind) => write!(f, "sandbox {kind}"),
+            Self::CapabilityDenied {
+                capability,
+                binding,
+            } => write!(f, "capability `{capability}` denied for `{binding}`"),
+            Self::VerificationFailed(msg) => write!(f, "VM verification failed: {msg}"),
             _ => unreachable!("static error formatted earlier"),
         }
     }

@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: 5c521ec87e8a71d2
+source_hash: f568141cbf93ac40
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -146,7 +146,7 @@ max-params = 5
 
 - `flick/js` публикует тег `js`, взаимоисключающую ось `runtime` (`rt` по умолчанию, `effect`), аддитивную ось `adapter` (`effect-adapter`, активен при наличии `@flick-lang/effect-ts` в зависимостях проекта) и встроенные хосты `node`, `browser`, `bun` и `cloudflare`.
 - `flick/go` публикует тег `go`, аддитивную ось `cgo` (`cgo`, активен при `[target.go] cgo = true`) и встроенный хост `native`.
-- `flick/vm` публикует тег `vm` и встроенный хост `native` (`vm/native`, также оформленный в пакете `packages/vm-host`), предоставляя нативные Rust-сервисы хоста `Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem` и `Process` и позволяя ограничивать пакеты и модули условиями `when = "vm"` / `@when "vm"`.
+- `flick/vm` публикует тег `vm` и встроенный хост `native` (`vm/native`, также оформленный в пакете `packages/vm-host`), предоставляя нативные Rust-сервисы хоста `Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem` и `Process` и позволяя ограничивать пакеты и модули условиями `when = "vm"` / `@when "vm"`. Встраиваемые сессии ВМ также поддерживают изоляцию по возможностям (`fs`, `net`, `process`, `env`, `clock`, `random`, `ffi`, `plugins`), лимиты ресурсов (`fuel`, `heap_bytes`, `wall_time_ms`, `max_stack_depth`) и верификацию образов и байткода до загрузки, единую для нативных и `wasm32`-хостов.
 - Сторонние бэкенды публикуют собственные теги, оси и хосты по той же схеме дескриптора.
 
 `flick/lua` — предварительная версия бэкенда для аддонов World of Warcraft и

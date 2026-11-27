@@ -7,6 +7,7 @@ use flick_core::ir::memory::{CodeId, Name};
 
 use super::save::canonical_closed_interface;
 use super::{ImageError, VmImage, compiler_hash, memory_ir_hash};
+use crate::sandbox::{check_program_capabilities, verify_image};
 use crate::session::VmSession;
 use crate::tier0::{
     ExecutionReport, Heap, HostMode, SessionPersistentState, Value, allocate_execution_id,
@@ -28,6 +29,8 @@ pub fn load_image_into_session(
     image: &VmImage,
 ) -> Result<LoadReport, ImageError> {
     verify_hashes(image)?;
+    verify_image(image)?;
+    check_program_capabilities(&image.program, None, session.capabilities())?;
 
     let already_loaded = session.loaded_modules();
     for module in &image.manifest.modules {
@@ -71,13 +74,32 @@ pub fn load_image_into_session(
         image.globals.iter().map(|g| g.value.as_ref()).collect();
     let default_module = image.manifest.modules.first().map(String::as_str);
 
-    let restored = match image.heap.restore(
-        &mut session.heap,
-        session.execution,
-        &code_map,
-        &roots,
-        default_module,
-    ) {
+    let prev_heap_limit = session.heap.byte_limit();
+    if let Some(limit) = session.limits().heap_bytes {
+        session.heap.set_byte_limit(Some(limit));
+    }
+    let restore_res = image
+        .heap
+        .restore(
+            &mut session.heap,
+            session.execution,
+            &code_map,
+            &roots,
+            default_module,
+        )
+        .and_then(|restored| {
+            if let Err(err) = session.heap.check_byte_limit() {
+                let mut to_drop: Vec<Value> = restored.values.into_iter().flatten().collect();
+                to_drop.extend(restored.cells);
+                to_drop.extend(restored.lazies);
+                let _ = session.heap.drop_values(to_drop);
+                return Err(ImageError::Vm(err.to_string()));
+            }
+            Ok(restored)
+        });
+    session.heap.set_byte_limit(prev_heap_limit);
+
+    let restored = match restore_res {
         Ok(restored) => restored,
         Err(err) => {
             // Roll back the program additions on any restoration error.
@@ -131,6 +153,7 @@ pub fn execute_image_main_with_args(
     program_args: Vec<String>,
 ) -> Result<ExecutionReport, ImageError> {
     verify_hashes(image)?;
+    verify_image(image)?;
     let execution = allocate_execution_id();
     let persistent = restore_standalone_persistent(heap, image, execution)?;
     Ok(execute_main_with_persistent_state(
@@ -157,6 +180,7 @@ pub fn execute_image_program(
     host_mode: HostMode,
 ) -> Result<ExecutionReport, ImageError> {
     verify_hashes(image)?;
+    verify_image(image)?;
     let execution = allocate_execution_id();
     let persistent = restore_standalone_persistent(heap, image, execution)?;
     Ok(execute_program_with_persistent_state(
