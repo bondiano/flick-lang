@@ -13,11 +13,15 @@
 use std::mem;
 
 use flick_core::ir::BinOp;
-use flick_core::ir::memory;
+use flick_core::ir::memory::{self, MemorySpan};
 
 use super::opcode::{Immediate, Instr, MAX_TAIL_ARGS, ValueSource};
 
-pub(super) fn fuse(instructions: Vec<Instr>) -> Vec<Instr> {
+pub(super) fn fuse(
+    instructions: Vec<Instr>,
+    spans: Vec<Option<MemorySpan>>,
+) -> (Vec<Instr>, Vec<Option<MemorySpan>>) {
+    debug_assert_eq!(instructions.len(), spans.len());
     let mut targets = vec![None; instructions.len()];
     for instr in &instructions {
         if let Instr::Branch {
@@ -36,28 +40,38 @@ pub(super) fn fuse(instructions: Vec<Instr>) -> Vec<Instr> {
     }
 
     let mut out = Vec::with_capacity(instructions.len());
+    let mut out_spans = Vec::with_capacity(spans.len());
     let mut block_start = 0;
-    for (pc, instr) in instructions.into_iter().enumerate() {
+    for (pc, (instr, span)) in instructions.into_iter().zip(spans).enumerate() {
         if let Some(target) = &mut targets[pc] {
             // A jump target starts a new fusion window and keeps its entry PC.
             *target = out.len();
             block_start = out.len();
         }
         out.push(instr);
+        out_spans.push(span);
         loop {
             if let [.., first, second] = &out[block_start..]
                 && let Some(fused) = fuse_pair(first, second)
             {
+                let second_span = out_spans.pop().expect("second span");
+                let first_span = out_spans.pop().expect("first span");
                 out.truncate(out.len() - 2);
                 out.push(fused);
+                out_spans.push(second_span.or(first_span));
                 continue;
             }
             if let [.., first, middle, third] = &out[block_start..]
                 && let Some((a, b)) = fuse_triple(first, middle, third)
             {
+                let third_span = out_spans.pop().expect("third span");
+                let middle_span = out_spans.pop().expect("middle span");
+                let first_span = out_spans.pop().expect("first span");
                 out.truncate(out.len() - 3);
                 out.push(a);
                 out.push(b);
+                out_spans.push(first_span.or(third_span));
+                out_spans.push(middle_span);
                 continue;
             }
             break;
@@ -81,7 +95,7 @@ pub(super) fn fuse(instructions: Vec<Instr>) -> Vec<Instr> {
     }
 
     mark_tail_calls(&mut out);
-    out
+    (out, out_spans)
 }
 
 fn mark_tail_calls(out: &mut [Instr]) {

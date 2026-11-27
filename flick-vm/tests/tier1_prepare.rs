@@ -93,19 +93,13 @@ fn unsupported_reachable_operations_report_name_and_source_span() {
     let source = "\
 module App.Main exposing (main)
 
-effect Ask =
-  ask : Unit ->{} Int
-
 main : Unit ->{} Int
 let main () =
-  try
-    Ask.ask ()
-  with
-  | Ask.ask () -> 42
+  await (task { 42 })
 ";
     let entry = Name::new("App.Main", "main");
     let (program, sources) = lower_source(source, &entry);
-    let err = tier1::prepare(&program, &entry).expect_err("Handle must fail tier1 prepare");
+    let err = tier1::prepare(&program, &entry).expect_err("Task must fail tier1 prepare");
     let PrepareError::Unsupported {
         operation,
         span: Some(MemorySpan { file, start, end }),
@@ -114,12 +108,12 @@ let main () =
     else {
         panic!("expected Unsupported with source span, got {err:?}");
     };
-    assert_eq!(operation, "Handle");
+    assert_eq!(operation, "Task");
     let text = &sources.get(FileId::new(file)).text;
     let snippet = &text[start as usize..end as usize];
     assert!(
-        snippet.contains("try") && snippet.contains("Ask.ask"),
-        "expected span to point at handler expression, got {snippet:?}"
+        snippet.contains("task") && snippet.contains("42"),
+        "expected span to point at task expression, got {snippet:?}"
     );
 }
 

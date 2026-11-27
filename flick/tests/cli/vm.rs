@@ -438,12 +438,17 @@ fn build_target_vm_emits_image_and_doctor_reports_vm() {
 }
 
 #[test]
-fn run_tier1_executes_pure_cases_and_reports_p012_with_span_for_unsupported() {
+fn run_tier1_executes_effects_and_reports_p012_with_span_for_unsupported() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     for rel in [
         "tests/run/bootstrap/hello.fl",
         "tests/run/codegen/ints.fl",
         "tests/run/codegen/fixed_width.fl",
+        "tests/run/codegen/handlers.fl",
+        "tests/run/codegen/partial_handlers.fl",
+        "tests/run/codegen/prototype_operation.fl",
+        "tests/run/codegen/counted_failures.fl",
+        "tests/run/codegen/fail.fl",
     ] {
         let path = repo.join(rel);
         let expected = fs::read_to_string(path.with_extension("stdout"))
@@ -464,14 +469,9 @@ fn run_tier1_executes_pure_cases_and_reports_p012_with_span_for_unsupported() {
     let unsupported = "\
 module App.Main exposing (main)
 
-effect Ask =
-  ask : Unit ->{} Int
-
 main : Unit ->{Host.Console} Unit
 let main () =
-  let n =
-    try Ask.ask () with
-    | Ask.ask () -> 7
+  let n = await (task { 7 })
   Platform.stdout_line (show n)
 ";
     let dir = project(
@@ -481,11 +481,111 @@ let main () =
     let out = flick_no_path(&dir, &["run", "--target", "vm", "--vm-tier", "tier1"]);
     assert!(
         !out.status.success(),
-        "expected tier1 to reject Handle: {out:?}"
+        "expected tier1 to reject Task: {out:?}"
     );
     let err = stderr(&out);
     assert!(
-        err.contains("FLICK-P012") && err.contains("Handle") && err.contains("src/App/Main.fl"),
+        err.contains("FLICK-P012") && err.contains("Task") && err.contains("src/App/Main.fl"),
         "expected FLICK-P012 with operation name and source span, got:\n{err}"
     );
+}
+
+#[test]
+fn run_tier1_control_handlers_and_result_unwind_match_tier0() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    for rel in [
+        "tests/rt/deep_control.fl",
+        "tests/rt/result_control_unwind.fl",
+    ] {
+        let path = repo.join(rel);
+        let expected = fs::read_to_string(path.with_extension("stdout"))
+            .unwrap_or_else(|e| panic!("read expected stdout for {rel}: {e}"));
+        let out = flick_no_path(&repo, &["run", "--target", "vm", "--vm-tier", "1", rel]);
+        assert!(
+            out.status.success(),
+            "{rel} (--vm-tier 1) failed:\n{}",
+            stderr(&out)
+        );
+        assert_eq!(
+            stdout(&out),
+            expected,
+            "{rel} (--vm-tier 1) stdout mismatch"
+        );
+    }
+
+    let main = "\
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+effect Ask =
+  ask : Unit ->{} Int
+
+effect Stop =
+  abort stop : forall a. String ->{} a
+
+effect Yield =
+  control emit : Int ->{} Unit
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let a =
+    try
+      let x = Ask.ask ()
+      let y =
+        try Ask.ask () with
+        | Ask.ask () -> 2
+      x + y + Ask.ask ()
+    with
+    | Ask.ask () -> 10
+  say (\"tail=\" ++ show a)
+  let b =
+    try
+      let _ = Fail.fail (Boom \"err\")
+      0
+    with
+    | Boom s ->
+      say (\"fail:\" ++ s)
+      2
+  say (\"fail=\" ++ show b)
+  let c =
+    try
+      let _ = Stop.stop \"bye\"
+      0
+    with
+    | Stop.stop s ->
+      say (\"ab:\" ++ s)
+      3
+  say (\"ab=\" ++ show c)
+  let d =
+    try
+      Yield.emit 0
+      say \"dc:resumed\"
+      Yield.emit 4
+      0
+    with
+    | Yield.emit x ->
+      if x == 0 then resume ()
+      else
+        say (\"dc:arm:\" ++ show x)
+        x
+  say (\"dc=\" ++ show d)
+";
+    let dir = project(
+        "vm_tier1_effects_cli",
+        &[("flick.toml", APP), ("src/App/Main.fl", main)],
+    );
+    let expected = "tail=22\nfail:err\nfail=2\nab:bye\nab=3\ndc:resumed\ndc:arm:4\ndc=4\n";
+    for tier in ["0", "1"] {
+        let out = flick_no_path(&dir, &["run", "--target", "vm", "--vm-tier", tier]);
+        assert!(
+            out.status.success(),
+            "tier {tier} failed:\n{}",
+            stderr(&out)
+        );
+        assert_eq!(stdout(&out), expected, "tier {tier} stdout mismatch");
+    }
 }

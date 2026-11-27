@@ -1,12 +1,10 @@
 //! Differential checks comparing `flick_vm::tier1` against `flick_vm::tier0`.
 //!
-//! 1. Every pure `tests/run` case without handlers, tasks, scopes, arenas,
-//!    generators, layers, or foreign calls prepares on tier 1, prints its
-//!    checked-in expected `.stdout`, matches tier 0's outcome, and leaves
-//!    zero leaked slots on tier 1.
-//! 2. Generated well-typed programs from `flick_model::generate` give the
-//!    same outcome and structurally identical live-heap result on both tiers,
-//!    with zero leaked slots on tier 1.
+//! 1. Every `tests/run` (and selected `tests/rt`) case in tier 1's synchronous,
+//!    effects/handlers, and scope-finalizer subset prepares on tier 1, matches
+//!    checked-in `.stdout` and tier 0's outcome, and leaves zero leaked slots.
+//! 2. Generated programs (`flick_model::generate` and generated handler/scope
+//!    programs) match tier 0 with zero leaked slots on tier 1.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
@@ -23,7 +21,6 @@ use flick_test_support::files as fixture_files;
 use flick_vm::stdlib;
 use flick_vm::tier0::{
     Error as MemoryError, Heap, HostMode, ProgramOutcome, Value,
-    execute_main_program_outcome_with_host as tier0_exec_main,
     execute_program_outcome as tier0_exec_program,
 };
 use flick_vm::tier1;
@@ -32,10 +29,7 @@ fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
-/// Walks code reachable from `entry` to determine whether a lowered program
-/// falls within tier 1's pure synchronous subset (no handlers, tasks, scopes,
-/// arenas, generators, layers, refs, async, or foreign calls).
-fn is_pure_tier1_subset(program: &Program, entry: &Name) -> bool {
+fn is_tier1_subset(program: &Program, entry: &Name) -> bool {
     let initializers: BTreeMap<&Name, CodeId> = program
         .globals
         .iter()
@@ -53,14 +47,14 @@ fn is_pure_tier1_subset(program: &Program, entry: &Name) -> bool {
         let Some(function) = program.functions.get(&code) else {
             return false;
         };
-        if !block_is_pure(&function.body, &initializers, &mut queue) {
+        if !block_is_tier1_supported(&function.body, &initializers, &mut queue) {
             return false;
         }
     }
     true
 }
 
-fn block_is_pure(
+fn block_is_tier1_supported(
     block: &Block,
     initializers: &BTreeMap<&Name, CodeId>,
     queue: &mut VecDeque<CodeId>,
@@ -70,8 +64,7 @@ fn block_is_pure(
             continue;
         };
         match value {
-            Operation::Handle { .. }
-            | Operation::Task { .. }
+            Operation::Task { .. }
             | Operation::Await(_)
             | Operation::Within { .. }
             | Operation::WithOwnerEvidence { .. }
@@ -81,18 +74,6 @@ fn block_is_pure(
             | Operation::SeqOpen(_)
             | Operation::SeqNext(_)
             | Operation::ForeignCall { .. } => return false,
-            Operation::Perform {
-                effect,
-                op,
-                dicts,
-                args,
-            } if !(effect == "Host.Console"
-                && dicts.is_empty()
-                && args.len() == 1
-                && matches!(op.as_str(), "stdout_line" | "stdout_write" | "stderr_line")) =>
-            {
-                return false;
-            }
             Operation::Intrinsic { kind, .. } if !intrinsic_is_tier1_supported(*kind) => {
                 return false;
             }
@@ -112,7 +93,8 @@ fn block_is_pure(
     match &block.exit {
         Exit::Return(_) => true,
         Exit::Branch { then_, else_, .. } => {
-            block_is_pure(then_, initializers, queue) && block_is_pure(else_, initializers, queue)
+            block_is_tier1_supported(then_, initializers, queue)
+                && block_is_tier1_supported(else_, initializers, queue)
         }
     }
 }
@@ -131,6 +113,15 @@ fn intrinsic_is_tier1_supported(kind: Intrinsic) -> bool {
                 | Intrinsic::EffectDie
                 | Intrinsic::FailureRethrow
                 | Intrinsic::Try
+                | Intrinsic::ScopeRun
+                | Intrinsic::ScopeCurrent
+                | Intrinsic::ScopeAddFinalizer
+                | Intrinsic::ScopeAddFinalizerExit
+                | Intrinsic::ScopeAddClose
+                | Intrinsic::AcquireRelease
+                | Intrinsic::Bracket
+                | Intrinsic::Uninterruptible
+                | Intrinsic::HostService(_)
                 | Intrinsic::Host(
                     HostPrimitive::StderrLine
                         | HostPrimitive::StdoutWrite
@@ -197,7 +188,6 @@ fn values_structurally_equal(h0: &Heap, v0: &Value, h1: &Heap, v1: &Value) -> Re
             Ok(true)
         }
         (Value::Object(_), Value::Object(_)) => {
-            // Compare strings, BigInts, or rendered show values / tags + fields
             if let (Ok(s0), Ok(s1)) = (h0.string(v0), h1.string(v1)) {
                 return Ok(s0 == s1);
             }
@@ -208,21 +198,18 @@ fn values_structurally_equal(h0: &Heap, v0: &Value, h1: &Heap, v1: &Value) -> Re
                 if t0 != t1 {
                     return Ok(false);
                 }
-                let mut i = 0;
-                loop {
+                for i in 0.. {
                     match (h0.field(v0, i), h1.field(v1, i)) {
                         (Ok(a), Ok(b)) => {
                             if !values_structurally_equal(h0, a, h1, b)? {
                                 return Ok(false);
                             }
-                            i += 1;
                         }
                         (Err(_), Err(_)) => return Ok(true),
                         _ => return Ok(false),
                     }
                 }
             }
-            // Records, closures, dictionaries, or other heap objects: compare via show_value when available.
             match (stdlib::show_value(h0, v0), stdlib::show_value(h1, v1)) {
                 (Ok(s0), Ok(s1)) => Ok(s0 == s1),
                 (Err(_), Err(_)) => Ok(true),
@@ -280,7 +267,7 @@ fn check_run_profile(
             && r1.stdout != expected
         {
             failures.push(format!(
-                "{rel} ({profile}): checked-in stdout mismatch expected={expected:?} tier1={:?}",
+                "{rel} ({profile}): expected stdout mismatch expected={expected:?} tier1={:?}",
                 r1.stdout
             ));
         }
@@ -297,18 +284,21 @@ fn check_run_profile(
     }
     match heap1.finish() {
         Ok(stats) if stats.live_objects == 0 && stats.allocations == stats.frees => {}
-        Ok(stats) => {
-            failures.push(format!("{rel} ({profile}): tier1 leak stats={stats:?}"));
-        }
+        Ok(stats) => failures.push(format!("{rel} ({profile}): tier1 leak stats={stats:?}")),
         Err(err) => failures.push(format!("{rel} ({profile}): tier1 leak: {err}")),
     }
 }
 
 #[test]
 fn pure_tests_run_cases_match_tier0_and_checked_in_stdout() {
-    let run_dir = repo().join("tests/run");
-    let mut files = fixture_files(&run_dir, "fl");
+    let mut files = fixture_files(&repo().join("tests/run"), "fl");
     files.sort();
+    for rel in [
+        "tests/rt/deep_control.fl",
+        "tests/rt/result_control_unwind.fl",
+    ] {
+        files.push(repo().join(rel));
+    }
     let fuel: u64 = if cfg!(debug_assertions) {
         1_000_000
     } else {
@@ -316,6 +306,7 @@ fn pure_tests_run_cases_match_tier0_and_checked_in_stdout() {
     };
 
     let mut checked = 0usize;
+    let mut checked_files = BTreeSet::new();
     let mut failures = Vec::new();
     for path in &files {
         let rel = path
@@ -339,8 +330,7 @@ fn pure_tests_run_cases_match_tier0_and_checked_in_stdout() {
             let Ok(counted) = run::counted_main(&modules, &main, release) else {
                 continue;
             };
-            if !counted.eager_inits.is_empty()
-                || !is_pure_tier1_subset(&counted.program, &counted.entry)
+            if !counted.eager_inits.is_empty() || !is_tier1_subset(&counted.program, &counted.entry)
             {
                 continue;
             }
@@ -353,19 +343,35 @@ fn pure_tests_run_cases_match_tier0_and_checked_in_stdout() {
                 fuel,
                 &mut failures,
             );
+            checked_files.insert(rel.clone());
             checked += 1;
         }
     }
 
+    for required in [
+        "tests/run/codegen/handlers.fl",
+        "tests/run/codegen/partial_handlers.fl",
+        "tests/run/codegen/prototype_operation.fl",
+        "tests/run/codegen/counted_failures.fl",
+        "tests/run/codegen/fail.fl",
+        "tests/run/codegen/errors.fl",
+        "tests/rt/deep_control.fl",
+        "tests/rt/result_control_unwind.fl",
+    ] {
+        assert!(
+            checked_files.contains(required),
+            "required fixture did not run on tier1: {required}"
+        );
+    }
     assert!(
         failures.is_empty(),
-        "tier1 differential failures ({} of {checked} checked):\n{}",
+        "tier1 diff failures ({} of {checked}):\n{}",
         failures.len(),
         failures.join("\n")
     );
     assert!(
-        checked >= 100,
-        "expected at least 100 pure tests/run profiles to run on tier1, got {checked}"
+        checked >= 120,
+        "expected >= 120 tier1 profiles, got {checked}"
     );
 }
 
@@ -379,13 +385,7 @@ fn compare_generated_profile(
 ) {
     let mut heap0 = Heap::new();
     let r0 = if is_unit_fn {
-        tier0_exec_main(
-            &mut heap0,
-            &counted.program,
-            &counted.entry,
-            fuel,
-            HostMode::Deterministic,
-        )
+        counted.execute(&mut heap0, fuel)
     } else {
         tier0_exec_program(&mut heap0, &counted.program, &counted.entry, vec![], fuel)
     };
@@ -402,7 +402,7 @@ fn compare_generated_profile(
         tier1::execute_program_outcome(&mut heap1, &counted.program, &counted.entry, vec![], fuel)
     }
     .unwrap_or_else(|err| {
-        panic!("seed {seed} (release={release}) failed tier1 prepare: {err}\n{source}")
+        panic!("seed {seed} (release={release}) tier1 prepare failed: {err}\n{source}")
     });
 
     assert_eq!(
@@ -412,12 +412,11 @@ fn compare_generated_profile(
     match (&r0.outcome, &r1.outcome) {
         (ProgramOutcome::Returned(v0), ProgramOutcome::Returned(v1))
         | (ProgramOutcome::Raised(v0), ProgramOutcome::Raised(v1)) => {
-            let eq = values_structurally_equal(&heap0, v0, &heap1, v1).unwrap_or_else(|e| {
-                panic!("seed {seed} (release={release}) value compare error: {e}\n{source}")
-            });
+            let eq = values_structurally_equal(&heap0, v0, &heap1, v1)
+                .unwrap_or_else(|e| panic!("seed {seed} value compare error: {e}\n{source}"));
             assert!(
                 eq,
-                "seed {seed} (release={release}) returned value mismatch:\ntier0={v0:?}\ntier1={v1:?}\n{source}"
+                "seed {seed} (release={release}) value mismatch:\ntier0={v0:?}\ntier1={v1:?}\n{source}"
             );
         }
         (ProgramOutcome::Failed(_), ProgramOutcome::Failed(_))
@@ -425,11 +424,9 @@ fn compare_generated_profile(
             ProgramOutcome::Fault(MemoryError::OutOfFuel),
             ProgramOutcome::Fault(MemoryError::OutOfFuel),
         ) => {}
-        (o0, o1) => {
-            panic!(
-                "seed {seed} (release={release}) outcome mismatch:\ntier0={o0:?}\ntier1={o1:?}\n{source}"
-            );
-        }
+        (o0, o1) => panic!(
+            "seed {seed} (release={release}) outcome mismatch:\ntier0={o0:?}\ntier1={o1:?}\n{source}"
+        ),
     }
     r0.outcome.release(&mut heap0).expect("release tier0");
     heap0.finish().expect("zero leaks tier0");
@@ -449,9 +446,7 @@ fn generated_programs_match_tier0_outcome_and_value_with_zero_leaks() {
             .wrapping_add(1_442_695_040_888_963_407);
         u32::try_from(rng_state >> 32).expect("shifted u64 fits u32")
     };
-    let fuel = 100_000;
     let entry_path = ModelPath::new("Fixture", "program");
-
     for seed in 0..400 {
         let len = (next_u32() as usize % 40) + 6;
         let choices: Vec<u32> = (0..len).map(|_| next_u32()).collect();
@@ -459,10 +454,8 @@ fn generated_programs_match_tier0_outcome_and_value_with_zero_leaks() {
         if !generate::runs(&p) || matches!(&p.scheme.body, Type::Eff(..)) {
             continue;
         }
-        let is_unit_fn = matches!(
-            &p.scheme.body,
-            Type::Fun(u, _, _) if **u == Type::con("Prelude", "Unit")
-        );
+        let is_unit_fn =
+            matches!(&p.scheme.body, Type::Fun(u, _, _) if **u == Type::con("Prelude", "Unit"));
         let source = generate::source(&p);
         let Ok(modules) = run::compile_source(&source) else {
             continue;
@@ -471,16 +464,60 @@ fn generated_programs_match_tier0_outcome_and_value_with_zero_leaks() {
             let Ok(counted) = run::counted_main(&modules, &entry_path, release) else {
                 continue;
             };
-            if !is_pure_tier1_subset(&counted.program, &counted.entry) {
+            if !is_tier1_subset(&counted.program, &counted.entry) {
                 continue;
             }
-            compare_generated_profile(&counted, is_unit_fn, seed, release, &source, fuel);
+            compare_generated_profile(&counted, is_unit_fn, seed, release, &source, 100_000);
             compared += 1;
         }
     }
-
     assert!(
         compared >= 40,
-        "expected at least 40 generated program differential runs, got {compared}"
+        "expected >= 40 generated differential runs, got {compared}"
     );
+}
+
+#[test]
+fn generated_handler_programs_match_tier0_outcome_and_value_with_zero_leaks() {
+    let mut rng: u64 = 0x9750_efec_cafe_babe;
+    let mut next = || -> usize {
+        rng = rng
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        usize::try_from(rng >> 33).expect("fits usize")
+    };
+    let entry_path = ModelPath::new("App.GenHandlers", "main");
+    let mut compared = 0usize;
+    for seed in 0..40 {
+        let (ask_out, ask_in, ab_val, bias, ret_add) = (
+            next() % 11 + 1,
+            next() % 11 + 20,
+            next() % 17 + 50,
+            next() % 7 + 1,
+            next() % 5 + 1,
+        );
+        let inner = match next() % 3 {
+            0 => format!("Stop.stop {ab_val}"),
+            1 => format!("let _ = Fail.fail (Boom {ask_in})\n            0"),
+            _ => "let u = Ask.ask ()\n            u + Emit.emit u + Ask.ask ()".to_owned(),
+        };
+        let arm = if next() % 2 == 0 {
+            format!("Platform.stdout_line (\"drop:\" ++ show x)\n        x + {bias}")
+        } else {
+            format!("resume (x + {bias}) + 1")
+        };
+        let source = format!(
+            "module App.GenHandlers exposing (main)\ntype error Boom = Boom Int\neffect Ask =\n  ask : Unit ->{{}} Int\neffect Stop =\n  abort stop : forall a. Int ->{{}} a\neffect Emit =\n  control emit : Int ->{{}} Int\nmain : Unit ->{{Host.Console}} Unit\nlet main () =\n  let res =\n    try\n      try\n        let a =\n          try\n            {inner}\n          with\n          | Ask.ask () -> {ask_in}\n          | Stop.stop n -> n + 3\n          | return v -> v + {ret_add}\n        a + Ask.ask ()\n      with\n      | Emit.emit x ->\n        {arm}\n      | Boom n -> n + 100\n    with\n    | Ask.ask () -> {ask_out}\n  Platform.stdout_line (\"res=\" ++ show res)\n"
+        );
+        let modules = run::compile_source(&source)
+            .unwrap_or_else(|e| panic!("seed {seed} compile failed: {e:?}\n{source}"));
+        for release in [false, true] {
+            let counted = run::counted_main(&modules, &entry_path, release)
+                .unwrap_or_else(|e| panic!("seed {seed} lower failed: {e:?}\n{source}"));
+            assert!(is_tier1_subset(&counted.program, &counted.entry));
+            compare_generated_profile(&counted, true, seed, release, &source, 200_000);
+            compared += 1;
+        }
+    }
+    assert_eq!(compared, 80);
 }

@@ -2,9 +2,12 @@
 
 use std::collections::BTreeMap;
 
-use flick_core::ir::memory::{self, Block, CodeId, Exit, Instruction, Local, Name, Program};
+use flick_core::ir::memory::{
+    self, Block, CodeId, Exit, HostPrimitive, Instruction, Intrinsic, Local, MemorySpan, Name,
+    Program,
+};
 
-use super::opcode::{CompiledFunction, Instr, PrepareError, Prepared};
+use super::opcode::{CompiledFunction, Instr, PrepareError, Prepared, PreparedOp};
 use super::prepare_fuse;
 
 pub(super) struct Interner<T> {
@@ -83,6 +86,7 @@ pub(super) struct Lowering<'a> {
     pub(super) tags: Interner<String>,
     pub(super) dictionary_fields: Interner<String>,
     pub(super) loops: Interner<String>,
+    pub(super) operations: Interner<(String, String)>,
 }
 
 /// Validates `program` and prepares a tier-1 register bytecode image for `entry`.
@@ -112,6 +116,7 @@ pub fn prepare(program: &Program, entry: &Name) -> Result<Prepared, PrepareError
         tags: Interner::default(),
         dictionary_fields: Interner::default(),
         loops: Interner::default(),
+        operations: Interner::default(),
     };
     let entry_id = lowering.intern_global(entry);
     let mut functions = Vec::new();
@@ -124,6 +129,28 @@ pub fn prepare(program: &Program, entry: &Name) -> Result<Prepared, PrepareError
         .iter()
         .map(|name| lowering.codes.entries[&lowering.initializers[name]])
         .collect();
+    let operations = lowering
+        .operations
+        .values
+        .into_iter()
+        .map(|(effect, op)| {
+            let console_fallback = if effect == "Host.Console" {
+                match op.as_str() {
+                    "stdout_line" => Some(Intrinsic::PrintLine),
+                    "stdout_write" => Some(Intrinsic::Host(HostPrimitive::StdoutWrite)),
+                    "stderr_line" => Some(Intrinsic::Host(HostPrimitive::StderrLine)),
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            PreparedOp {
+                effect,
+                op,
+                console_fallback,
+            }
+        })
+        .collect();
     Ok(Prepared {
         functions,
         ir_codes: lowering.codes.values,
@@ -134,6 +161,7 @@ pub fn prepare(program: &Program, entry: &Name) -> Result<Prepared, PrepareError
         tags: lowering.tags.values,
         dictionary_fields: lowering.dictionary_fields.values,
         loops: lowering.loops.values,
+        operations,
     })
 }
 
@@ -143,12 +171,17 @@ impl Lowering<'_> {
         self.globals.intern(name.clone())
     }
 
+    pub(super) fn intern_operation(&mut self, effect: &str, op: &str) -> usize {
+        self.operations.intern((effect.to_owned(), op.to_owned()))
+    }
+
     fn prepare_function(
         &mut self,
         code: CodeId,
         function: &memory::Function,
     ) -> Result<CompiledFunction, PrepareError> {
         let mut instructions = Vec::new();
+        let mut spans = Vec::new();
         let mut slots = Slots::default();
         let mut tokens = Tokens::default();
         let params: Vec<usize> = function
@@ -168,15 +201,18 @@ impl Lowering<'_> {
             &mut slots,
             &mut op_index,
             &mut instructions,
+            &mut spans,
         )?;
-        let instructions = prepare_fuse::fuse(instructions);
+        let (instructions, spans) = prepare_fuse::fuse(instructions, spans);
         Ok(CompiledFunction {
             params,
             slots: slots.count,
             instructions,
+            spans,
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn prepare_block(
         &mut self,
         code: CodeId,
@@ -185,34 +221,42 @@ impl Lowering<'_> {
         slots: &mut Slots,
         op_index: &mut usize,
         instructions: &mut Vec<Instr>,
+        spans: &mut Vec<Option<MemorySpan>>,
     ) -> Result<(), PrepareError> {
         for instruction in &block.instructions {
             let current_op = *op_index;
             *op_index += 1;
-            let instr = match instruction {
+            let (instr, instr_span) = match instruction {
                 Instruction::Let { binding, value } => {
                     let dst = slots.reserve();
                     let span = self.program.op_spans.get(&(code, current_op)).copied();
                     let instr = self.translate_operation(code, value, dst, span, &mut tokens)?;
                     tokens.bind(*binding, dst);
-                    instr
+                    (instr, span)
                 }
                 Instruction::Dup(local) => {
                     let src = tokens.peek(*local);
                     let dst = slots.reserve();
                     tokens.bind(*local, dst);
-                    Instr::Dup { src, dst }
+                    (Instr::Dup { src, dst }, None)
                 }
-                Instruction::Drop(local) => Instr::Drop {
-                    src: tokens.take(*local),
-                },
+                Instruction::Drop(local) => (
+                    Instr::Drop {
+                        src: tokens.take(*local),
+                    },
+                    None,
+                ),
             };
             instructions.push(instr);
+            spans.push(instr_span);
         }
         match &block.exit {
-            Exit::Return(value) => instructions.push(Instr::Return {
-                value: tokens.take(*value),
-            }),
+            Exit::Return(value) => {
+                instructions.push(Instr::Return {
+                    value: tokens.take(*value),
+                });
+                spans.push(None);
+            }
             Exit::Branch {
                 condition,
                 then_,
@@ -226,14 +270,23 @@ impl Lowering<'_> {
                     then_pc,
                     else_pc: then_pc,
                 });
-                self.prepare_block(code, then_, tokens.clone(), slots, op_index, instructions)?;
+                spans.push(None);
+                self.prepare_block(
+                    code,
+                    then_,
+                    tokens.clone(),
+                    slots,
+                    op_index,
+                    instructions,
+                    spans,
+                )?;
                 let else_pc = instructions.len();
                 instructions[branch_pc] = Instr::Branch {
                     condition,
                     then_pc,
                     else_pc,
                 };
-                self.prepare_block(code, else_, tokens, slots, op_index, instructions)?;
+                self.prepare_block(code, else_, tokens, slots, op_index, instructions, spans)?;
             }
         }
         Ok(())

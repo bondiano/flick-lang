@@ -8,6 +8,7 @@ use flick_core::ir::memory::{
 };
 use flick_core::ir::{BinOp, Pat};
 use flick_core::numeric::Num;
+use flick_core::types::OpClass;
 
 use crate::tier0::Value;
 
@@ -26,6 +27,24 @@ pub struct PreparedStats {
     pub fused_tail_calls: usize,
 }
 
+/// Interned effect operation descriptor for fast handler lookup and caching.
+#[derive(Debug, Clone)]
+pub(crate) struct PreparedOp {
+    pub(crate) effect: String,
+    pub(crate) op: String,
+    pub(crate) console_fallback: Option<Intrinsic>,
+}
+
+/// Compiled operation entry installed by [`Instr::Handle`].
+#[derive(Debug, Clone)]
+pub(crate) struct CompiledHandlerOp {
+    pub(crate) op_id: usize,
+    pub(crate) class: OpClass,
+    pub(crate) dicts: usize,
+    pub(crate) arity: usize,
+    pub(crate) function: usize,
+}
+
 /// A validated, bytecode-compiled tier-1 VM image rooted at one entry global.
 #[derive(Debug)]
 pub struct Prepared {
@@ -38,9 +57,18 @@ pub struct Prepared {
     pub(crate) tags: Vec<String>,
     pub(crate) dictionary_fields: Vec<String>,
     pub(crate) loops: Vec<String>,
+    pub(crate) operations: Vec<PreparedOp>,
 }
 
 impl Prepared {
+    /// Returns the source span preserved for bytecode instruction `(code, pc)`, if any.
+    #[must_use]
+    pub(crate) fn span(&self, code: usize, pc: usize) -> Option<MemorySpan> {
+        self.functions
+            .get(code)
+            .and_then(|function| function.spans.get(pc).copied().flatten())
+    }
+
     /// Returns instruction and fusion counts across all reachable functions.
     #[must_use]
     pub fn stats(&self) -> PreparedStats {
@@ -74,6 +102,7 @@ pub(crate) struct CompiledFunction {
     pub(crate) params: Vec<usize>,
     pub(crate) slots: usize,
     pub(crate) instructions: Vec<Instr>,
+    pub(crate) spans: Vec<Option<MemorySpan>>,
 }
 
 /// Copyable immediate scalar values stored directly in bytecode instructions.
@@ -366,6 +395,54 @@ pub(crate) enum Instr {
         dst: usize,
         body: usize,
         selector: usize,
+    },
+    Handle {
+        dst: usize,
+        body: usize,
+        operations: Vec<CompiledHandlerOp>,
+        ret: Option<usize>,
+        errors: Option<usize>,
+    },
+    Perform {
+        dst: usize,
+        op_id: usize,
+        dicts: Vec<usize>,
+        args: Vec<usize>,
+    },
+    ScopeRun {
+        dst: usize,
+        body: usize,
+    },
+    ScopeCurrent {
+        dst: usize,
+        unit: usize,
+    },
+    ScopeAddFinalizer {
+        dst: usize,
+        task: usize,
+    },
+    ScopeAddFinalizerExit {
+        dst: usize,
+        func: usize,
+    },
+    ScopeAddClose {
+        dst: usize,
+        func: usize,
+    },
+    AcquireRelease {
+        dst: usize,
+        acquire: usize,
+        release: usize,
+    },
+    Bracket {
+        dst: usize,
+        acquire: usize,
+        use_fn: usize,
+        release: usize,
+    },
+    Uninterruptible {
+        dst: usize,
+        task: usize,
     },
     Recovery {
         dst: usize,

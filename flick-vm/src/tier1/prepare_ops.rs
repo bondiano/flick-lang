@@ -171,8 +171,13 @@ impl Lowering<'_> {
                 op: op_name,
                 dicts,
                 args,
-            } => Self::translate_perform(code, effect, op_name, dicts, args, dst, span, tokens),
-            Operation::Handle { .. } => Err(unsupported(code, "Handle", span)),
+            } => Ok(self.translate_perform(effect, op_name, dicts, args, dst, tokens)),
+            Operation::Handle {
+                body,
+                effects,
+                ret,
+                errors,
+            } => Ok(self.translate_handle(*body, effects, *ret, *errors, dst, tokens)),
             Operation::Task { .. } => Err(unsupported(code, "Task", span)),
             Operation::Await(_) => Err(unsupported(code, "Await", span)),
             Operation::Within { .. } => Err(unsupported(code, "Within", span)),
@@ -399,47 +404,30 @@ impl Lowering<'_> {
                 body: tokens.take(*body),
                 selector: tokens.take(*selector),
             }),
+            (Intrinsic::ScopeRun, [body]) => Ok(Self::translate_scope_run(*body, dst, tokens)),
+            (Intrinsic::ScopeCurrent, [unit]) => {
+                Ok(Self::translate_scope_current(*unit, dst, tokens))
+            }
+            (Intrinsic::ScopeAddFinalizer, [task]) => {
+                Ok(Self::translate_scope_add_finalizer(*task, dst, tokens))
+            }
+            (Intrinsic::ScopeAddFinalizerExit, [func]) => {
+                Ok(Self::translate_scope_add_finalizer_exit(*func, dst, tokens))
+            }
+            (Intrinsic::ScopeAddClose, [func]) => {
+                Ok(Self::translate_scope_add_close(*func, dst, tokens))
+            }
+            (Intrinsic::AcquireRelease, [acquire, release]) => Ok(Self::translate_acquire_release(
+                *acquire, *release, dst, tokens,
+            )),
+            (Intrinsic::Bracket, [acquire, use_fn, release]) => Ok(Self::translate_bracket(
+                *acquire, *use_fn, *release, dst, tokens,
+            )),
+            (Intrinsic::Uninterruptible, [task]) => {
+                Ok(Self::translate_uninterruptible(*task, dst, tokens))
+            }
             _ => Err(unsupported(code, format!("Intrinsic::{kind:?}"), span)),
         }
-    }
-
-    /// Translates `Host.Console.{stdout_line, stdout_write, stderr_line}` direct
-    /// console output to host intrinsics when no handlers exist on tier 1; rejects
-    /// all other `Perform` operations.
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn translate_perform(
-        code: CodeId,
-        effect: &str,
-        op_name: &str,
-        dicts: &[Local],
-        args: &[Local],
-        dst: usize,
-        span: Option<MemorySpan>,
-        tokens: &mut Tokens,
-    ) -> Result<Instr, PrepareError> {
-        if effect == "Host.Console"
-            && dicts.is_empty()
-            && let [src] = args
-        {
-            let kind = match op_name {
-                "stdout_line" => Some(Intrinsic::PrintLine),
-                "stdout_write" => Some(Intrinsic::Host(HostPrimitive::StdoutWrite)),
-                "stderr_line" => Some(Intrinsic::Host(HostPrimitive::StderrLine)),
-                _ => None,
-            };
-            if let Some(kind) = kind {
-                return Ok(Instr::HostIntrinsic {
-                    dst,
-                    kind,
-                    src: tokens.take(*src),
-                });
-            }
-        }
-        Err(unsupported(
-            code,
-            format!("Perform({effect}.{op_name})"),
-            span,
-        ))
     }
 }
 

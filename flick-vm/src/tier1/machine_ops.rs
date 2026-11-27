@@ -410,26 +410,7 @@ impl Machine<'_, '_> {
                 self.scratch.push(old);
                 self.release_operands()?;
             }
-            Instr::Apply { .. }
-            | Instr::TailApply { .. }
-            | Instr::Call { .. }
-            | Instr::TailCall { .. }
-            | Instr::Global { .. }
-            | Instr::Loop { .. }
-            | Instr::LoopExit { .. }
-            | Instr::FunctionBoundary { .. }
-            | Instr::UnwrapOption { .. }
-            | Instr::Try { .. }
-            | Instr::Recovery { .. }
-            | Instr::FromResult { .. }
-            | Instr::Raise { .. }
-            | Instr::Die { .. }
-            | Instr::FailureRethrow { .. }
-            | Instr::MatchFail
-            | Instr::Return { .. }
-            | Instr::ReturnUnit
-            | Instr::Branch { .. }
-            | Instr::CompareBranch { .. } => self.step_control(instr)?,
+            other => self.step_control(other)?,
         }
         Ok(())
     }

@@ -7,20 +7,27 @@
 //! and [`crate::tier0::Heap::finish`] enforces zero leaked slots identically
 //! to tier 0.
 //!
-//! Any reachable operation outside tier 1's pure synchronous subset fails
-//! [`prepare`] with a structured [`PrepareError`] naming the operation and its
-//! source span, with no silent fallback to tier 0.
+//! Any reachable operation outside tier 1's synchronous effect/handler subset
+//! fails [`prepare`] with a structured [`PrepareError`] naming the operation
+//! and its source span, with no silent fallback to tier 0.
 
 mod machine;
 mod machine_call;
+mod machine_continuations;
 mod machine_dict;
+mod machine_handlers;
 mod machine_ops;
 mod machine_recovery;
+mod machine_resources;
+mod machine_scopes;
+mod machine_state;
+mod machine_unwind;
 mod opcode;
 mod prepare;
 mod prepare_fuse;
 mod prepare_ops;
 mod prepare_ops_data;
+mod prepare_ops_handlers;
 
 use flick_core::ir::memory::{Name, Program};
 

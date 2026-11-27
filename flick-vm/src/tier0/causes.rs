@@ -1,4 +1,6 @@
 //! Immutable owned causes. Representation builders do not activate VM producers.
+use flick_core::ir::memory::MemorySpan;
+
 use super::{Data, Error, Heap, ObjectToken, Value, charge};
 use crate::stdlib::{Fuel, FuelCounter, charge as charge_hooks};
 
@@ -124,33 +126,46 @@ pub enum DefectCode {
 #[derive(Debug, PartialEq, Eq)]
 pub struct DefectSpec {
     code: DefectCode,
+    span: Option<MemorySpan>,
 }
 
 impl DefectSpec {
-    pub(super) fn arena_owner_closed() -> Self {
+    pub(crate) fn arena_owner_closed() -> Self {
         Self {
             code: DefectCode::ArenaOwnerClosed,
+            span: None,
         }
     }
 
     pub(super) fn arena_closed() -> Self {
         Self {
             code: DefectCode::ArenaClosed,
+            span: None,
         }
     }
 
     pub(crate) fn custom(msg: impl Into<String>) -> Self {
         Self {
             code: DefectCode::Assert(msg.into()),
+            span: None,
         }
     }
 
     pub(crate) const fn from_code(code: DefectCode) -> Self {
-        Self { code }
+        Self { code, span: None }
+    }
+
+    pub(crate) const fn with_span(mut self, span: Option<MemorySpan>) -> Self {
+        self.span = span;
+        self
     }
 
     pub fn code(&self) -> &DefectCode {
         &self.code
+    }
+
+    pub const fn span(&self) -> Option<MemorySpan> {
+        self.span
     }
 
     pub(crate) fn message(&self) -> String {
@@ -248,7 +263,7 @@ impl StepFailure {
             Error::RangeError(msg) => DefectCode::RangeError(msg),
             evaluator => return Self::Evaluator(evaluator),
         };
-        Self::Language(DefectSpec { code })
+        Self::Language(DefectSpec { code, span: None })
     }
 }
 

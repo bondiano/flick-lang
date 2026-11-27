@@ -69,6 +69,32 @@ impl Machine<'_, '_> {
                     dst: *dst,
                 };
             }
+            Instr::Handle {
+                dst,
+                body,
+                operations,
+                ret,
+                errors,
+            } => self.exec_handle(*dst, *body, operations, *ret, *errors)?,
+            Instr::ScopeRun { dst, body } => self.exec_scope_run(*dst, *body)?,
+            Instr::ScopeCurrent { dst, unit } => self.exec_scope_current(*dst, *unit)?,
+            Instr::ScopeAddFinalizer { dst, task } => self.exec_scope_add_finalizer(*dst, *task)?,
+            Instr::ScopeAddFinalizerExit { dst, func } => {
+                self.exec_scope_add_finalizer_exit(*dst, *func)?;
+            }
+            Instr::ScopeAddClose { dst, func } => self.exec_scope_add_close(*dst, *func)?,
+            Instr::AcquireRelease {
+                dst,
+                acquire,
+                release,
+            } => self.exec_acquire_release(*dst, *acquire, *release)?,
+            Instr::Bracket {
+                dst,
+                acquire,
+                use_fn,
+                release,
+            } => self.exec_bracket(*dst, *acquire, *use_fn, *release)?,
+            Instr::Uninterruptible { dst, task } => self.exec_uninterruptible(*dst, *task)?,
             Instr::Recovery { dst, selected } => self.exec_recovery(*dst, *selected)?,
             Instr::FromResult { dst, src } => self.exec_from_result(*dst, *src)?,
             Instr::Raise { src } => {
@@ -141,7 +167,7 @@ impl Machine<'_, '_> {
             for arg in args {
                 Self::reg_into_roots(arg, &mut roots);
             }
-            Self::drain_end_roots(end, &mut roots);
+            self.drain_end_roots(end, &mut roots);
             self.heap.drop_values(roots)?;
             return Err(Error::ArgumentCount {
                 expected: function.params.len(),
@@ -168,18 +194,15 @@ impl Machine<'_, '_> {
         Ok(())
     }
 
+    fn is_tail_safe_end(end: &End) -> bool {
+        matches!(end, End::Top | End::Store(_) | End::Global { .. })
+    }
+
     fn can_tail_call(&self) -> bool {
         let frame = self.frame();
         frame.vars.is_empty()
             && frame.recovery_id.is_none()
-            && !matches!(
-                frame.end,
-                End::Loop(_)
-                    | End::Try { .. }
-                    | End::FunctionBoundary { .. }
-                    | End::RecoverySelection { .. }
-                    | End::RecoveryHelper { .. }
-            )
+            && Self::is_tail_safe_end(&frame.end)
             && self.registers[frame.base..].iter().all(Option::is_none)
     }
 
@@ -225,14 +248,7 @@ impl Machine<'_, '_> {
         let frame = self.frame();
         if !frame.vars.is_empty()
             || frame.recovery_id.is_some()
-            || matches!(
-                frame.end,
-                End::Loop(_)
-                    | End::Try { .. }
-                    | End::FunctionBoundary { .. }
-                    | End::RecoverySelection { .. }
-                    | End::RecoveryHelper { .. }
-            )
+            || !Self::is_tail_safe_end(&frame.end)
         {
             return false;
         }
@@ -250,13 +266,19 @@ impl Machine<'_, '_> {
         end: End,
         tail: bool,
     ) -> Result<(), Error> {
+        if let RegVal::Value(Value::Object(tok)) = &callee
+            && let Ok(obj) = self.heap.object(tok.id)
+            && let Data::Continuation { execution, id } = obj.data
+        {
+            return self.apply_continuation(callee, argument, execution, id, end, tail);
+        }
         let code = match self.checked_closure(&callee) {
             Ok(code) => code,
             Err(err) => {
                 let mut roots = Vec::new();
                 Self::reg_into_roots(callee, &mut roots);
                 Self::reg_into_roots(argument, &mut roots);
-                Self::drain_end_roots(end, &mut roots);
+                self.drain_end_roots(end, &mut roots);
                 self.heap.drop_values(roots)?;
                 return Err(err);
             }
@@ -267,6 +289,41 @@ impl Machine<'_, '_> {
         } else {
             self.push_call(code, [callee, argument], end)
         }
+    }
+
+    pub(super) fn await_task_reg(&mut self, task: RegVal, end: End) -> Result<(), Error> {
+        let task_info = if let RegVal::Value(Value::Object(tok)) = &task {
+            if let Data::Task {
+                execution, code, ..
+            } = &self.heap.object(tok.id)?.data
+            {
+                Some((*execution, *code))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let Some((execution, ir_code)) = task_info else {
+            let mut roots = Vec::new();
+            Self::reg_into_roots(task, &mut roots);
+            self.drain_end_roots(end, &mut roots);
+            self.heap.drop_values(roots)?;
+            return Err(Error::ExpectedTask);
+        };
+        if execution != self.execution {
+            let mut roots = Vec::new();
+            Self::reg_into_roots(task, &mut roots);
+            self.drain_end_roots(end, &mut roots);
+            self.heap.drop_values(roots)?;
+            return Err(Error::ForeignTask);
+        }
+        let code = *self
+            .image
+            .code_indices
+            .get(&ir_code)
+            .ok_or(Error::InvalidProgram(memory::Error::UnknownCode(ir_code)))?;
+        self.push_call(code, [task, RegVal::Value(Value::Unit)], end)
     }
 
     pub(super) fn checked_closure(&self, callee: &RegVal) -> Result<usize, Error> {
@@ -337,7 +394,7 @@ impl Machine<'_, '_> {
         }
         let mut frame = self.frames.pop().expect("returning frame");
         let base = frame.base;
-        let leftover: Vec<Value> = self
+        let mut leftover: Vec<Value> = self
             .registers
             .drain(base..)
             .flatten()
@@ -346,12 +403,12 @@ impl Machine<'_, '_> {
                 RegVal::StaticClosure(_) => None,
             })
             .collect();
+        self.detach_frame_vars(mem::take(&mut frame.vars), &mut leftover);
         self.heap.drop_values(leftover)?;
-        self.heap.drop_values(mem::take(&mut frame.vars))?;
         self.deliver_end(frame.end)
     }
 
-    fn deliver_end(&mut self, end: End) -> Result<(), Error> {
+    pub(super) fn deliver_end(&mut self, end: End) -> Result<(), Error> {
         match end {
             End::Top => {
                 self.top = self.pending.take();
@@ -387,6 +444,21 @@ impl Machine<'_, '_> {
                 let reg = self.pending.take().expect("helper result");
                 self.store_transport(dst, reg, id)?;
             }
+            End::RecoveryBody { dst, owner } => {
+                self.current_owner = owner;
+                let reg = self.pending.take().expect("selected body result");
+                self.store_reg(dst, reg)?;
+            }
+            End::Handle { activation, dst } => self.handler_returned(activation, dst)?,
+            End::Discontinue { cont_id, dst } => self.discontinue_returned(cont_id, dst)?,
+            End::Invocation(id) => {
+                self.invocations
+                    .get_mut(&id)
+                    .expect("running invocation")
+                    .callee = self.pending.take();
+                self.ready = Some(id);
+            }
+            other => self.deliver_scope_end(other)?,
         }
         Ok(())
     }

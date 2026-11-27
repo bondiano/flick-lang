@@ -48,7 +48,7 @@ impl Heap {
     }
 
     /// Drains continuation IDs whose last counted reference hit zero in `execution`.
-    pub(super) fn take_dropped_continuations(&mut self, execution: usize) -> Vec<usize> {
+    pub(crate) fn take_dropped_continuations(&mut self, execution: usize) -> Vec<usize> {
         let mut taken = Vec::new();
         let mut kept = Vec::new();
         for (owner, id) in mem::take(&mut self.dropped_continuations) {

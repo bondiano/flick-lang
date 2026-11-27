@@ -1,10 +1,11 @@
-//! Frame unwinding and typed-error `try` recovery selection for tier 1.
+//! Frame unwinding, loops, `Option?`, and typed-error `try` recovery selection for tier 1.
 
 use std::mem;
 
 use crate::tier0::{Data, Error, Reason, Value};
 
 use super::machine::{End, GlobalState, LoopState, Machine, RecoveryState, RegVal};
+use super::machine_unwind::{Discard, TransferNext};
 
 impl Machine<'_, '_> {
     pub(super) fn enter_loop(
@@ -64,38 +65,49 @@ impl Machine<'_, '_> {
     }
 
     pub(super) fn exit_loop(&mut self, id: usize, value: Option<usize>) -> Result<(), Error> {
-        if let Some(slot) = value {
-            let reg = self.take_reg(slot)?;
-            self.pending = Some(reg);
-        }
+        let break_val = if let Some(slot) = value {
+            Some(self.take_reg(slot)?)
+        } else {
+            None
+        };
         let target = self
             .frames
             .iter()
-            .rposition(|frame| matches!(&frame.end, End::Loop(state) if state.id == id))
-            .ok_or_else(|| Error::MissingLoopTarget(self.image.loops[id].clone()))?;
-        while self.frames.len() > target + 1 {
-            self.discard_top_frame()?;
-        }
-        let mut loop_frame = self.frames.pop().expect("loop frame");
-        let mut roots = mem::take(&mut loop_frame.vars);
-        for reg in self.registers.drain(loop_frame.base..).flatten() {
-            Self::reg_into_roots(reg, &mut roots);
-        }
-        let End::Loop(state) = loop_frame.end else {
-            unreachable!("validated loop frame");
-        };
-        if value.is_some() {
-            let dst = state.dst;
-            for arg in state.args {
-                Self::reg_into_roots(arg, &mut roots);
+            .rposition(|frame| matches!(&frame.end, End::Loop(state) if state.id == id));
+        let Some(target) = target else {
+            if let Some(val) = break_val {
+                self.drop_reg(val)?;
             }
-            self.heap.drop_values(roots)?;
-            let reg = self.pending.take().expect("break value");
-            self.store_reg(dst, reg)
+            return Err(Error::MissingLoopTarget(self.image.loops[id].clone()));
+        };
+        if let Some(val) = break_val {
+            let captured = self.split_frames(target);
+            let End::Loop(state) = &captured.frames[0].end else {
+                unreachable!("validated loop target");
+            };
+            let dst = state.dst;
+            self.bump_handler_epoch();
+            self.discard = Some(Discard {
+                frames: captured,
+                owner: None,
+                next: TransferNext::DeliverValue { dst, value: val },
+                aborted: false,
+            });
         } else {
-            self.heap.drop_values(roots)?;
-            self.restart_loop(state)
+            let mut captured = self.split_frames(target);
+            let End::Loop(state) = mem::replace(&mut captured.frames[0].end, End::DiscardFinalizer)
+            else {
+                unreachable!("validated loop target");
+            };
+            self.bump_handler_epoch();
+            self.discard = Some(Discard {
+                frames: captured,
+                owner: None,
+                next: TransferNext::LoopContinue(state),
+                aborted: false,
+            });
         }
+        Ok(())
     }
 
     pub(super) fn exec_unwrap_option(&mut self, dst: usize, option: usize) -> Result<(), Error> {
@@ -124,20 +136,18 @@ impl Machine<'_, '_> {
                     .iter()
                     .rposition(|f| matches!(f.end, End::FunctionBoundary { .. }))
                     .ok_or(Error::MissingFunctionBoundary)?;
-                while self.frames.len() > target + 1 {
-                    self.discard_top_frame()?;
-                }
-                let mut boundary = self.frames.pop().expect("boundary frame");
-                let mut roots = mem::take(&mut boundary.vars);
-                for reg in self.registers.drain(boundary.base..).flatten() {
-                    Self::reg_into_roots(reg, &mut roots);
-                }
-                let End::FunctionBoundary { dst: out_dst } = boundary.end else {
+                let captured = self.split_frames(target);
+                let End::FunctionBoundary { dst: out_dst } = captured.frames[0].end else {
                     unreachable!("validated boundary frame");
                 };
-                self.heap.drop_values(roots)?;
-                let none = self.heap.construct("Prelude.Option.None", Vec::new())?;
-                self.store_reg(out_dst, RegVal::Value(none))
+                self.bump_handler_epoch();
+                self.discard = Some(Discard {
+                    frames: captured,
+                    owner: None,
+                    next: TransferNext::ReturnNone { dst: out_dst },
+                    aborted: false,
+                });
+                Ok(())
             }
             _ => Err(Error::ExpectedOption),
         }
@@ -173,44 +183,33 @@ impl Machine<'_, '_> {
         }
     }
 
-    pub(super) fn discard_top_frame(&mut self) -> Result<(), Error> {
-        let mut frame = self.frames.pop().expect("discarded frame");
-        let mut roots = mem::take(&mut frame.vars);
-        for reg in self.registers.drain(frame.base..).flatten() {
-            Self::reg_into_roots(reg, &mut roots);
-        }
-        match frame.end {
-            End::Global { id, .. } => {
-                self.globals[id] = GlobalState::Empty;
-            }
-            End::RecoverySelection { id } => {
-                if let Some(state) = self.recoveries.remove(&id) {
-                    roots.push(state.original.into_value());
-                }
-            }
-            other => Self::drain_end_roots(other, &mut roots),
-        }
-        self.heap.drop_values(roots)
-    }
-
     pub(super) fn unwind_frame(&mut self) -> Result<(), Error> {
         let mut frame = self.frames.pop().expect("unwound frame");
-        let mut roots = mem::take(&mut frame.vars);
+        let mut roots = Vec::new();
         for reg in self.registers.drain(frame.base..).flatten() {
             Self::reg_into_roots(reg, &mut roots);
         }
+        self.detach_frame_vars(mem::take(&mut frame.vars), &mut roots);
         self.heap.drop_values(roots)?;
-        match frame.end {
+        self.fail_end(frame.end)
+    }
+
+    pub(super) fn fail_end(&mut self, end: End) -> Result<(), Error> {
+        match end {
+            End::Handle { activation, dst } => self.handler_failed(activation, dst),
+            End::Discontinue { cont_id, .. } => {
+                self.unwind_discontinue(cont_id);
+                Ok(())
+            }
+            End::Invocation(id) => self.invocation_failed(id),
             End::Try { selector, dst } => {
                 self.pending_handler = Some(selector);
                 self.begin_recovery(dst)
             }
-            End::RecoverySelection { id } => {
-                let state = self
-                    .recoveries
-                    .remove(&id)
-                    .ok_or(Error::ForeignRecoveryResult)?;
-                self.heap.drop_cause(state.original)
+            End::RecoverySelection { id } => self.abandon_recovery(id),
+            End::RecoveryBody { owner, .. } => {
+                self.current_owner = owner;
+                Ok(())
             }
             End::Global { id, .. } => {
                 self.globals[id] = GlobalState::Empty;
@@ -226,11 +225,13 @@ impl Machine<'_, '_> {
             End::Top
             | End::Store(_)
             | End::FunctionBoundary { .. }
-            | End::RecoveryHelper { .. } => Ok(()),
+            | End::RecoveryHelper { .. }
+            | End::DiscardFinalizer => Ok(()),
+            other => self.unwind_scope_end(other),
         }
     }
 
-    fn begin_recovery(&mut self, dst: usize) -> Result<(), Error> {
+    pub(super) fn begin_recovery(&mut self, dst: usize) -> Result<(), Error> {
         self.prepare_failure()?;
         let original = self.failure.as_ref().expect("failure root");
         let has_die = self
@@ -238,6 +239,8 @@ impl Machine<'_, '_> {
             .cause_reasons(original)?
             .any(|reason| matches!(reason, Reason::Die(_)));
         if has_die {
+            self.failure_elected = false;
+            self.prepare_failure()?;
             let sel = self.pending_handler.take().expect("unused selector");
             return self.drop_reg(sel);
         }
@@ -253,6 +256,7 @@ impl Machine<'_, '_> {
             RecoveryState {
                 original: self.failure.take().expect("eligible whole cause"),
                 dst,
+                owner: self.current_owner,
             },
         );
         self.charge_fuel(1)?;
@@ -264,6 +268,15 @@ impl Machine<'_, '_> {
             End::RecoverySelection { id },
             false,
         )
+    }
+
+    pub(super) fn abandon_recovery(&mut self, id: usize) -> Result<(), Error> {
+        let state = self
+            .recoveries
+            .remove(&id)
+            .ok_or(Error::ForeignRecoveryResult)?;
+        self.current_owner = state.owner;
+        self.heap.drop_cause(state.original)
     }
 
     fn executing_recovery(&self) -> Result<usize, Error> {
@@ -371,12 +384,16 @@ impl Machine<'_, '_> {
             .recoveries
             .remove(&id)
             .ok_or(Error::ForeignRecoveryResult)?;
+        self.current_owner = state.owner;
         if let Some(body) = self.scratch.pop() {
             self.heap.drop_cause(state.original)?;
             self.apply_reg(
                 RegVal::Value(body),
                 RegVal::Value(Value::Unit),
-                End::Store(state.dst),
+                End::RecoveryBody {
+                    dst: state.dst,
+                    owner: state.owner,
+                },
                 false,
             )
         } else {

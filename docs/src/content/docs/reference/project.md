@@ -97,7 +97,7 @@ virtual workspace root (`FLICK-P005`).
 | `target.js.ui` | module specifier rendering and mounting views in place of React (exports every name `Ui` and `Action` bind from `@flick-lang/effect-ts/ui` and `@flick-lang/effect-ts/ui/react`; relative paths are from the project root) | React |
 | `target.go.cgo` | boolean; enable cgo (`CGO_ENABLED=1`) when building Go executables | `false` |
 | `target.go.kind` | `"app"` or `"library"` (`"library"` is declared and currently refused by `flick/go` with `FLICK-P012`) | `"app"` |
-| `target.vm.tier` | `"0"`, `"tier0"`, `"1"`, or `"tier1"`; execution tier for the in-process VM (`flick run` / `flick test`); overridden by `--vm-tier` | `"0"` |
+| `target.vm.tier` | `"0"`, `"tier0"`, `"1"`, or `"tier1"`; execution tier for the in-process VM (`flick run` / `flick test` / `flick repl`; tier 1 supports synchronous execution, one-shot effect handlers, typed `try` recovery, and LIFO scope finalizers); overridden by `--vm-tier` | `"0"` |
 
 `flick new` takes its template files from the selected target backend (`--target js` by default creates an RT project with `[tools] "flick/js" = ["pnpm"]`, `@flick-lang/runtime` and no Effect dependency; `--target go` creates a Go project with `[build] target = "go"`, `[tools] "flick/go" = ["go"]`, and no `package.json`), or from a third-party package via `--from`. Pass `--runtime rt` to `build`, `run`, `dev`, `test` or `inspect` to select RT for one invocation of an Effect project. Set `[target.js] runtime = "effect"` explicitly when a project needs the Effect adapter and add `@flick-lang/effect-ts` to its dependencies.
 

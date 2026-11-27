@@ -3,6 +3,8 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::mem;
 
+use flick_core::ir::memory::MemorySpan;
+
 use crate::stdlib::HostServices;
 use crate::tier0::causes::StepFailure;
 use crate::tier0::{
@@ -10,59 +12,13 @@ use crate::tier0::{
     ProgramOutcome, Reason, Value, program as tier0_program,
 };
 
+use super::machine_handlers::{Activation, CachedHandlerHit, CapturedSlot, Invocation, Segment};
+use super::machine_scopes::OwnerState;
+pub(super) use super::machine_state::{
+    End, Frame, GlobalState, LoopState, MainStage, RecoveryState, RegVal,
+};
+use super::machine_unwind::{CapturedFrames, Discard};
 use super::opcode::{Instr, Prepared};
-
-/// Compact register value: captureless closures stay unallocated in registers
-/// until they escape to a heap container, primitive, or top-level return.
-#[derive(Debug)]
-pub(crate) enum RegVal {
-    Value(Value),
-    StaticClosure(usize),
-}
-
-pub(super) enum GlobalState {
-    Empty,
-    Initializing,
-    Ready(RegVal),
-}
-
-pub(super) struct LoopState {
-    pub(super) id: usize,
-    pub(super) code: usize,
-    pub(super) args: Vec<RegVal>,
-    pub(super) dst: usize,
-}
-
-pub(super) struct RecoveryState {
-    pub(super) original: CauseToken,
-    pub(super) dst: usize,
-}
-
-pub(super) enum End {
-    Top,
-    Store(usize),
-    Global { id: usize, dst: usize },
-    Loop(LoopState),
-    FunctionBoundary { dst: usize },
-    Try { selector: RegVal, dst: usize },
-    RecoverySelection { id: usize },
-    RecoveryHelper { id: usize, dst: usize },
-}
-
-pub(super) struct Frame {
-    pub(super) code: usize,
-    pub(super) pc: usize,
-    pub(super) base: usize,
-    pub(super) vars: Vec<Value>,
-    pub(super) recovery_id: Option<usize>,
-    pub(super) end: End,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum MainStage {
-    Function,
-    Done,
-}
 
 pub(super) struct Machine<'p, 'h> {
     pub(super) heap: &'h mut Heap,
@@ -71,6 +27,25 @@ pub(super) struct Machine<'p, 'h> {
     pub(super) frames: Vec<Frame>,
     pub(super) registers: Vec<Option<RegVal>>,
     pub(super) globals: Vec<GlobalState>,
+    pub(super) owners: Vec<OwnerState>,
+    pub(super) current_owner: usize,
+    pub(super) mask_depth: usize,
+    pub(super) activations: BTreeMap<usize, Activation>,
+    pub(super) segments: BTreeMap<usize, Segment>,
+    pub(super) continuations: BTreeMap<usize, CapturedSlot>,
+    pub(super) invocations: BTreeMap<usize, Invocation>,
+    pub(super) discard: Option<Discard>,
+    pub(super) ready: Option<usize>,
+    pub(super) next_handler: usize,
+    pub(super) next_handler_epoch: u64,
+    pub(super) handler_epoch: u64,
+    pub(super) handler_cache_epoch: u64,
+    pub(super) handler_cache: BTreeMap<usize, Option<CachedHandlerHit>>,
+    #[cfg(test)]
+    pub(super) handler_cache_hits: u64,
+    #[cfg(test)]
+    pub(super) handler_cache_misses: u64,
+    pub(super) last_defect_span: Option<MemorySpan>,
     pub(super) scratch: Vec<Value>,
     pub(super) pending: Option<RegVal>,
     pub(super) failure: Option<CauseToken>,
@@ -113,42 +88,113 @@ pub(super) fn execute_prepared(
             stderr: String::new(),
         };
     }
-    let mut machine = Machine {
+    let mut machine = Machine::new(
         heap,
         image,
-        execution: tier0_program::next_execution_id(),
-        frames: Vec::new(),
-        registers: Vec::new(),
-        globals: (0..image.globals.len())
-            .map(|_| GlobalState::Empty)
-            .collect(),
-        scratch: Vec::new(),
-        pending: None,
-        failure: None,
-        failure_elected: false,
-        recoveries: BTreeMap::new(),
-        next_recovery: 0,
-        pending_handler: None,
-        arguments: arguments.into(),
-        top: None,
-        main_stage: if main_protocol {
-            MainStage::Function
-        } else {
-            MainStage::Done
-        },
-        stdout: String::new(),
-        stderr: String::new(),
-        program_args,
-        host_services: HostServices::new(),
+        arguments,
         fuel,
         host_mode,
-    };
+        program_args,
+        main_protocol,
+    );
     let result = machine.start_entry().and_then(|()| machine.run());
     let outcome = machine.finish(result);
     ExecutionReport {
         outcome,
         stdout: machine.stdout,
         stderr: machine.stderr,
+    }
+}
+
+#[cfg(test)]
+pub(super) fn execute_prepared_cache_stats(
+    heap: &mut Heap,
+    image: &Prepared,
+    fuel: u64,
+) -> (ExecutionReport, u64, u64, u64) {
+    let mut machine = Machine::new(
+        heap,
+        image,
+        Vec::new(),
+        fuel,
+        HostMode::Deterministic,
+        Vec::new(),
+        false,
+    );
+    let result = machine.start_entry().and_then(|()| machine.run());
+    let outcome = machine.finish(result);
+    let report = ExecutionReport {
+        outcome,
+        stdout: machine.stdout,
+        stderr: machine.stderr,
+    };
+    (
+        report,
+        machine.handler_cache_hits,
+        machine.handler_cache_misses,
+        machine.handler_epoch,
+    )
+}
+
+impl<'p, 'h> Machine<'p, 'h> {
+    fn new(
+        heap: &'h mut Heap,
+        image: &'p Prepared,
+        arguments: Vec<Value>,
+        fuel: u64,
+        host_mode: HostMode,
+        program_args: Vec<String>,
+        main_protocol: bool,
+    ) -> Self {
+        Self {
+            heap,
+            image,
+            execution: tier0_program::next_execution_id(),
+            frames: Vec::new(),
+            registers: Vec::new(),
+            globals: (0..image.globals.len())
+                .map(|_| GlobalState::Empty)
+                .collect(),
+            owners: vec![OwnerState::default()],
+            current_owner: 0,
+            mask_depth: 0,
+            activations: BTreeMap::new(),
+            segments: BTreeMap::new(),
+            continuations: BTreeMap::new(),
+            invocations: BTreeMap::new(),
+            discard: None,
+            ready: None,
+            next_handler: 0,
+            next_handler_epoch: 1,
+            handler_epoch: 0,
+            handler_cache_epoch: 0,
+            handler_cache: BTreeMap::new(),
+            #[cfg(test)]
+            handler_cache_hits: 0,
+            #[cfg(test)]
+            handler_cache_misses: 0,
+            last_defect_span: None,
+            scratch: Vec::new(),
+            pending: None,
+            failure: None,
+            failure_elected: false,
+            recoveries: BTreeMap::new(),
+            next_recovery: 0,
+            pending_handler: None,
+            arguments: arguments.into(),
+            top: None,
+            main_stage: if main_protocol {
+                MainStage::Function
+            } else {
+                MainStage::Done
+            },
+            stdout: String::new(),
+            stderr: String::new(),
+            program_args,
+            host_services: HostServices::new(),
+            fuel,
+            host_mode,
+        }
     }
 }
 
@@ -211,11 +257,21 @@ impl Machine<'_, '_> {
             if self.failure.is_some() && !self.failure_elected {
                 self.prepare_failure()?;
             }
-            if self.failure.is_some() && self.frames.is_empty() {
+            self.drain_dropped_continuations();
+            if self.discard.is_none()
+                && self.ready.is_none()
+                && self.failure.is_some()
+                && self.frames.is_empty()
+            {
                 let cause = self.failure.take().expect("failure root");
                 return Ok(LanguageExit::Failure(cause));
             }
-            if self.frames.is_empty() && self.arguments.is_empty() && self.top.is_some() {
+            if self.discard.is_none()
+                && self.ready.is_none()
+                && self.frames.is_empty()
+                && self.arguments.is_empty()
+                && self.top.is_some()
+            {
                 if self.main_stage != MainStage::Done {
                     self.advance_main()?;
                     continue;
@@ -229,7 +285,11 @@ impl Machine<'_, '_> {
             }
             self.fuel -= 1;
 
-            if self.failure.is_some() {
+            if self.discard.is_some() {
+                self.discard_step()?;
+            } else if let Some(id) = self.ready.take() {
+                self.invoke_step(id)?;
+            } else if self.failure.is_some() {
                 self.unwind_frame()?;
             } else if let Some(callee) = self.top.take() {
                 let arg = self
@@ -245,9 +305,15 @@ impl Machine<'_, '_> {
                     (frame.code, at)
                 };
                 let instr = &image.functions[code].instructions[pc];
-                if let Err(error) = self.step(instr) {
+                if let Err(error) = self.step_at(code, pc, instr) {
                     match StepFailure::classify(error) {
-                        StepFailure::Language(spec) => self.raise_defect(spec)?,
+                        StepFailure::Language(spec) => {
+                            let span = image
+                                .span(code, pc)
+                                .or_else(|| self.last_defect_span.take());
+                            self.last_defect_span = None;
+                            self.raise_defect(spec.with_span(span))?;
+                        }
                         StepFailure::Evaluator(err) => return Err(err),
                     }
                 }
@@ -289,7 +355,10 @@ impl Machine<'_, '_> {
     pub(super) fn dup_reg(&mut self, reg: &RegVal) -> Result<RegVal, Error> {
         match reg {
             RegVal::StaticClosure(code) => Ok(RegVal::StaticClosure(*code)),
-            RegVal::Value(val) => Ok(RegVal::Value(self.heap.dup(val)?)),
+            RegVal::Value(val) => {
+                let rep = val.representation();
+                Ok(RegVal::Value(self.heap.dup(&rep)?))
+            }
         }
     }
 
@@ -429,20 +498,29 @@ impl Machine<'_, '_> {
         Ok(val)
     }
 
-    pub(super) fn drain_end_roots(end: End, roots: &mut Vec<Value>) {
-        match end {
-            End::Loop(state) => {
-                for arg in state.args {
-                    Self::reg_into_roots(arg, roots);
-                }
+    pub(super) fn detach_frame_vars(&mut self, vars: Vec<Value>, roots: &mut Vec<Value>) {
+        for root in &vars {
+            if let Value::Object(token) = root
+                && let Ok(object) = self.heap.object_mut(token.id)
+                && let Data::Var { contents, .. } = &mut object.data
+            {
+                roots.extend(contents.take());
             }
-            End::Try { selector, .. } => Self::reg_into_roots(selector, roots),
-            End::Top
-            | End::Store(_)
-            | End::Global { .. }
-            | End::FunctionBoundary { .. }
-            | End::RecoverySelection { .. }
-            | End::RecoveryHelper { .. } => {}
+        }
+        roots.extend(vars);
+    }
+
+    pub(super) fn drain_captured_roots(
+        &mut self,
+        captured: CapturedFrames,
+        roots: &mut Vec<Value>,
+    ) {
+        for reg in captured.registers.into_iter().flatten() {
+            Self::reg_into_roots(reg, roots);
+        }
+        for frame in captured.frames {
+            self.detach_frame_vars(frame.vars, roots);
+            self.drain_end_roots(frame.end, roots);
         }
     }
 
@@ -465,9 +543,10 @@ impl Machine<'_, '_> {
             Self::reg_into_roots(reg, &mut roots);
         }
         for frame in mem::take(&mut self.frames) {
-            roots.extend(frame.vars);
-            Self::drain_end_roots(frame.end, &mut roots);
+            self.detach_frame_vars(frame.vars, &mut roots);
+            self.drain_end_roots(frame.end, &mut roots);
         }
+        self.cleanup_handlers(&mut roots);
         for state in mem::take(&mut self.recoveries).into_values() {
             roots.push(state.original.into_value());
         }
@@ -476,10 +555,28 @@ impl Machine<'_, '_> {
                 Self::reg_into_roots(reg, &mut roots);
             }
         }
-        self.heap.drop_values(roots)
+        let mut owner_err = None;
+        for owner in (0..self.owners.len()).rev() {
+            if let Err(err) = self.close_owner(owner) {
+                owner_err.get_or_insert(err);
+            }
+        }
+        let released = self.heap.drop_values(roots);
+        let _ = self.heap.take_dropped_continuations(self.execution);
+        owner_err.map_or(released, Err)
     }
 
-    pub(super) fn step(&mut self, instr: &Instr) -> Result<(), Error> {
+    fn step_at(&mut self, code: usize, pc: usize, instr: &Instr) -> Result<(), Error> {
+        if let Instr::Perform {
+            dst,
+            op_id,
+            dicts,
+            args,
+        } = instr
+        {
+            let span = self.image.span(code, pc);
+            return self.exec_perform(*dst, *op_id, dicts, args, span);
+        }
         self.step_instr(instr)
     }
 }
