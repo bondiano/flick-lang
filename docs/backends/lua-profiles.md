@@ -169,7 +169,9 @@ representation of the program. Generated code calls `K` for:
 - strings, which are WTF-8 Lua strings: `++` joins the halves of a
   surrogate pair, `<` and the hooks order them by UTF-16 code units, and
   `String.length`, `char_code_at`, `slice`, `index_of` and `last_index_of`
-  count UTF-16 code units;
+  count UTF-16 code units; the other string functions are Flick bodies over
+  them, `to_upper` and `to_lower` by the tables of `String.CaseData`, which
+  `tools/unicode-case/gen.mjs` writes from Node, a final sigma included;
 - `++` of lists, `List.length`, `List.get` and `List.initialize`, and the
   hooks `equals`, `compare`, `hash` (that of the JS and Go runtimes, bit for
   bit) and `show` (JS spelling, `-0` kept) of the primitive values;
@@ -223,6 +225,7 @@ snapshot. The CI `lua-probes` job runs it.
 | `Language.Mutation` | pass (8 of 8 pure tests), the same report as JS; 3 effect tests skipped |
 | `Language.NumericBoundaries` | pass (10 of 10 pure tests), the same report as JS; 2 effect tests skipped |
 | `Language.Show` | pass (19 of 19 pure tests), the same report as JS; 1 effect test skipped |
+| `Language.Strings` | pass (40 of 40), the same report as JS |
 
 ## The synchronous WoW slice
 

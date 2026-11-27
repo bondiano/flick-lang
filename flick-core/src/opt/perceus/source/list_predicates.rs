@@ -213,11 +213,12 @@ mod tests {
             seen,
             BTreeSet::from([
                 ("Instances", "count_of"),
+                ("String.Text", "count_of"),
                 ("List.Core", "any"),
                 ("List.Core", "length"),
                 ("NonEmpty", "length")
             ])
         );
-        eprintln!("4 exact observer contracts, {rejected} rejected metadata mutations");
+        eprintln!("5 exact observer contracts, {rejected} rejected metadata mutations");
     }
 }

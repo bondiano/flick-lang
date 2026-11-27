@@ -3,6 +3,9 @@
 /// order. Regular expressions are in `RegExp`.
 module String exposing (..)
 
+import String.Case
+import String.Text
+
 /// A Unicode normalization form, as `String.normalize` takes it.
 type NormalForm = NFC | NFD | NFKC | NFKD
 
@@ -71,12 +74,14 @@ let is_empty s = s == ""
 
 /// Whether the string has a code unit.
 is_non_empty : String -> Bool
-foreign pure is_non_empty from "flick:String" "isNonEmpty"
+let is_non_empty s = length s > 0
+  @native "flick:String" "isNonEmpty" when js || go
 
 /// The parts between the separators: `"a,b" |> String.split ","`.
 split : String -> String -> List String
-foreign pure split from "flick:String" "split"
-  arity 1
+let split separator s = String.Text.split separator s
+  @native "flick:String" "split" when js || go
+    arity 1
 
 /// The parts with the separator between them.
 join : String -> List String -> String
@@ -93,18 +98,24 @@ let join separator parts =
 
 /// Whether `part` occurs in the string.
 contains : String -> String -> Bool
-foreign pure contains from "flick:String" "includes"
-  arity 1
+let contains part s = index_of part s != None
+  @native "flick:String" "includes" when js || go
+    arity 1
 
 /// Whether the string starts with `prefix`.
 starts_with : String -> String -> Bool
-foreign pure starts_with from "flick:String" "startsWith"
-  arity 1
+let starts_with prefix s = slice 0 (length prefix) s == prefix
+  @native "flick:String" "startsWith" when js || go
+    arity 1
 
 /// Whether the string ends with `suffix`.
 ends_with : String -> String -> Bool
-foreign pure ends_with from "flick:String" "endsWith"
-  arity 1
+let ends_with suffix s =
+  let n = length s
+  let width = length suffix
+  width <= n && slice (n - width) n s == suffix
+  @native "flick:String" "endsWith" when js || go
+    arity 1
 
 /// The position of the first occurrence of `part`.
 index_of : String -> String -> Option Int
@@ -118,11 +129,13 @@ foreign pure last_index_of from "flick:String" "lastIndexOf"
 
 /// Upper case, by the default Unicode rules.
 to_upper : String -> String
-foreign pure to_upper from "flick:String" "toUpperCase"
+let to_upper s = String.Case.upper s
+  @native "flick:String" "toUpperCase" when js || go
 
 /// Lower case, by the default Unicode rules.
 to_lower : String -> String
-foreign pure to_lower from "flick:String" "toLowerCase"
+let to_lower s = String.Case.lower s
+  @native "flick:String" "toLowerCase" when js || go
 
 /// Upper case by the rules of the locale `locale` (a BCP 47 tag; an invalid
 /// one is a defect).
@@ -137,11 +150,13 @@ foreign pure to_locale_lower from "flick:String" "toLocaleLowerCase"
 
 /// The first character in upper case.
 capitalize : String -> String
-foreign pure capitalize from "flick:String" "capitalize"
+let capitalize s = String.Case.upper (slice 0 1 s) ++ slice 1 (length s) s
+  @native "flick:String" "capitalize" when js || go
 
 /// The first character in lower case.
 uncapitalize : String -> String
-foreign pure uncapitalize from "flick:String" "uncapitalize"
+let uncapitalize s = String.Case.lower (slice 0 1 s) ++ slice 1 (length s) s
+  @native "flick:String" "uncapitalize" when js || go
 
 /// The code units from `start` up to `end`, as JS `slice`: negative
 /// positions count from the end.
@@ -152,28 +167,44 @@ foreign pure slice from "flick:String" "slice"
 /// The code units between `start` and `end`, as JS `substring`: negative
 /// positions are 0, and the two may come in either order.
 substring : Int -> Int -> String -> String
-foreign pure substring from "flick:String" "substring"
-  arity 2
+let substring start end s =
+  let n = length s
+  let clamp i = if i < 0 then 0 else if i > n then n else i
+  let (a, b) = (clamp start, clamp end)
+  if a <= b then slice a b s else slice b a s
+  @native "flick:String" "substring" when js || go
+    arity 2
 
 /// The first `n` code units.
 take_left : Int -> String -> String
-foreign pure take_left from "flick:String" "takeLeft"
-  arity 1
+let take_left n s = slice 0 (if n > 0 then n else 0) s
+  @native "flick:String" "takeLeft" when js || go
+    arity 1
 
 /// The last `n` code units.
 take_right : Int -> String -> String
-foreign pure take_right from "flick:String" "takeRight"
-  arity 1
+let take_right n s =
+  let count = length s
+  let k = if n <= 0 then 0 else if n > count then count else n
+  slice (count - k) count s
+  @native "flick:String" "takeRight" when js || go
+    arity 1
 
 /// The code unit at `index`; a negative one counts from the end.
 at : Int -> String -> Option String
-foreign pure at from "flick:String" "at"
-  arity 1
+let at index s =
+  let n = length s
+  let i = if index < 0 then n + index else index
+  if i >= 0 && i < n then Some (slice i (i + 1) s) else None
+  @native "flick:String" "at" when js || go
+    arity 1
 
 /// The code unit at `index`, which must be in range.
 char_at : Int -> String -> Option String
-foreign pure char_at from "flick:String" "charAt"
-  arity 1
+let char_at index s =
+  if index >= 0 && index < length s then Some (slice index (index + 1) s) else None
+  @native "flick:String" "charAt" when js || go
+    arity 1
 
 /// The UTF-16 code unit at `index`, as a number.
 char_code_at : Int -> String -> Option Int
@@ -182,8 +213,14 @@ foreign pure char_code_at from "flick:String" "charCodeAt"
 
 /// The code point starting at `index`.
 code_point_at : Int -> String -> Option Int
-foreign pure code_point_at from "flick:String" "codePointAt"
-  arity 1
+let code_point_at index s =
+  if index >= 0 && index < length s then
+    let (cp, _) = String.Text.point_at s index
+    Some cp
+  else
+    None
+  @native "flick:String" "codePointAt" when js || go
+    arity 1
 
 /// Compares by the collation of the locale `locale`: `self |>
 /// String.locale_compare "de" that`.
@@ -196,22 +233,26 @@ foreign pure normalize from "flick:String" "flickNormalize"
 
 /// Padded at the start with `fill`, repeated and cut, up to `length`.
 pad_start : Int -> String -> String -> String
-foreign pure pad_start from "flick:String" "padStart"
-  arity 2
+let pad_start target fill s = String.Text.padding target fill s ++ s
+  @native "flick:String" "padStart" when js || go
+    arity 2
 
 /// Padded at the end with `fill`, repeated and cut, up to `length`.
 pad_end : Int -> String -> String -> String
-foreign pure pad_end from "flick:String" "padEnd"
-  arity 2
+let pad_end target fill s = s ++ String.Text.padding target fill s
+  @native "flick:String" "padEnd" when js || go
+    arity 2
 
 /// The string `n` times; a negative `n` counts as 0, a fraction is cut.
 repeat : Int -> String -> String
-foreign pure repeat from "flick:String" "repeat"
-  arity 1
+let repeat n s = String.Text.repeat n s
+  @native "flick:String" "repeat" when js || go
+    arity 1
 
 /// Every occurrence of `pattern` replaced by `replacement`, taken as it is.
 replace_all : String -> String -> String -> String
-foreign pure replace_all from "flick:rt" "stringReplaceAll"
+let replace_all pattern replacement s = String.Text.replace_all pattern replacement s
+  @native "flick:rt" "stringReplaceAll" when js || go
 
 /// The lines, without their line breaks (`\n` or `\r\n`).
 lines : String -> List String
@@ -299,7 +340,8 @@ foreign pure snake_case from "flick:String" "snakeCase"
 
 /// The code points, each as a string.
 chars : String -> List String
-foreign pure chars from "flick:rt" "stringChars"
+let chars s = String.Text.chars s
+  @native "flick:rt" "stringChars" when js || go
 
 /// The number in JS syntax; `-0` is `"-0"`.
 from_number : Float -> String
