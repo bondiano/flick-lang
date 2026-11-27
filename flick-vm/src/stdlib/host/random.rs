@@ -1,10 +1,14 @@
 //! Host randomness primitive (`Host.Random.next`), preserving deterministic
 //! `Random.with_seed` (`IsaacRng`) and `HostMode::Deterministic` (`DRAW`).
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::collections::hash_map::RandomState;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::hash::{BuildHasher as _, Hasher as _};
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::stdlib::hooks::VmHooks;
@@ -21,6 +25,9 @@ pub(super) fn next(hooks: &mut dyn VmHooks) -> f64 {
     match hooks.host_mode() {
         HostMode::Deterministic => DRAW,
         HostMode::LiveOs => {
+            if let Some(draw) = hooks.host_random_next() {
+                return draw;
+            }
             if let Some(svc) = hooks.host_services() {
                 let rng = svc.os_rng.get_or_insert_with(os_seeded_rng);
                 rng.next_f64()
@@ -36,6 +43,7 @@ fn os_seeded_rng() -> IsaacRng {
     IsaacRng::from_seed(f64::from(seed_u32))
 }
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 #[expect(
     clippy::cast_possible_truncation,
     reason = "mixing 64-bit OS entropy down to 32-bit ISAAC seed"
@@ -64,6 +72,19 @@ fn os_entropy_u32() -> u32 {
     (mixed ^ (mixed >> 32)) as u32
 }
 
+#[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "folding 64-bit counter down to 32-bit ISAAC seed"
+)]
+fn os_entropy_u32() -> u32 {
+    let n = ENTROPY_COUNTER
+        .fetch_add(1, Ordering::Relaxed)
+        .wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    (n ^ (n >> 32)) as u32
+}
+
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 pub(crate) fn random_hex(bytes: usize) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut rng = os_seeded_rng();

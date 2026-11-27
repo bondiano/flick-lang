@@ -1,5 +1,5 @@
 // Lazy cells, resource acquisition, finalizer registration, and scope-close entry points.
-impl<'p> Machine<'p, '_> {
+impl Machine<'_, '_> {
     fn control_intrinsic(&mut self, kind: Intrinsic, binding: Local) -> Result<bool, Error> {
         match kind {
             Intrinsic::LazyMake | Intrinsic::LazyMakeLocal => {
@@ -101,7 +101,7 @@ impl<'p> Machine<'p, '_> {
     /// interrupt-bearing cause, trigger a discard, or execute user code after
     /// unwinding/discarding a `LazyComplete` frame. Keep this match exhaustive
     /// so every new `Destination` variant is classified explicitly.
-    fn destination_can_reset_local(&self, dest: &Destination<'p>) -> bool {
+    fn destination_can_reset_local(&self, dest: &Destination) -> bool {
         match dest {
             Destination::Handle { activation, .. } => self
                 .activations
@@ -307,7 +307,7 @@ impl<'p> Machine<'p, '_> {
         &mut self,
         owner: usize,
         previous: usize,
-        outcome: ScopeOutcome<'p>,
+        outcome: ScopeOutcome,
     ) -> Result<(), Error> {
         self.begin_close_scope_elect(owner, previous, outcome, false)
     }
@@ -316,7 +316,7 @@ impl<'p> Machine<'p, '_> {
         &mut self,
         owner: usize,
         previous: usize,
-        outcome: ScopeOutcome<'p>,
+        outcome: ScopeOutcome,
         elect_on_fail: bool,
     ) -> Result<(), Error> {
         self.begin_close_scope_with_override(owner, previous, outcome, None, elect_on_fail)
@@ -326,7 +326,7 @@ impl<'p> Machine<'p, '_> {
         &mut self,
         owner: usize,
         previous: usize,
-        outcome: ScopeOutcome<'p>,
+        outcome: ScopeOutcome,
         exit_override: Option<CauseToken>,
         elect_on_fail: bool,
     ) -> Result<(), Error> {

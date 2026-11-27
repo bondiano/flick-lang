@@ -16,7 +16,9 @@ use crate::tier0::{Error, Heap, Value};
 pub(crate) mod cli;
 mod hooks;
 mod host;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 pub(crate) mod host_bridge;
+mod host_callbacks;
 pub(crate) mod primitives;
 pub(crate) mod runtime;
 
@@ -26,7 +28,9 @@ pub use host::{
     DRAW, HostMode, HostServices, MILLIS, MONOTONIC_NANOS, NANOS, format_uncaught_cause,
     format_uncaught_raised,
 };
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 pub use host_bridge::HostBridge;
+pub use host_callbacks::{HostCallbacks, HostFetchRequest, HostFetchResponse};
 pub use primitives::{is_metered_primitive, parse_float, parse_number, show_value};
 pub use runtime::{DEFAULT_VIRTUAL_NOW_NS, FIBER_QUANTUM, QUANTUM_VIRTUAL_NS};
 

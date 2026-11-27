@@ -6,13 +6,13 @@ use serde_json::{Value as Json, json};
 
 use crate::stdlib::host_bridge::wire::{self, WireRegistrar};
 
-struct PendingForeignCall<'p> {
+struct PendingForeignCall {
     fiber: usize,
-    destination: Destination<'p>,
+    destination: Destination,
     catch_fn: Option<Value>,
 }
 
-struct ForeignState<'p> {
+struct ForeignState {
     bridge_opened: bool,
     next_call_id: u64,
     next_cb_id: u64,
@@ -23,7 +23,7 @@ struct ForeignState<'p> {
     dict_getter_by_obj: BTreeMap<(ObjectId, ObjectId), u64>,
     cells: BTreeMap<u64, CellHandle>,
     cell_by_id: BTreeMap<ObjectId, u64>,
-    pending_calls: BTreeMap<u64, PendingForeignCall<'p>>,
+    pending_calls: BTreeMap<u64, PendingForeignCall>,
     pending_host_cbs: BTreeMap<usize, u64>,
     mirrored_owners: BTreeSet<usize>,
     closed_mirrored_owners: BTreeSet<usize>,
@@ -34,7 +34,7 @@ struct ForeignState<'p> {
     sync_task_fiber: Option<usize>,
 }
 
-impl Default for ForeignState<'_> {
+impl Default for ForeignState {
     fn default() -> Self {
         Self {
             bridge_opened: false,
@@ -60,7 +60,7 @@ impl Default for ForeignState<'_> {
     }
 }
 
-impl WireRegistrar for ForeignState<'_> {
+impl WireRegistrar for ForeignState {
     fn register_closure(
         &mut self,
         heap: &mut Heap,
@@ -136,7 +136,7 @@ impl WireRegistrar for ForeignState<'_> {
     }
 }
 
-impl<'p> Machine<'p, '_> {
+impl Machine<'_, '_> {
     fn ensure_bridge_open(&mut self) -> Result<(), Error> {
         if self.foreign.bridge_opened {
             return Ok(());
@@ -268,7 +268,7 @@ impl<'p> Machine<'p, '_> {
 
     fn foreign_call_handle(
         &mut self,
-        destination: Destination<'p>,
+        destination: Destination,
         execution: usize,
         host_id: u64,
     ) -> Result<(), Error> {
@@ -310,7 +310,7 @@ impl<'p> Machine<'p, '_> {
 
     fn foreign_await_handle(
         &mut self,
-        destination: Destination<'p>,
+        destination: Destination,
         host_id: u64,
     ) -> Result<(), Error> {
         self.check_ffi_capability("HostBridge.await_handle")?;

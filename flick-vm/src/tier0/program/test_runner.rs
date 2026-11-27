@@ -24,7 +24,7 @@ pub fn execute_tests_program(
     fuel_per_test: u64,
     skip_groups: &[&str],
 ) -> Result<Vec<TestCaseResult>, Error> {
-    execute_tests_program_inner(
+    execute_tests_program_with_host(
         heap,
         program,
         entry,
@@ -33,7 +33,6 @@ pub fn execute_tests_program(
         fuel_per_test,
         skip_groups,
         HostMode::Deterministic,
-        None,
     )
 }
 
@@ -49,21 +48,38 @@ pub fn execute_tests_program_with_host(
     skip_groups: &[&str],
     host_mode: HostMode,
 ) -> Result<Vec<TestCaseResult>, Error> {
-    execute_tests_program_inner(
-        heap,
-        program,
-        entry,
-        root,
-        seed,
-        fuel_per_test,
-        skip_groups,
-        host_mode,
-        None,
-    )
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+    {
+        execute_tests_program_inner(
+            heap,
+            program,
+            entry,
+            root,
+            seed,
+            fuel_per_test,
+            skip_groups,
+            host_mode,
+            None,
+        )
+    }
+    #[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+    {
+        execute_tests_program_inner(
+            heap,
+            program,
+            entry,
+            root,
+            seed,
+            fuel_per_test,
+            skip_groups,
+            host_mode,
+        )
+    }
 }
 
 /// Evaluates and runs a `List Test.Test` suite with an explicit [`HostMode`]
 /// and [`HostBridge`], releasing all Rust heap slots and host handles on return.
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 #[expect(clippy::too_many_arguments, reason = "explicit host-bridged test runner")]
 pub fn execute_tests_program_with_bridge(
     heap: &mut Heap,
@@ -99,7 +115,7 @@ fn execute_tests_program_inner(
     fuel_per_test: u64,
     skip_groups: &[&str],
     host_mode: HostMode,
-    bridge: Option<&mut HostBridge>,
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))] bridge: Option<&mut HostBridge>,
 ) -> Result<Vec<TestCaseResult>, Error> {
     if let Err(err) = memory::validate_program(program) {
         return Err(Error::InvalidProgram(err));
@@ -120,7 +136,10 @@ fn execute_tests_program_inner(
         .expect("fewer than usize::MAX model executions");
     let mut machine = Machine::new(heap, program, execution, vec![], fuel_per_test, main_stage);
     machine.host_mode = host_mode;
-    machine.bridge = bridge;
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+    {
+        machine.bridge = bridge;
+    }
     let tests_val = match machine.global(start_global, None).and_then(|()| machine.run()) {
         Ok(LanguageExit::Success(val)) => val,
         Ok(LanguageExit::Failure(cause)) => {

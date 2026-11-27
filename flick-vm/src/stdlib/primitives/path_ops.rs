@@ -1,5 +1,6 @@
 //! Counted POSIX `Path` primitives (`packages/std/src/Path.fl`), matching `runtime-go/flickrt/path.go`.
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::env;
 
 use flick_core::ir::Lit;
@@ -218,11 +219,19 @@ pub(super) fn path_resolve(paths: &[String]) -> String {
         let p: &str = if idx >= 0 {
             &paths[usize::try_from(idx).unwrap_or(0)]
         } else {
-            owned = env::current_dir()
-                .ok()
-                .and_then(|d| d.into_os_string().into_string().ok())
-                .unwrap_or_default();
-            &owned
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+            {
+                owned = env::current_dir()
+                    .ok()
+                    .and_then(|d| d.into_os_string().into_string().ok())
+                    .unwrap_or_default();
+                &owned
+            }
+            #[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+            {
+                owned = "/".to_owned();
+                &owned
+            }
         };
         idx -= 1;
         if p.is_empty() {

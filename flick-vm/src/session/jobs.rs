@@ -92,6 +92,10 @@ pub(super) struct JobTable {
 }
 
 impl JobTable {
+    pub(super) fn new() -> Self {
+        Self::default()
+    }
+
     pub(super) fn list(&self) -> Vec<JobInfo> {
         self.jobs
             .values()
@@ -292,11 +296,12 @@ fn execute_bg_job(
             handlers: &[],
             fuel: input.fuel,
             host_mode: input.host_mode,
+            program_args: &[],
             external_interrupt: Some(Arc::clone(&input.interrupt)),
             synthetic_codes: codes,
             sandbox: &input.sandbox,
         };
-        let report = execute_session_step(heap, &input.program, execution, persistent, &spec);
+        let report = execute_session_step(heap, &input.program, execution, persistent, &spec, None);
         stdout.push_str(&report.stdout);
         match report.outcome {
             ProgramOutcome::Returned(layer) => *root_layer = Some(layer),
@@ -313,11 +318,13 @@ fn execute_bg_job(
             handlers: &[],
             fuel: input.fuel,
             host_mode: input.host_mode,
+            program_args: &[],
             external_interrupt: Some(Arc::clone(&input.interrupt)),
             synthetic_codes: codes,
             sandbox: &input.sandbox,
         };
-        let report = build_session_layer_value(heap, &input.program, execution, persistent, &spec);
+        let report =
+            build_session_layer_value(heap, &input.program, execution, persistent, &spec, None);
         stdout.push_str(&report.stdout);
         match report.outcome {
             ProgramOutcome::Returned(val) => provided_layers.push(val),
@@ -334,11 +341,12 @@ fn execute_bg_job(
             handlers: &[],
             fuel: input.fuel,
             host_mode: input.host_mode,
+            program_args: &[],
             external_interrupt: Some(Arc::clone(&input.interrupt)),
             synthetic_codes: codes,
             sandbox: &input.sandbox,
         };
-        let report = execute_session_step(heap, &input.program, execution, persistent, &spec);
+        let report = execute_session_step(heap, &input.program, execution, persistent, &spec, None);
         stdout.push_str(&report.stdout);
         match report.outcome {
             ProgramOutcome::Returned(closure) => handlers.push((closure, *kind)),
@@ -358,11 +366,12 @@ fn execute_bg_job(
         handlers: &handler_reps,
         fuel: input.fuel,
         host_mode: input.host_mode,
+        program_args: &[],
         external_interrupt: Some(Arc::clone(&input.interrupt)),
         synthetic_codes: codes,
         sandbox: &input.sandbox,
     };
-    let report = execute_session_step(heap, &input.program, execution, persistent, &spec);
+    let report = execute_session_step(heap, &input.program, execution, persistent, &spec, None);
     stdout.push_str(&report.stdout);
     match report.outcome {
         ProgramOutcome::Returned(value) => {

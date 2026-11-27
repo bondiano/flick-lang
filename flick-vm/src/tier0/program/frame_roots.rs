@@ -1,6 +1,6 @@
 // Frame-resource release, root draining, and continuation tombstone cleanup.
-impl<'p> Machine<'p, '_> {
-    fn drain_transfer_next_roots(&mut self, next: &mut TransferNext<'p>, roots: &mut Vec<Value>) {
+impl Machine<'_, '_> {
+    fn drain_transfer_next_roots(&mut self, next: &mut TransferNext, roots: &mut Vec<Value>) {
         let old = mem::replace(next, TransferNext::Raise);
         match old {
             TransferNext::DeliverValue { value, .. } => roots.push(value),
@@ -25,14 +25,14 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    fn drain_discard_roots(&mut self, mut discard: Discard<'p>, roots: &mut Vec<Value>) {
+    fn drain_discard_roots(&mut self, mut discard: Discard, roots: &mut Vec<Value>) {
         for frame in discard.frames.drain(..) {
             self.drain_frame_roots(frame, roots);
         }
         self.drain_transfer_next_roots(&mut discard.next, roots);
     }
 
-    fn drain_closing_scope_roots(&mut self, state: ClosingScopeState<'p>, roots: &mut Vec<Value>) {
+    fn drain_closing_scope_roots(&mut self, state: ClosingScopeState, roots: &mut Vec<Value>) {
         for fin in state.remaining {
             Self::finalizer_roots(fin, roots);
         }
@@ -58,7 +58,7 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    fn drain_destination_roots(&mut self, destination: Destination<'p>, roots: &mut Vec<Value>) {
+    fn drain_destination_roots(&mut self, destination: Destination, roots: &mut Vec<Value>) {
         match destination {
             Destination::Catch { handler, .. }
             | Destination::CatchDefect { handler, .. }
@@ -139,7 +139,7 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    fn drain_frame_roots(&mut self, mut frame: Frame<'p>, roots: &mut Vec<Value>) {
+    fn drain_frame_roots(&mut self, mut frame: Frame, roots: &mut Vec<Value>) {
         frame.locals.drain_values(roots);
         for root in &frame.vars {
             if let Value::Object(token) = root
@@ -179,7 +179,7 @@ impl<'p> Machine<'p, '_> {
         self.drain_destination_roots(frame.destination, roots);
     }
 
-    fn release_frame_resources(&mut self, frame: &mut Frame<'p>) -> Result<Vec<Frame<'p>>, Error> {
+    fn release_frame_resources(&mut self, frame: &mut Frame) -> Result<Vec<Frame>, Error> {
         let mut roots = Vec::new();
         for root in &frame.vars {
             if let Value::Object(token) = root
@@ -219,7 +219,7 @@ impl<'p> Machine<'p, '_> {
         Ok(gen_frames)
     }
 
-    fn queue_discard_frames(&mut self, frames: Vec<Frame<'p>>) {
+    fn queue_discard_frames(&mut self, frames: Vec<Frame>) {
         if frames.is_empty() {
             return;
         }

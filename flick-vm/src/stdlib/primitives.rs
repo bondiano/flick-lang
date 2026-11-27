@@ -96,6 +96,7 @@ use bigint_norm::{bigint_order, bigint_text, normalize_bigint};
 pub(crate) use cause_ops::{
     concat_causes, first_defect_message, join_causes, strip_fail_and_add_interrupt,
 };
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 pub(crate) use decimal_ops::format_decimal;
 pub use float_ops::{parse_float, parse_number};
 pub(crate) use isaac_ops::{

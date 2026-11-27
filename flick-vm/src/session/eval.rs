@@ -15,7 +15,11 @@ use crate::tier0::{
 };
 
 impl VmSession {
-    fn check_link_capabilities(&self, incoming: &Program, roots: &[Name]) -> Option<EvalOutcome> {
+    pub(super) fn check_link_capabilities(
+        &self,
+        incoming: &Program,
+        roots: &[Name],
+    ) -> Option<EvalOutcome> {
         match check_program_capabilities(incoming, Some(roots), self.sandbox.capabilities) {
             Ok(()) => None,
             Err(SandboxError::CapabilityDenied {
@@ -196,6 +200,7 @@ impl VmSession {
             handlers: &[],
             fuel: self.fuel,
             host_mode: self.host_mode,
+            program_args: &self.program_args,
             external_interrupt: interrupt,
             synthetic_codes: super::program::SessionProgram::synthetic_codes(),
             sandbox: &self.sandbox,
@@ -206,6 +211,7 @@ impl VmSession {
             self.execution,
             &mut self.persistent,
             &spec,
+            self.host_callbacks.as_deref_mut(),
         );
         let stdout = report.stdout;
         match report.outcome {
@@ -250,6 +256,7 @@ impl VmSession {
             handlers: &[],
             fuel: self.fuel,
             host_mode: self.host_mode,
+            program_args: &self.program_args,
             external_interrupt: interrupt,
             synthetic_codes: super::program::SessionProgram::synthetic_codes(),
             sandbox: &self.sandbox,
@@ -260,6 +267,7 @@ impl VmSession {
             self.execution,
             &mut self.persistent,
             &spec,
+            self.host_callbacks.as_deref_mut(),
         );
         match report.outcome {
             ProgramOutcome::Returned(layer) => {
@@ -295,6 +303,7 @@ impl VmSession {
             handlers: &handler_reps,
             fuel: self.fuel,
             host_mode: self.host_mode,
+            program_args: &self.program_args,
             external_interrupt: interrupt,
             synthetic_codes: super::program::SessionProgram::synthetic_codes(),
             sandbox: &self.sandbox,
@@ -306,12 +315,13 @@ impl VmSession {
             self.execution,
             &mut self.persistent,
             &spec,
+            self.host_callbacks.as_deref_mut(),
         );
         self.heap.restore_allocation_module(prev_mod);
         report
     }
 
-    fn classify_value_report(&mut self, report: ExecutionReport) -> EvalOutcome {
+    pub(super) fn classify_value_report(&mut self, report: ExecutionReport) -> EvalOutcome {
         let stdout = report.stdout;
         match report.outcome {
             ProgramOutcome::Returned(value) => {

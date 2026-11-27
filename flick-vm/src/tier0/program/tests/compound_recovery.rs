@@ -63,7 +63,7 @@ fn compound_first_fail_reaches_recovery_selection_before_final_reporting() {
     let push_frame = |at, destination| Frame {
         recovery_id: None,
         evidence: None,
-        block,
+        block: BlockLoc::root(0),
         at,
         locals: Locals::new(),
         vars: vec![],
@@ -181,7 +181,7 @@ fn compound_miss_keeps_identity_order_interrupt_metadata_and_all_prefix_roots() 
             machine.frames.push(Frame {
                 recovery_id: None,
                 evidence: None,
-                block,
+                block: BlockLoc::root(0),
                 at: block.instructions.len(),
                 locals: Locals::new(),
                 vars: vec![],
@@ -191,7 +191,7 @@ fn compound_miss_keeps_identity_order_interrupt_metadata_and_all_prefix_roots() 
             machine.frames.push(Frame {
                 recovery_id: None,
                 evidence: None,
-                block,
+                block: BlockLoc::root(0),
                 at: 0,
                 locals: Locals::new(),
                 vars: vec![],

@@ -973,6 +973,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "flick-vm-wasm"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "flick-core",
+ "flick-vm",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "flick-wasm"
 version = "0.2.0"
 dependencies = [

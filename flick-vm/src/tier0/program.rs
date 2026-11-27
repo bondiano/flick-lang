@@ -2,6 +2,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::time::{Duration, Instant};
 use std::{iter, mem};
 
@@ -13,17 +14,20 @@ use flick_core::ir::memory::{
     Intrinsic, Local, Name, Operation, Program,
 };
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+use super::HostBridge;
 use super::{
-    ArenaHandle, ArenaView, CellHandle, Data, Error, ExitData, Heap, HostBridge, HostMode,
-    HostServices, IteratorHandle, IteratorState, LayerData, LazyHandle, LazyState, Locals,
-    ObjectId, ObjectToken, OwnerHandle, SeqData, Value, VarHandle, patterns, peek, tagged_boundary,
-    take,
+    ArenaHandle, ArenaView, CellHandle, Data, Error, ExitData, Heap, HostMode, HostServices,
+    IteratorHandle, IteratorState, LayerData, LazyHandle, LazyState, Locals, ObjectId, ObjectToken,
+    OwnerHandle, SeqData, Value, VarHandle, patterns, peek, tagged_boundary, take,
 };
 use crate::stdlib::cli::{CliRunState, CliStep};
-use crate::stdlib::runtime::coop::{HOST_CTX_KEY, MEMO_REF_KEY};
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+use crate::stdlib::runtime::coop::HOST_CTX_KEY;
+use crate::stdlib::runtime::coop::MEMO_REF_KEY;
 use crate::stdlib::{
-    self, DEFAULT_VIRTUAL_NOW_NS, FIBER_QUANTUM, FuelCounter, HostContext, QUANTUM_VIRTUAL_NS,
-    primitives,
+    self, DEFAULT_VIRTUAL_NOW_NS, FIBER_QUANTUM, FuelCounter, HostCallbacks, HostContext,
+    QUANTUM_VIRTUAL_NS, primitives,
 };
 
 #[path = "dictionaries.rs"]
@@ -41,190 +45,9 @@ use layers::{MemoRestore, Provider};
 mod recovery;
 use recovery::RecoveryState;
 
-/// The result token remains owned by the caller after all execution roots
-/// are released. A returned closure is safely droppable, but cannot be
-/// invoked by a different execution: code identities are execution-local.
-#[derive(Debug)]
-pub struct Executed {
-    pub value: Value,
-    pub stdout: String,
-}
+include!("program/entrypoints.rs");
 
-/// An executed outcome owns exactly one token on return or typed failure.
-#[derive(Debug)]
-pub enum ProgramOutcome {
-    Returned(Value),
-    Raised(Value),
-    Failed(CauseToken),
-    Fault(Error),
-}
-
-impl ProgramOutcome {
-    /// Releases precisely this outcome's owned root, without sweeping the heap.
-    pub fn release(self, heap: &mut Heap) -> Result<(), Error> {
-        match self {
-            Self::Returned(value) | Self::Raised(value) => heap.drop_value(value),
-            Self::Failed(cause) => heap.drop_cause(cause),
-            Self::Fault(_) => Ok(()),
-        }
-    }
-}
-
-#[derive(Debug)]
-/// Captures output on every executed outcome, including faults and fuel exhaustion.
-pub struct ExecutionReport {
-    pub outcome: ProgramOutcome,
-    pub stdout: String,
-    pub stderr: String,
-}
-
-/// Evaluates with a caller-owned heap and transfers all valid argument tokens.
-/// Returned and raised values remain caller-owned after execution cleanup.
-/// Invalid/foreign ownership is rejected before token acceptance, as in
-/// [`execute_program`]; this function never sweeps either heap.
-pub fn execute_program_outcome(
-    heap: &mut Heap,
-    program: &Program,
-    entry: &Name,
-    arguments: Vec<Value>,
-    fuel: u64,
-) -> ExecutionReport {
-    execute(heap, program, entry, arguments, fuel, MainStage::Done)
-}
-
-/// Runs the main apply/await protocol, stopping immediately on typed failure.
-pub fn execute_main_program_outcome(
-    heap: &mut Heap,
-    program: &Program,
-    entry: &Name,
-    fuel: u64,
-) -> ExecutionReport {
-    execute(heap, program, entry, vec![], fuel, MainStage::Function)
-}
-
-/// [`execute_main_program_outcome`] with the root services `Σ₀`: the layer
-/// the global `root` gives answers each operation no frame answers, for the
-/// whole execution, and is released with its other roots.
-pub fn execute_rooted_main_program_outcome(
-    heap: &mut Heap,
-    program: &Program,
-    entry: &Name,
-    root: &Name,
-    fuel: u64,
-) -> ExecutionReport {
-    // `execute` checks the root it starts from; `main` is checked here
-    if !program.globals.iter().any(|global| &global.name == entry) {
-        return ExecutionReport {
-            outcome: ProgramOutcome::Fault(Error::UnknownGlobal(entry.clone())),
-            stdout: String::new(),
-            stderr: String::new(),
-        };
-    }
-    let stage = MainStage::Root {
-        main: entry.clone(),
-        eager_inits: VecDeque::new(),
-    };
-    execute(heap, program, root, vec![], fuel, stage)
-}
-
-fn success_only(heap: &mut Heap, report: ExecutionReport) -> Result<Executed, Error> {
-    match report.outcome {
-        ProgramOutcome::Returned(value) => Ok(Executed {
-            value,
-            stdout: report.stdout,
-        }),
-        ProgramOutcome::Raised(value) => {
-            heap.drop_value(value)?;
-            Err(Error::UnhandledFailure)
-        }
-        ProgramOutcome::Failed(cause) => {
-            let error = heap.cause_error(&cause);
-            heap.drop_cause(cause)?;
-            Err(error?)
-        }
-        ProgramOutcome::Fault(error) => Err(error),
-    }
-}
-
-static NEXT_EXECUTION: AtomicUsize = AtomicUsize::new(0);
-
-pub(crate) fn next_execution_id() -> usize {
-    NEXT_EXECUTION
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
-        .expect("fewer than usize::MAX VM executions")
-}
-
-/// Evaluates a global once, then applies the supplied unary arguments.
-/// All accepted argument tokens are transferred into this execution.
-/// Runtime failure and exhausted fuel release its real roots, including
-/// pending operands and suspended frames; no heap reachability sweep runs.
-/// External aliases and a successful returned value remain caller-owned.
-pub fn execute_program(
-    heap: &mut Heap,
-    program: &Program,
-    entry: &Name,
-    arguments: Vec<Value>,
-    fuel: u64,
-) -> Result<Executed, Error> {
-    let report = execute_program_outcome(heap, program, entry, arguments, fuel);
-    success_only(heap, report)
-}
-
-/// Runs the main protocol in one execution: optionally apply its ordinary
-/// function to Unit, then optionally await the resulting task once. The
-/// cell arena survives both stages and is closed only after the outcome.
-pub fn execute_main_program(
-    heap: &mut Heap,
-    program: &Program,
-    entry: &Name,
-    fuel: u64,
-) -> Result<Executed, Error> {
-    let report = execute_main_program_outcome(heap, program, entry, fuel);
-    success_only(heap, report)
-}
-
-fn prepare_arguments(
-    heap: &mut Heap,
-    program: &Program,
-    entry: &Name,
-    arguments: Vec<Value>,
-) -> Result<Vec<Value>, Error> {
-    heap.ensure_owned(&arguments)?;
-    if let Err(error) = heap.admit_values(&arguments) {
-        heap.drop_values(arguments)?;
-        return Err(error);
-    }
-    if let Err(error) = memory::validate_program(program) {
-        heap.drop_values(arguments)?;
-        return Err(Error::InvalidProgram(error));
-    }
-    if !program.globals.iter().any(|global| &global.name == entry) {
-        heap.drop_values(arguments)?;
-        return Err(Error::UnknownGlobal(entry.clone()));
-    }
-    Ok(arguments)
-}
-
-fn execute(
-    heap: &mut Heap,
-    program: &Program,
-    entry: &Name,
-    arguments: Vec<Value>,
-    fuel: u64,
-    main_stage: MainStage,
-) -> ExecutionReport {
-    execute_with_host(
-        heap,
-        program,
-        entry,
-        arguments,
-        fuel,
-        main_stage,
-        HostMode::Deterministic,
-    )
-}
-
-enum Destination<'p> {
+enum Destination {
     RecoverySelection {
         id: usize,
     },
@@ -277,7 +100,7 @@ enum Destination<'p> {
         binding: Option<Local>,
     },
     ClosingScope {
-        state: Box<ClosingScopeState<'p>>,
+        state: Box<ClosingScopeState>,
     },
     RestoreOwner {
         previous: usize,
@@ -328,17 +151,17 @@ enum Destination<'p> {
     DiscardCleanupDone {
         saved_mask: usize,
         masked: bool,
-        paused: Box<Discard<'p>>,
+        paused: Box<Discard>,
     },
     OnExitDiscardRunFin {
         saved_mask: usize,
         masked: bool,
-        paused: Box<Discard<'p>>,
+        paused: Box<Discard>,
     },
     RestoreMask {
         saved_mask: usize,
         check_on_exit: bool,
-        next: Box<Destination<'p>>,
+        next: Box<Destination>,
     },
     EnsuringFinish {
         finalizer: Value,
@@ -377,7 +200,7 @@ enum Destination<'p> {
     },
     CachedComplete {
         cell_id: usize,
-        next: Box<Destination<'p>>,
+        next: Box<Destination>,
     },
     ProvideContext {
         context: Value,
@@ -385,7 +208,7 @@ enum Destination<'p> {
     },
     WithServices {
         services: Vec<Value>,
-        next: Box<Destination<'p>>,
+        next: Box<Destination>,
     },
     RestoreFiberRef {
         key: String,
@@ -416,18 +239,34 @@ enum Destination<'p> {
         or_die: bool,
         target: LayerBuildTarget,
     },
+    #[cfg_attr(
+        not(all(feature = "native-host", not(target_arch = "wasm32"))),
+        allow(dead_code)
+    )]
     RaiseFromCatch,
     CliStep {
         state: Box<CliRunState>,
         binding: Local,
     },
+    #[cfg_attr(
+        not(all(feature = "native-host", not(target_arch = "wasm32"))),
+        allow(dead_code)
+    )]
     HostSyncCallback {
         req_id: u64,
         remaining_args: VecDeque<Value>,
     },
+    #[cfg_attr(
+        not(all(feature = "native-host", not(target_arch = "wasm32"))),
+        allow(dead_code)
+    )]
     HostApplyChain {
         remaining_args: VecDeque<Value>,
     },
+    #[cfg_attr(
+        not(all(feature = "native-host", not(target_arch = "wasm32"))),
+        allow(dead_code)
+    )]
     ForeignLayerBuildFinish {
         or_die: bool,
         target: LayerBuildTarget,
@@ -483,14 +322,14 @@ impl OwnerEvidence {
     }
 }
 
-struct Frame<'p> {
+struct Frame {
     recovery_id: Option<usize>,
-    block: &'p Block,
+    block: BlockLoc,
     at: usize,
     locals: Locals,
     vars: Vec<Value>,
     iterators: Vec<Value>,
-    destination: Destination<'p>,
+    destination: Destination,
     evidence: Option<OwnerEvidence>,
 }
 
@@ -510,25 +349,25 @@ struct Activation {
     owner: usize,
 }
 
-struct Segment<'p> {
-    frames: Vec<Frame<'p>>,
+struct Segment {
+    frames: Vec<Frame>,
     owner: usize,
     binding: Local,
 }
 
-struct CapturedContinuation<'p> {
-    frames: Vec<Frame<'p>>,
+struct CapturedContinuation {
+    frames: Vec<Frame>,
     owner: usize,
     binding: Local,
 }
 
-enum GeneratorRun<'p> {
+enum GeneratorRun {
     Fresh {
         seq: Value,
         code: CodeId,
     },
     Suspended {
-        frames: Vec<Frame<'p>>,
+        frames: Vec<Frame>,
         owner: usize,
         yield_binding: Local,
     },
@@ -536,8 +375,8 @@ enum GeneratorRun<'p> {
     Done,
 }
 
-struct GeneratorSlot<'p> {
-    run: GeneratorRun<'p>,
+struct GeneratorSlot {
+    run: GeneratorRun,
     remaining: Option<usize>,
 }
 
@@ -555,7 +394,7 @@ struct Invocation {
     evidence: Option<OwnerEvidence>,
 }
 
-enum TransferNext<'p> {
+enum TransferNext {
     Invoke(usize),
     Raise,
     LoopContinue {
@@ -583,13 +422,13 @@ enum TransferNext<'p> {
         binding: Local,
     },
     FinishCutoff,
-    Chain(Box<Discard<'p>>),
+    Chain(Box<Discard>),
 }
 
-struct Discard<'p> {
-    frames: Vec<Frame<'p>>,
+struct Discard {
+    frames: Vec<Frame>,
     owner: Option<usize>,
-    next: TransferNext<'p>,
+    next: TransferNext,
     aborted: bool,
 }
 
@@ -606,14 +445,14 @@ struct Machine<'p, 'h> {
     owners: Vec<OwnerState>,
     current_owner: usize,
     current_evidence: Option<OwnerEvidence>,
-    frames: Vec<Frame<'p>>,
+    frames: Vec<Frame>,
     activations: BTreeMap<usize, Activation>,
     providers: BTreeMap<usize, Provider>,
-    segments: BTreeMap<usize, Segment<'p>>,
-    continuations: BTreeMap<usize, Option<CapturedContinuation<'p>>>,
-    generators: BTreeMap<usize, GeneratorSlot<'p>>,
+    segments: BTreeMap<usize, Segment>,
+    continuations: BTreeMap<usize, Option<CapturedContinuation>>,
+    generators: BTreeMap<usize, GeneratorSlot>,
     invocations: BTreeMap<usize, Invocation>,
-    discard: Option<Discard<'p>>,
+    discard: Option<Discard>,
     ready: Option<usize>,
     next_handler: usize,
     arguments: VecDeque<Value>,
@@ -640,7 +479,7 @@ struct Machine<'p, 'h> {
     active_fiber: usize,
     next_fiber: usize,
     quantum: u32,
-    parked_fibers: BTreeMap<usize, FiberContext<'p>>,
+    parked_fibers: BTreeMap<usize, FiberContext>,
     fiber_table: BTreeMap<usize, FiberRecord>,
     run_queue: VecDeque<usize>,
     virtual_now_ns: u64,
@@ -660,7 +499,7 @@ struct Machine<'p, 'h> {
     next_cached: usize,
     isaac_rngs: BTreeMap<usize, primitives::IsaacRng>,
     next_rng: usize,
-    closing_scopes: BTreeMap<usize, Box<ClosingScopeState<'p>>>,
+    closing_scopes: BTreeMap<usize, Box<ClosingScopeState>>,
     pending_provides: BTreeMap<usize, PendingProvide>,
     next_provide: usize,
     pending_resume_close: Option<usize>,
@@ -676,18 +515,29 @@ struct Machine<'p, 'h> {
     root_defects: Vec<CauseToken>,
     runtime_fibers_started: u64,
     host_mode: HostMode,
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
     bridge: Option<&'h mut HostBridge>,
-    foreign: ForeignState<'p>,
+    host_callbacks: Option<&'h mut (dyn HostCallbacks + 'static)>,
+    foreign: ForeignState,
     external_interrupt: Option<Arc<AtomicBool>>,
     sandbox: SandboxRuntime,
 }
 
 include!("program/async_state.rs");
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 include!("program/foreign.rs");
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 include!("program/foreign_calls.rs");
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 include!("program/foreign_cb.rs");
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 include!("program/foreign_poll.rs");
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 include!("program/foreign_layers.rs");
+#[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+include!("program/foreign_stub.rs");
+include!("program/block_loc.rs");
+include!("program/stepper.rs");
 include!("program/driving.rs");
 include!("program/driving_unwind.rs");
 include!("program/returns.rs");

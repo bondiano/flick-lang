@@ -1,5 +1,5 @@
 // Full C0-C6 owner close state machine, LIFO finalizer execution, and outcome completion.
-impl<'p> Machine<'p, '_> {
+impl Machine<'_, '_> {
     fn resume_owner_close(&mut self, owner: usize) -> Result<(), Error> {
         let Some(state) = self.closing_scopes.remove(&owner) else {
             return Ok(());
@@ -7,7 +7,7 @@ impl<'p> Machine<'p, '_> {
         self.step_close_scope(state)
     }
 
-    fn state_exit_cause<'a>(state: &'a ClosingScopeState<'p>) -> Option<&'a CauseToken> {
+    fn state_exit_cause(state: &ClosingScopeState) -> Option<&CauseToken> {
         state.exit_override.as_ref().or(match &state.outcome {
             ScopeOutcome::Failure(c) => Some(c),
             ScopeOutcome::ChildClose { inherited_exit, .. } => inherited_exit.as_ref(),
@@ -16,7 +16,7 @@ impl<'p> Machine<'p, '_> {
         })
     }
 
-    fn step_close_scope(&mut self, mut state: Box<ClosingScopeState<'p>>) -> Result<(), Error> {
+    fn step_close_scope(&mut self, mut state: Box<ClosingScopeState>) -> Result<(), Error> {
         loop {
             self.current_owner = state.owner;
             match state.phase {
@@ -56,8 +56,8 @@ impl<'p> Machine<'p, '_> {
 
     fn step_close_hooks(
         &mut self,
-        mut state: Box<ClosingScopeState<'p>>,
-    ) -> Result<Option<Box<ClosingScopeState<'p>>>, Error> {
+        mut state: Box<ClosingScopeState>,
+    ) -> Result<Option<Box<ClosingScopeState>>, Error> {
         if let Some(OwnerHook::StopFiberGroup(gid)) = self.owners[state.owner].hooks.pop_front() {
             let wait = match self.stop_fiber_group_for_close(gid, state.owner) {
                 Ok(w) => w,
@@ -114,8 +114,8 @@ impl<'p> Machine<'p, '_> {
 
     fn step_close_finalizer(
         &mut self,
-        mut state: Box<ClosingScopeState<'p>>,
-    ) -> Result<Option<Box<ClosingScopeState<'p>>>, Error> {
+        mut state: Box<ClosingScopeState>,
+    ) -> Result<Option<Box<ClosingScopeState>>, Error> {
         let Some(finalizer) = state.remaining.pop() else {
             let owner = state.owner;
             if let Err(err) = self.close_mirrored_owner(owner) {
@@ -180,7 +180,7 @@ impl<'p> Machine<'p, '_> {
     fn close_child_owner_for_finalizer(
         &mut self,
         child_owner: usize,
-        state: Box<ClosingScopeState<'p>>,
+        state: Box<ClosingScopeState>,
     ) -> Result<(), Error> {
         let inherited_exit = match Self::state_exit_cause(&state) {
             Some(c) => Some(self.heap.dup_cause(c)?),
@@ -202,9 +202,9 @@ impl<'p> Machine<'p, '_> {
         &mut self,
         finalizer: Finalizer,
         exit_cause: Option<&CauseToken>,
-        next: Destination<'p>,
+        next: Destination,
     ) -> Result<(), Error> {
-        let wrap = |services: Vec<Value>, inner: Destination<'p>| {
+        let wrap = |services: Vec<Value>, inner: Destination| {
             if services.is_empty() {
                 inner
             } else {
@@ -259,7 +259,7 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    fn finalizer_failed(&mut self, mut state: Box<ClosingScopeState<'p>>) -> Result<(), Error> {
+    fn finalizer_failed(&mut self, mut state: Box<ClosingScopeState>) -> Result<(), Error> {
         let cause = self.failure.take().expect("finalizer failure cause");
         state.finalizer_failure = Some(match state.finalizer_failure.take() {
             None => cause,
@@ -313,7 +313,7 @@ impl<'p> Machine<'p, '_> {
 
     pub(super) fn complete_scope_outcome(
         &mut self,
-        outcome: ScopeOutcome<'p>,
+        outcome: ScopeOutcome,
         finalizer_failure: Option<CauseToken>,
         elect_on_fail: bool,
     ) -> Result<(), Error> {
@@ -401,7 +401,7 @@ impl<'p> Machine<'p, '_> {
 
     pub(super) fn escalate_paused_discard(
         &mut self,
-        mut discard: Discard<'p>,
+        mut discard: Discard,
         fin_cause: CauseToken,
         elect_on_fail: bool,
     ) -> Result<(), Error> {
@@ -432,7 +432,7 @@ impl<'p> Machine<'p, '_> {
         Ok(())
     }
 
-    fn take_saved_failure(next: &mut TransferNext<'p>) -> Option<CauseToken> {
+    fn take_saved_failure(next: &mut TransferNext) -> Option<CauseToken> {
         match next {
             TransferNext::ResumeRunning { saved_failure, .. } => saved_failure.take(),
             TransferNext::Chain(chained) => Self::take_saved_failure(&mut chained.next),
@@ -440,7 +440,7 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    pub(super) fn peek_discard_exit_cause<'a>(next: &'a TransferNext<'p>) -> Option<&'a CauseToken> {
+    pub(super) fn peek_discard_exit_cause(next: &TransferNext) -> Option<&CauseToken> {
         match next {
             TransferNext::ResumeRunning {
                 saved_failure,

@@ -27,6 +27,7 @@ enum SandboxAbort {
         capability: Capability,
         binding: String,
     },
+    Abandoned,
 }
 
 impl SandboxAbort {
@@ -40,6 +41,7 @@ impl SandboxAbort {
                 capability,
                 binding,
             },
+            Self::Abandoned => Error::OutOfFuel,
         }
     }
 }

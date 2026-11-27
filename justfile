@@ -23,6 +23,9 @@ lint:
     cargo clippy --workspace --all-targets -- -D warnings
     just feature-check
     cargo clippy -p flick-wasm --target wasm32-unknown-unknown -- -D warnings
+    cargo clippy -p flick-vm --no-default-features --target wasm32-unknown-unknown -- -D warnings
+    cargo clippy -p flick-vm --target wasm32-unknown-unknown -- -D warnings
+    cargo clippy -p flick-vm-wasm --target wasm32-unknown-unknown -- -D warnings
     cargo machete
     node tools/style/no-iife.mjs
 
@@ -97,6 +100,7 @@ feature-check:
     cargo clippy -p flick-core --all-targets --no-default-features -- -D warnings
     for feature in native-js native-project ide contracts; do cargo clippy -p flick-core --all-targets --no-default-features --features "$feature" -- -D warnings || exit $?; done
     cargo clippy -p flick-ffi --all-targets --no-default-features -- -D warnings
+    cargo clippy -p flick-vm --all-targets --no-default-features -- -D warnings
     cargo clippy -p flick --no-default-features -- -D warnings
 
 # Exercise minimal and independently enabled compiler capabilities
@@ -209,6 +213,11 @@ language-vm seed="42": e2e-compiler
 # in debug and release profiles with empty PATH (no node or go spawned)
 vm-cases: e2e-compiler
     node tools/vm-cases/index.mjs {{flick}}
+
+# Verify `flick-vm-wasm` in Node: `tests/language` corpus parity against Tier 0,
+# cooperative stepping / abandon() (AC 3), JS host callbacks, and .fvm round-trip
+vm-wasm: e2e-compiler wasm
+    node tools/vm-wasm/index.mjs
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size: e2e-compiler
@@ -359,10 +368,16 @@ wasm-plugins: wasm-backends
 wasm:
     node --test tools/wasm-dedup/index.test.mjs
     CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=fat CARGO_PROFILE_RELEASE_STRIP=debuginfo cargo build -p flick-wasm --target wasm32-unknown-unknown --release
-    node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
-    @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
+    node tools/wasm-dedup/index.mjs "${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/flick_wasm.wasm"
+    @wasm="${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/flick_wasm.wasm"; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
     test $(wc -c < $wasm) -le 4890000 # reason: field accessors (#788): accessor parsing, typing, diagnostics and IDE queries in the playground (4.766 MB with them); ordered guarded matches over known shapes in the release optimizer the playground runs (4.806 MB with them, 4.798 MB before); optional field steps (#789): path typing and lowering, the nested-Option codec rule, completion, hover and rewrites (+16 KB: 4.824 MB with them, 4.808 MB before); reused modules sharing their IR with the editor's module cache (#966, +4 KB); the std module PriorityQueue (#736), whose source the playground embeds (about 4.2 KB: 4,831,578 bytes with it); the std modules OrderedMap and OrderedSet (#735), whose sources the playground embeds (about 9.7 KB: 4,841,667 bytes with them); the `@native` clauses of the built-in modules selected for each build (#1095) and the Flick bodies of the list and string hooks the Lua target runs (#831), whose sources the playground embeds (about 3.6 KB: 4,848,036 bytes with them); the Flick bodies of the String functions and the Unicode case tables of `String.CaseData` the Lua target runs (#831), whose sources the playground embeds (about 34 KB: 4,868,670 bytes with them, 4,834,554 before); the Flick representation and bodies of `EqHash`, `HashSet` and `HashMap` and their private trie (#831, about 19 KB: 4,887,622 bytes with them)
+    CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=fat CARGO_PROFILE_RELEASE_STRIP=debuginfo cargo build -p flick-vm-wasm --target wasm32-unknown-unknown --release
+    node tools/wasm-dedup/index.mjs "${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/flick_vm_wasm.wasm"
+    @vm_wasm="${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/flick_vm_wasm.wasm"; \
+    vm_gz=$(gzip -6c "$vm_wasm" | wc -c); \
+    echo "flick_vm_wasm.wasm: $(wc -c < "$vm_wasm") bytes, $vm_gz gzipped"; \
+    test "$vm_gz" -le 2000000 # reason: initial wasm32 VM runtime budget (#997): flick-vm-wasm with Tier 0/1 VM, stdlib/CLI primitives, sandbox verifier, cooperative stepping, and CBOR image codec (1,731,798 bytes gzipped, 5,595,984 bytes raw after wasm-opt -Oz)
 
 # Build the playground's compiler: the wasm module, its JS bindings, and the
 # pinned official JS backend component assets loaded lazily by backend.worker.ts

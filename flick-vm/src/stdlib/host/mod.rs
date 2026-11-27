@@ -7,18 +7,30 @@
 mod clock;
 mod console;
 mod env;
+mod error_format;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 mod error_map;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 mod fs;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 mod fs_handle;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 mod fs_ops;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 mod fs_stat;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 mod process;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 mod process_cmd;
 mod random;
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::fs as std_fs;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::path::PathBuf;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::time::Instant;
 
 use flick_core::ir::memory::{HostPrimitive, HostServiceIntrinsic};
@@ -30,8 +42,10 @@ use crate::tier0::{Error, Heap, Value};
 
 use super::hooks::VmHooks;
 use super::primitives::IsaacRng;
-pub use error_map::{format_uncaught_cause, format_uncaught_raised};
+pub use error_format::{format_uncaught_cause, format_uncaught_raised};
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use fs_handle::FsFileEntry;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use process::ProcessEntry;
 
 /// The deterministic wall clock, in milliseconds since the epoch: 2025-06-15T17:46:40Z.
@@ -64,11 +78,17 @@ pub enum HostMode {
 /// are cleaned up in [`Drop`].
 #[derive(Debug)]
 pub struct HostServices {
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
     next_handle: i64,
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
     pub(crate) files: BTreeMap<i64, std_fs::File>,
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
     pub(crate) fs_files: BTreeMap<i64, FsFileEntry>,
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
     pub(crate) scoped_temps: BTreeSet<PathBuf>,
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
     pub(crate) processes: BTreeMap<i64, ProcessEntry>,
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
     pub(crate) monotonic_start: Instant,
     pub(crate) os_rng: Option<IsaacRng>,
 }
@@ -82,16 +102,23 @@ impl Default for HostServices {
 impl HostServices {
     pub fn new() -> Self {
         Self {
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
             next_handle: 1,
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
             files: BTreeMap::new(),
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
             fs_files: BTreeMap::new(),
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
             scoped_temps: BTreeSet::new(),
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
             processes: BTreeMap::new(),
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
             monotonic_start: Instant::now(),
             os_rng: None,
         }
     }
 
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
     pub(crate) fn alloc_handle(&mut self) -> i64 {
         let id = self.next_handle;
         self.next_handle = self.next_handle.wrapping_add(1);
@@ -99,6 +126,7 @@ impl HostServices {
     }
 }
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 impl Drop for HostServices {
     fn drop(&mut self) {
         self.files.clear();
@@ -143,12 +171,20 @@ pub(crate) fn run_with_hooks(
             if hooks.host_mode() == HostMode::Deterministic {
                 Err(Error::UnsupportedOperation("a child process"))
             } else {
-                process::spawn(heap, value, hooks)
+                #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+                {
+                    process::spawn(heap, value, hooks)
+                }
+                #[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+                {
+                    Err(Error::UnsupportedOperation("a child process"))
+                }
             }
         }
     }
 }
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 pub(crate) fn run_service_with_hooks(
     heap: &mut Heap,
     op: HostServiceIntrinsic,
@@ -230,4 +266,25 @@ pub(crate) fn run_service_with_hooks(
         | H::FsWriteFile
         | H::FsWriteFileString => fs::run(heap, op, args, hooks),
     }
+}
+
+#[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+pub(crate) fn run_service_with_hooks(
+    heap: &mut Heap,
+    op: HostServiceIntrinsic,
+    args: &[Value],
+    hooks: &mut dyn VmHooks,
+) -> Result<Value, Error> {
+    heap.admit_values(args)?;
+    if let Some((capability, binding)) = required_capability_for_host_service(op)
+        && !hooks.capabilities().contains(capability)
+    {
+        return Err(Error::CapabilityDenied {
+            capability,
+            binding,
+        });
+    }
+    Err(Error::UnsupportedOperation(
+        "host filesystem and process services require native-host",
+    ))
 }

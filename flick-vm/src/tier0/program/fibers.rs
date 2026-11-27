@@ -1,10 +1,10 @@
 // Cooperative single-threaded fiber contexts, spawn, park/yield, interrupt, and wake.
 
-struct FiberContext<'p> {
+struct FiberContext {
     current_owner: usize,
     current_evidence: Option<OwnerEvidence>,
-    frames: Vec<Frame<'p>>,
-    discard: Option<Discard<'p>>,
+    frames: Vec<Frame>,
+    discard: Option<Discard>,
     ready: Option<usize>,
     scratch: Vec<Value>,
     pending: Option<Value>,
@@ -24,7 +24,7 @@ struct FiberContext<'p> {
     pending_layer_build: Option<(Value, usize, usize)>,
 }
 
-impl FiberContext<'_> {
+impl FiberContext {
     fn empty(owner: usize, evidence: Option<OwnerEvidence>) -> Self {
         Self {
             current_owner: owner,
@@ -92,6 +92,10 @@ enum ParkReason {
     FiberGroupEmpty,
     TestClock,
     Lazy { lazy_id: ObjectId },
+    #[cfg_attr(
+        not(all(feature = "native-host", not(target_arch = "wasm32"))),
+        allow(dead_code)
+    )]
     ForeignAsync { call_id: u64 },
 }
 
@@ -138,8 +142,8 @@ struct TestClockAdvance {
     target_ns: u64,
 }
 
-impl<'p> Machine<'p, '_> {
-    fn swap_fiber_context(&mut self, ctx: &mut FiberContext<'p>) {
+impl Machine<'_, '_> {
+    fn swap_fiber_context(&mut self, ctx: &mut FiberContext) {
         mem::swap(&mut self.current_owner, &mut ctx.current_owner);
         mem::swap(&mut self.current_evidence, &mut ctx.current_evidence);
         mem::swap(&mut self.frames, &mut ctx.frames);
@@ -207,7 +211,7 @@ impl<'p> Machine<'p, '_> {
     }
 
     fn collect_dest_services(
-        dest: &Destination<'p>,
+        dest: &Destination,
         providers: &BTreeMap<usize, Provider>,
         reps: &mut Vec<Value>,
     ) {

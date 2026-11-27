@@ -7,8 +7,13 @@
 
 mod eval;
 pub mod format;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+mod jobs;
+#[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+#[path = "jobs_stub.rs"]
 mod jobs;
 pub(crate) mod program;
+mod step;
 #[cfg(test)]
 mod tests;
 
@@ -20,6 +25,7 @@ use flick_core::ir::memory::{MemorySpan, Name};
 
 pub use format::render_value;
 pub use jobs::{JobId, JobInfo, JobStatus, KillOutcome};
+pub use step::StepOutcome;
 
 use jobs::JobTable;
 pub(crate) use program::SessionProgram;
@@ -27,9 +33,12 @@ pub(crate) use program::SessionProgram;
 use crate::image::{
     self, HeapInventory, ImageError, LoadReport, SaveSelection, UnloadReport, VmImage,
 };
-use crate::sandbox::{Capability, CapabilitySet, LimitKind, ResourceLimits, SandboxConfig};
+use crate::sandbox::{
+    Capability, CapabilitySet, LimitKind, ResourceLimits, SandboxConfig, verify_image_bytes,
+};
+use crate::stdlib::{HostCallbacks, HostFetchRequest, HostFetchResponse};
 use crate::tier0::{
-    Error, Heap, HostMode, SessionHandlerKind, SessionPersistentState, Value,
+    Error, Heap, HostMode, SessionHandlerKind, SessionPersistentState, SuspendedSessionEval, Value,
     allocate_execution_id, shutdown_persistent_state,
 };
 
@@ -116,6 +125,9 @@ pub struct VmSession {
     pub(crate) handlers: Vec<InstalledHandler>,
     jobs: JobTable,
     host_mode: HostMode,
+    program_args: Vec<String>,
+    host_callbacks: Option<Box<dyn HostCallbacks>>,
+    active_eval: Option<Box<SuspendedSessionEval>>,
     fuel: u64,
     sandbox: SandboxConfig,
     shutdown_done: bool,
@@ -158,12 +170,54 @@ impl VmSession {
             root_layer_name: None,
             layers: Vec::new(),
             handlers: Vec::new(),
-            jobs: JobTable::default(),
+            jobs: JobTable::new(),
             host_mode,
+            program_args: Vec::new(),
+            host_callbacks: None,
+            active_eval: None,
             fuel,
             sandbox,
             shutdown_done: false,
         }
+    }
+
+    /// Installs or clears embedder-supplied [`HostCallbacks`] (console, clock,
+    /// random, env, and optional `fetch`).
+    pub fn set_host_callbacks(&mut self, callbacks: Option<Box<dyn HostCallbacks>>) {
+        self.host_callbacks = callbacks;
+    }
+
+    /// Sets forwarded program arguments (`Host.Arguments.args`).
+    pub fn set_program_args(&mut self, args: Vec<String>) {
+        self.program_args = args;
+    }
+
+    /// Executes a host-provided HTTP fetch through [`HostCallbacks::fetch`],
+    /// enforcing [`Capability::Net`] first.
+    pub fn host_fetch(&mut self, request: &HostFetchRequest) -> Result<HostFetchResponse, Error> {
+        if !self.sandbox.capabilities.contains(Capability::Net) {
+            return Err(Error::CapabilityDenied {
+                capability: Capability::Net,
+                binding: "Host.Net.fetch".to_owned(),
+            });
+        }
+        let Some(cb) = self.host_callbacks.as_deref_mut() else {
+            return Err(Error::UnsupportedOperation(
+                "host fetch callback not configured",
+            ));
+        };
+        cb.fetch(request).map_err(Error::HostBridge)
+    }
+
+    /// Saves the live session directly into encoded `.fvm` image bytes.
+    pub fn save_image_bytes(&self, entry: Option<Name>) -> Result<Vec<u8>, ImageError> {
+        self.save_image(entry)?.encode()
+    }
+
+    /// Verifies, decodes, and links `.fvm` image bytes into this session.
+    pub fn load_image_bytes(&mut self, bytes: &[u8]) -> Result<LoadReport, ImageError> {
+        let image = verify_image_bytes(bytes)?;
+        self.load_image(&image)
     }
 
     /// Returns the active [`SandboxConfig`] for this session.
@@ -287,6 +341,9 @@ impl VmSession {
     pub fn shutdown(&mut self) -> Result<(), String> {
         if self.shutdown_done {
             return Ok(());
+        }
+        if self.active_eval.is_some() {
+            let _ = self.abandon();
         }
         self.shutdown_done = true;
         let bg_res = self.jobs.kill_all();

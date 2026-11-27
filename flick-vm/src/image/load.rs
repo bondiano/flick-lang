@@ -1,6 +1,6 @@
 //! Loading [`VmImage`]s into a live [`VmSession`] and executing standalone images.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use flick_core::iface::{self, Interface};
 use flick_core::ir::memory::{CodeId, Name};
@@ -30,7 +30,8 @@ pub fn load_image_into_session(
 ) -> Result<LoadReport, ImageError> {
     verify_hashes(image)?;
     verify_image(image)?;
-    check_program_capabilities(&image.program, None, session.capabilities())?;
+    let cap_roots = image_capability_roots(image);
+    check_program_capabilities(&image.program, cap_roots.as_deref(), session.capabilities())?;
 
     let already_loaded = session.loaded_modules();
     for module in &image.manifest.modules {
@@ -222,6 +223,41 @@ fn restore_standalone_persistent(
         cells: restored.cells,
         lazies: restored.lazies,
     })
+}
+
+/// Selects the roots for link-time capability checking when loading `image`.
+///
+/// Images lowered with `Host.live` carry transitive `Host.*` / `std` root-layer
+/// helper globals (such as `ChildProcess.*` or `File.*`) even when user modules
+/// never call them. Checking from the declared `entry`, or from globals owned
+/// by the image's user `interfaces` (falling back to all non-`Host.live`
+/// globals for synthetic images without interfaces), prevents false denials on
+/// unused root-layer services while still statically rejecting any capability
+/// actually reachable from user code.
+fn image_capability_roots(image: &VmImage) -> Option<Vec<Name>> {
+    if let Some(entry) = &image.manifest.entry {
+        return Some(vec![entry.clone()]);
+    }
+    if !image.interfaces.is_empty() {
+        let user_modules: BTreeSet<&str> = image
+            .interfaces
+            .iter()
+            .map(|rec| rec.name.as_str())
+            .collect();
+        let skip_host_live = image.program.globals.len() > 1;
+        let roots: Vec<Name> = image
+            .program
+            .globals
+            .iter()
+            .filter(|g| user_modules.contains(g.name.module.as_str()))
+            .filter(|g| !(skip_host_live && g.name.module == "Host" && g.name.name == "live"))
+            .map(|g| g.name.clone())
+            .collect();
+        if !roots.is_empty() {
+            return Some(roots);
+        }
+    }
+    None
 }
 
 fn verify_hashes(image: &VmImage) -> Result<(), ImageError> {

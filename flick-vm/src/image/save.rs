@@ -253,10 +253,14 @@ pub(crate) fn canonical_closed_interface(
     sanitize_closed_interface(raw)
 }
 
-fn sanitize_closed_interface(mut iface: Interface) -> Result<Interface, ImageError> {
+fn sanitize_closed_interface(iface: Interface) -> Result<Interface, ImageError> {
     let module = iface.module.clone();
     #[cfg(not(target_arch = "wasm32"))]
-    iface.local_schemes.clear();
+    let iface = {
+        let mut iface = iface;
+        iface.local_schemes.clear();
+        iface
+    };
     // `iface::fingerprint` enforces closedness via `flick_core::iface::closed`.
     let _ = iface::fingerprint(&iface)
         .map_err(|detail| ImageError::OpenInterface { module, detail })?;

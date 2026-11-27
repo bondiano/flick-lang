@@ -70,6 +70,7 @@ change needs.
 | [`Math.log` in the kernel, and an exact `Float.next_pow2`](#mathlog-in-the-kernel-and-an-exact-floatnext_pow2) | no | — |
 | [Hot-swap compatibility and declared state-cell migrations (formal model)](#hot-swap-compatibility-and-declared-state-cell-migrations-formal-model) | no | — |
 | [VM Tier 1 runs std and CLI intrinsics](#vm-tier-1-runs-std-and-cli-intrinsics) | no | — |
+| [`flick-vm` `native-host` feature gate and `wasm32` runtime](#flick-vm-native-host-feature-gate-and-wasm32-runtime) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -937,3 +938,18 @@ schemas, codecs, JSON, temporal (`DateTime`, `Duration`, `TimeZone`), `Decimal`,
 errors, help, version, and Bash/Zsh/Fish/PowerShell completions) through the
 shared `flick-vm` standard library. JS and Go outputs are unchanged, and
 existing Flick sources require no edits.
+
+## `flick-vm` `native-host` feature gate and `wasm32` runtime
+
+`flick-vm` now gates OS-bound host modules (`Host.File`, `Host.FileSystem`,
+`Host.Process`, `HostBridge`, OS background job threads, and system TZif/env
+reads) behind the default `native-host` feature and `not(target_arch = "wasm32")`.
+Embedders targeting `wasm32-unknown-unknown` depend on `flick-vm` with
+`default-features = false` or use the dedicated `flick-vm-wasm` `wasm-bindgen`
+crate, supplying console, clock, random, environment, and capability-gated
+`fetch` callbacks from JS and driving evaluations cooperatively with
+`start_eval`, `step(fuel)`, and `abandon()`.
+
+Existing Flick sources require no changes; programs that rely on native
+filesystem, child process, or `HostBridge` APIs remain native-host-only (see
+[Backends](../../reference/backends/#webassembly-vm-runtime-flick-vm-wasm)).

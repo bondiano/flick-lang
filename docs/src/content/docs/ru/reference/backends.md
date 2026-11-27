@@ -1,6 +1,6 @@
 ---
 title: "Бэкенды"
-source_hash: ba6dc22f0e9d7fa4
+source_hash: 7d9e13d7204c1bdd
 ---
 
 Генерация кода в Flick выполняется через WebAssembly-компоненты, реализующие контракт `flick:backend@0.1.0`, а не через жёстко встроенный в CLI код таргетов. Команды `flick build`, `flick run`, `flick dev`, `flick test`, `flick pack` и `flick inspect` выбирают, проверяют и запускают компонент бэкенда проекта до записи или запуска любых артефактов.
@@ -15,7 +15,7 @@ source_hash: ba6dc22f0e9d7fa4
 | - | - | - | - |
 | `flick/js` | `js` (по умолчанию) | `js/node` | Официальный бэкенд JavaScript и TypeScript; также поддерживает `js/browser`, `js/bun` и `js/cloudflare`. |
 | `flick/go` | `go` | `go/native` | Официальный бэкенд Go; генерирует модуль Go для каждого входа или набора тестов и запускает `go build` при разрешении `[tools] "flick/go" = ["go"]`. |
-| `flick/vm` | `vm` | `vm/native` | Встроенная внутрипроцессная ВМ на Rust (`flick build --target vm`, `flick run --target vm` и `flick test --target vm`), собирающая и исполняющая образы `.fvm` с нативными Rust-сервисами хоста (`Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem`, `Process`); не требует Node или Go. |
+| `flick/vm` | `vm` | `vm/native` | Встроенная внутрипроцессная ВМ на Rust (`flick build --target vm`, `flick run --target vm` и `flick test --target vm`), собирающая и исполняющая образы `.fvm` с нативными Rust-сервисами хоста (`Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem`, `Process`), а также среда выполнения `wasm32-unknown-unknown` (`flick-vm-wasm`) для браузеров и Node.js; на нативной платформе не требует Node или Go. |
 | `flick/lua` | `lua` | — | Предварительный компонент (не входит в официальный индекс релизов); выбирается через `[build.backend]` с явным окружением (`lua/love`, `lua/wow-retail` или `lua/wow-forever`). |
 
 `[build] environment` задаёт пару `<backend>/<host>`, например `"js/node"`, `"js/browser"`, `"js/bun"`, `"js/cloudflare"`, `"go/native"` или хост из пакета-библиотеки с разделом `[host]`:
@@ -171,6 +171,28 @@ world backend {
 | `flick/lua@0.1.0` | Предварительный компонент | Явное закрепление `[build.backend]` | `whole-program` | `lua/love`, `lua/wow-retail`, `lua/wow-forever` |
 | Сторонний компонент (`[build.backend]`) | Внешний бэкенд | Wasmtime-хост CLI (только `inputs.read`, закреплённый SHA-256) | `per-module` и/или `whole-program` по `describe` | Любая пара `<backend>/<host>` из `describe` |
 | Нативный Rust `flick_backend::Backend` | Адаптер разработки и parity | Только внутрипроцессные тесты Rust (никогда не используется как скрытый откат в релизе) | Совпадает с контрактом компонента | Наборы разработки и проверки эквивалентности |
+| `flick-vm-wasm` | Среда выполнения ВМ для браузеров и Node.js | `wasm-bindgen` (`wasm32-unknown-unknown`) поверх `flick-vm` (`--no-default-features`) | Исполняет проверенные образы `.fvm` | Хосты браузера и Node.js с JS-колбэками |
+
+## WebAssembly-среда выполнения ВМ (`flick-vm-wasm`)
+
+Крейт `flick-vm` собирается под `wasm32-unknown-unknown` (как с функциями по умолчанию, так и с `--no-default-features`) без системных зависимостей ОС (`tokio`, `hyper`, `wasmtime`, `libffi`, `rustix` и `mio`). Крейт `flick-vm-wasm` предоставляет интерфейс `wasm-bindgen` с типом `VmSession` для браузеров и Node.js:
+
+- **Образы в буферах байтов:** `load_image(bytes)` проверяет и связывает образы `.fvm` из буферов `Uint8Array`, а `save_image()` сохраняет живое состояние сессии обратно в `Uint8Array`.
+- **Песочница и лимиты:** `VmSession` применяет те же наборы возможностей (`CapabilitySet`) и лимиты ресурсов (`fuel`, `heapBytes`, `wallTimeMs`, `maxStackDepth`), что и нативный `flick-vm`, причём `wallTimeMs` опирается на `performance.now()` в JS. По умолчанию сессия создаётся в недоверенном пресете (только чистые вычисления и консоль).
+- **JS-колбэки хоста:** встраивающий код передаёт необязательные колбэки через `set_host_callbacks`: `writeStdout`, `writeStderr`, `currentTimeMillis`, `currentTimeNanos`, `monotonicTimeNanos`, `randomNext`, `envVar`, `envVars` и ограниченный возможностями `fetch` (требует `"net"`).
+- **Однопоточное кооперативное пошаговое исполнение:** `start_eval(module, name, mainProtocol)` запускает вычисление, которое продвигается ограниченными квантами топлива через `step(fuel)` (возвращая `yielded`, `completed`, `limitExceeded` или `faulted`). Вызов `abandon()` чисто сворачивает открытые области видимости и исполняет финализаторы в порядке LIFO без утечки слотов кучи и без повреждения сессии для последующих вычислений.
+
+### Операции, доступные только на нативном хосте (`wasm32`)
+
+Поскольку на `wasm32-unknown-unknown` нет файловой системы ОС, таблицы процессов и нативных потоков, следующие возможности хоста скрыты за флагом `native-host` и недоступны на `wasm32`:
+
+- Нативные сервисы файловой системы (`Host.File`, `Host.FileSystem`).
+- Запуск дочерних процессов (`Host.Process`).
+- Вызовы внешних функций через постоянный мост `HostBridge` (`ForeignCall` по-прежнему проверяет права доступа перед возвратом ошибки неподдерживаемой операции).
+- Фоновые потоки задач ОС (`:bg`, `:jobs`, `:kill` в интерактивных REPL-сессиях).
+- Прямое чтение переменных окружения ОС, текущего рабочего каталога и системных файлов часовых поясов TZif (чтение окружения на `wasm32` идёт только через установленные JS-колбэки `envVar`/`envVars`; без системных файлов TZif используется UTC).
+
+Семантика ядра языка (владение, подсчёт ссылок, эффекты, файберы, области видимости, финализаторы и правила песочницы) полностью совпадает между нативным `flick-vm` и `flick-vm-wasm`; модель `flick-model` и формализация Lean в `formal/` не затрагиваются.
 
 ## Примеры миграции
 

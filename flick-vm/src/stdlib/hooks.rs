@@ -5,6 +5,7 @@ use crate::sandbox::CapabilitySet;
 use crate::tier0::{Error, Heap};
 
 use super::host::{HostMode, HostServices};
+use super::host_callbacks::{HostCallbacks, HostFetchRequest, HostFetchResponse};
 use super::primitives::IsaacRng;
 
 /// Fuel and allocation accounting hook supplied by any VM tier calling into
@@ -66,6 +67,41 @@ pub trait HostEnv {
     /// Defaults to [`CapabilitySet::all`] for backward compatibility.
     fn capabilities(&self) -> CapabilitySet {
         CapabilitySet::all()
+    }
+
+    /// Optional embedder-provided wall-clock milliseconds (`HostMode::LiveOs`).
+    fn host_wall_time_millis(&mut self) -> Option<f64> {
+        None
+    }
+
+    /// Optional embedder-provided wall-clock nanoseconds (`HostMode::LiveOs`).
+    fn host_wall_time_nanos(&mut self) -> Option<u128> {
+        None
+    }
+
+    /// Optional embedder-provided monotonic nanoseconds (`HostMode::LiveOs`).
+    fn host_monotonic_nanos(&mut self) -> Option<u128> {
+        None
+    }
+
+    /// Optional embedder-provided random draw in `[0, 1)` (`HostMode::LiveOs`).
+    fn host_random_next(&mut self) -> Option<f64> {
+        None
+    }
+
+    /// Optional embedder-provided environment variable lookup (`HostMode::LiveOs`).
+    fn host_env_var(&mut self, _key: &str) -> Option<String> {
+        None
+    }
+
+    /// Optional embedder-provided environment variable listing (`HostMode::LiveOs`).
+    fn host_env_vars(&mut self) -> Option<Vec<(String, String)>> {
+        None
+    }
+
+    /// Optional embedder-provided HTTP fetch when `Capability::Net` is granted.
+    fn host_fetch(&mut self, _req: &HostFetchRequest) -> Option<Result<HostFetchResponse, String>> {
+        None
     }
 }
 
@@ -166,6 +202,7 @@ pub struct HostContext<'a> {
     virtual_now_ns: Option<u64>,
     seeded_rng: Option<&'a mut IsaacRng>,
     host_services: Option<&'a mut HostServices>,
+    host_callbacks: Option<&'a mut (dyn HostCallbacks + 'static)>,
     capabilities: CapabilitySet,
 }
 
@@ -180,8 +217,15 @@ impl<'a> HostContext<'a> {
             virtual_now_ns: None,
             seeded_rng: None,
             host_services: None,
+            host_callbacks: None,
             capabilities: CapabilitySet::all(),
         }
+    }
+
+    #[must_use]
+    pub fn with_host_callbacks(mut self, callbacks: &'a mut (dyn HostCallbacks + 'static)) -> Self {
+        self.host_callbacks = Some(callbacks);
+        self
     }
 
     #[must_use]
@@ -233,11 +277,17 @@ impl HostEnv for HostContext<'_> {
 
     fn write_stdout(&mut self, text: &str) {
         self.stdout.push_str(text);
+        if let Some(cb) = self.host_callbacks.as_deref_mut() {
+            cb.write_stdout(text);
+        }
     }
 
     fn write_stderr(&mut self, text: &str) {
         if let Some(stderr) = self.stderr.as_deref_mut() {
             stderr.push_str(text);
+        }
+        if let Some(cb) = self.host_callbacks.as_deref_mut() {
+            cb.write_stderr(text);
         }
     }
 
@@ -259,5 +309,45 @@ impl HostEnv for HostContext<'_> {
 
     fn capabilities(&self) -> CapabilitySet {
         self.capabilities
+    }
+
+    fn host_wall_time_millis(&mut self) -> Option<f64> {
+        self.host_callbacks
+            .as_deref_mut()
+            .and_then(HostCallbacks::current_time_millis)
+    }
+
+    fn host_wall_time_nanos(&mut self) -> Option<u128> {
+        self.host_callbacks
+            .as_deref_mut()
+            .and_then(HostCallbacks::current_time_nanos)
+    }
+
+    fn host_monotonic_nanos(&mut self) -> Option<u128> {
+        self.host_callbacks
+            .as_deref_mut()
+            .and_then(HostCallbacks::monotonic_time_nanos)
+    }
+
+    fn host_random_next(&mut self) -> Option<f64> {
+        self.host_callbacks
+            .as_deref_mut()
+            .and_then(HostCallbacks::random_next)
+    }
+
+    fn host_env_var(&mut self, key: &str) -> Option<String> {
+        self.host_callbacks
+            .as_deref_mut()
+            .and_then(|cb| cb.env_var(key))
+    }
+
+    fn host_env_vars(&mut self) -> Option<Vec<(String, String)>> {
+        self.host_callbacks
+            .as_deref_mut()
+            .and_then(HostCallbacks::env_vars)
+    }
+
+    fn host_fetch(&mut self, req: &HostFetchRequest) -> Option<Result<HostFetchResponse, String>> {
+        self.host_callbacks.as_deref_mut().map(|cb| cb.fetch(req))
     }
 }

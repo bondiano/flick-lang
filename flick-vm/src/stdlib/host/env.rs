@@ -1,6 +1,7 @@
 //! Host environment variables and program CLI arguments (`Host.Environment`,
 //! `Host.Arguments`).
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::env;
 
 use flick_core::ir::Lit;
@@ -18,13 +19,26 @@ pub(super) fn get_env(
     let key = heap.string(key_val)?.to_owned();
     match hooks.host_mode() {
         HostMode::Deterministic => heap.construct("Prelude.Option.None", vec![]),
-        HostMode::LiveOs => match env::var(&key) {
-            Ok(found) => {
+        HostMode::LiveOs => {
+            if let Some(found) = hooks.host_env_var(&key) {
                 let text = heap.literal(&Lit::String(found))?;
-                heap.construct("Prelude.Option.Some", vec![text])
+                return heap.construct("Prelude.Option.Some", vec![text]);
             }
-            Err(_) => heap.construct("Prelude.Option.None", vec![]),
-        },
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+            {
+                match env::var(&key) {
+                    Ok(found) => {
+                        let text = heap.literal(&Lit::String(found))?;
+                        heap.construct("Prelude.Option.Some", vec![text])
+                    }
+                    Err(_) => heap.construct("Prelude.Option.None", vec![]),
+                }
+            }
+            #[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+            {
+                heap.construct("Prelude.Option.None", vec![])
+            }
+        }
     }
 }
 
@@ -32,8 +46,14 @@ pub(super) fn list_vars(heap: &mut Heap, hooks: &mut dyn VmHooks) -> Result<Valu
     match hooks.host_mode() {
         HostMode::Deterministic => heap.construct("$list", vec![]),
         HostMode::LiveOs => {
-            let mut pairs = Vec::new();
-            for (k, v) in env::vars() {
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+            let entries: Vec<(String, String)> = hooks
+                .host_env_vars()
+                .unwrap_or_else(|| env::vars().collect());
+            #[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+            let entries: Vec<(String, String)> = hooks.host_env_vars().unwrap_or_default();
+            let mut pairs = Vec::with_capacity(entries.len());
+            for (k, v) in entries {
                 let key = match heap.literal(&Lit::String(k)) {
                     Ok(val) => val,
                     Err(err) => {

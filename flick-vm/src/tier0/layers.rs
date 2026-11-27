@@ -21,7 +21,7 @@ pub(super) struct Provider {
     pub(super) restore_memo: MemoRestore,
 }
 
-impl<'p> Machine<'p, '_> {
+impl Machine<'_, '_> {
     pub(super) fn layer_intrinsic(&mut self, kind: Intrinsic, binding: Local) -> Result<(), Error> {
         match kind {
             Intrinsic::LayerSucceed => {
@@ -169,7 +169,7 @@ impl<'p> Machine<'p, '_> {
     pub(super) fn leave_provider_outcome(
         &mut self,
         id: usize,
-        outcome: ScopeOutcome<'p>,
+        outcome: ScopeOutcome,
     ) -> Result<(), Error> {
         let provider = self.providers.remove(&id).expect("departed provider");
         if let MemoRestore::Restore(prev_memo) = provider.restore_memo {

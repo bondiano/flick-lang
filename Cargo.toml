@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["tools/component-build", "backends/js", "backends/go", "backends/lua", "flick-backend", "flick-backend-support", "flick-core", "flick-diagnostics", "flick-ffi", "flick-syntax", "flick-ir", "flick", "flick-test-support", "flick-pretty", "flick-wasm", "flick-vm", "flick-model", "flick-plugin", "flick-plugin/macros", "plugins/cli", "plugins/derive", "plugins/refined", "plugins/sql", "plugins/test", "plugins/ui", "tests/plugins/pairs", "tests/plugins/meta", "tests/backends/literal", "examples/typed-dsl/plugin", "packages/effect-ts/tools/surface"]
+members = ["tools/component-build", "backends/js", "backends/go", "backends/lua", "flick-backend", "flick-backend-support", "flick-core", "flick-diagnostics", "flick-ffi", "flick-syntax", "flick-ir", "flick", "flick-test-support", "flick-pretty", "flick-wasm", "flick-vm", "flick-vm-wasm", "flick-model", "flick-plugin", "flick-plugin/macros", "plugins/cli", "plugins/derive", "plugins/refined", "plugins/sql", "plugins/test", "plugins/ui", "tests/plugins/pairs", "tests/plugins/meta", "tests/backends/literal", "examples/typed-dsl/plugin", "packages/effect-ts/tools/surface"]
 
 [workspace.package]
 edition = "2024"

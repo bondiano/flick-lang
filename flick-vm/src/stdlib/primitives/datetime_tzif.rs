@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::{env, fs};
 
 use flick_core::opt::js_number;
@@ -161,22 +162,33 @@ pub(super) fn local_zone() -> TimeZoneData {
     static LOCAL: OnceLock<TimeZoneData> = OnceLock::new();
     LOCAL
         .get_or_init(|| {
-            let mut name = env::var("TZ").unwrap_or_default();
-            if let Some(stripped) = name.strip_prefix(':') {
-                name = stripped.to_owned();
-            }
-            if name.is_empty()
-                && let Ok(link) = fs::read_link("/etc/localtime")
-                && let Some(s) = link.to_str()
-                && let Some((_, after)) = s.split_once("zoneinfo/")
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
             {
-                after.clone_into(&mut name);
+                let mut name = env::var("TZ").unwrap_or_default();
+                if let Some(stripped) = name.strip_prefix(':') {
+                    name = stripped.to_owned();
+                }
+                if name.is_empty()
+                    && let Ok(link) = fs::read_link("/etc/localtime")
+                    && let Some(s) = link.to_str()
+                    && let Some((_, after)) = s.split_once("zoneinfo/")
+                {
+                    after.clone_into(&mut name);
+                }
+                let resolved = zone_table(&name).unwrap_or_else(|| "UTC".into());
+                TimeZoneData::Named {
+                    id: resolved,
+                    fixed_seconds: None,
+                    is_local: true,
+                }
             }
-            let resolved = zone_table(&name).unwrap_or_else(|| "UTC".into());
-            TimeZoneData::Named {
-                id: resolved,
-                fixed_seconds: None,
-                is_local: true,
+            #[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+            {
+                TimeZoneData::Named {
+                    id: "UTC".into(),
+                    fixed_seconds: Some(0),
+                    is_local: true,
+                }
             }
         })
         .clone()

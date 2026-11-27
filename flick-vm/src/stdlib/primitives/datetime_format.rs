@@ -1,6 +1,7 @@
 //! Locale validation + `Intl.DateTimeFormat` formatting (`runtime-go/flickrt/{locale,datetime_format,datetime_metazone}.go`).
 
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::env;
 use std::sync::OnceLock;
 
@@ -278,6 +279,7 @@ fn lookup_locale<'a, V>(
 }
 
 fn default_locale() -> &'static str {
+    #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
     for name in ["LC_ALL", "LC_MESSAGES", "LANG"] {
         if let Ok(v) = env::var(name)
             && !v.is_empty()

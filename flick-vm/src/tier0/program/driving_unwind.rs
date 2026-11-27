@@ -1,6 +1,6 @@
 // Frame unwinding, interrupted-handler skipping, and lazy unwind/handoff.
 
-impl<'p> Machine<'p, '_> {
+impl Machine<'_, '_> {
     /// Each suspended-frame crossing consumes one ordinary VM step.
     fn unwind(&mut self) -> Result<(), Error> {
         let mut frame = self.frames.pop().expect("raised frame");
@@ -36,7 +36,7 @@ impl<'p> Machine<'p, '_> {
         Ok(true)
     }
 
-    fn fail_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn fail_destination(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::Handle {
                 activation,
@@ -96,7 +96,7 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    fn unwind_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn unwind_destination(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::RecoverySelection { id } => self.abandon_recovery(id)?,
             Destination::RecoveryBody {
@@ -190,7 +190,7 @@ impl<'p> Machine<'p, '_> {
         Ok(())
     }
 
-    fn unwind_foreign_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn unwind_foreign_destination(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::HostSyncCallback {
                 req_id,

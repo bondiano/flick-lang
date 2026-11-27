@@ -14,7 +14,7 @@ Without an explicit component pin, Flick selects an official backend from `[buil
 | - | - | - | - |
 | `flick/js` | `js` (default) | `js/node` | Official JavaScript and TypeScript backend; also supports `js/browser`, `js/bun` and `js/cloudflare`. |
 | `flick/go` | `go` | `go/native` | Official Go backend; emits a Go module per entry/test suite and runs `go build` under `[tools] "flick/go" = ["go"]`. |
-| `flick/vm` | `vm` | `vm/native` | Built-in in-process Rust VM (`flick build --target vm`, `flick run --target vm`, and `flick test --target vm`) emitting and executing `.fvm` images with native Rust host services (`Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem`, `Process`); requires no Node or Go. |
+| `flick/vm` | `vm` | `vm/native` | Built-in in-process Rust VM (`flick build --target vm`, `flick run --target vm`, and `flick test --target vm`) emitting and executing `.fvm` images with native Rust host services (`Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem`, `Process`), plus a `wasm32-unknown-unknown` runtime (`flick-vm-wasm`) for browsers and Node.js; requires no Node or Go on native. |
 | `flick/lua` | `lua` | — | Preview component (not in the official release index); select with `[build.backend]` and an explicit environment (`lua/love`, `lua/wow-retail` or `lua/wow-forever`). |
 
 `[build] environment` selects a `<backend>/<host>` pair such as `"js/node"`, `"js/browser"`, `"js/bun"`, `"js/cloudflare"`, `"go/native"`, or a host contributed by a `[host]` library package:
@@ -170,6 +170,28 @@ The portable backend delivery contract versions its surfaces independently (`0.x
 | `flick/lua@0.1.0` | Preview component | Explicit `[build.backend]` pin | `whole-program` | `lua/love`, `lua/wow-retail`, `lua/wow-forever` |
 | Third-party component (`[build.backend]`) | External backend | CLI Wasmtime host (`inputs.read` only, pinned SHA-256) | `per-module` and/or `whole-program` as declared | Any `<backend>/<host>` declared by `describe` |
 | Native Rust `flick_backend::Backend` | Development & parity adapter | In-process Rust tests only (never a silent production fallback) | Matches component contract | Development/parity suites |
+| `flick-vm-wasm` | Browser & Node.js VM runtime | `wasm-bindgen` (`wasm32-unknown-unknown`) over `flick-vm` (`--no-default-features`) | Executes verified `.fvm` images | Browser & Node.js hosts with JS callbacks |
+
+## WebAssembly VM runtime (`flick-vm-wasm`)
+
+`flick-vm` builds cleanly for `wasm32-unknown-unknown` (both with default features and `--no-default-features`) without pulling OS-only runtime dependencies (`tokio`, `hyper`, `wasmtime`, `libffi`, `rustix`, or `mio`). The `flick-vm-wasm` crate exposes a `wasm-bindgen` `VmSession` for browsers and Node.js:
+
+- **Byte-buffer images:** `load_image(bytes)` verifies and links `.fvm` images from `Uint8Array` buffers, and `save_image()` snapshots live session state back to `Uint8Array`.
+- **Sandboxing and limits:** `VmSession` enforces the same capability sets (`CapabilitySet`) and resource limits (`fuel`, `heapBytes`, `wallTimeMs`, `maxStackDepth`) as native `flick-vm`, with `wallTimeMs` backed by JS `performance.now()`. Default sessions start with the untrusted preset (pure computation and console only).
+- **JS host callbacks:** embedders plug optional JS callbacks via `set_host_callbacks` for `writeStdout`, `writeStderr`, `currentTimeMillis`, `currentTimeNanos`, `monotonicTimeNanos`, `randomNext`, `envVar`, `envVars`, and capability-gated `fetch` (requiring `"net"`).
+- **Single-threaded cooperative stepping:** `start_eval(module, name, mainProtocol)` begins an evaluation that advances in bounded fuel slices via `step(fuel)` (returning `yielded`, `completed`, `limitExceeded`, or `faulted`). Calling `abandon()` unwinds open scopes and runs LIFO finalizers without leaking heap slots or corrupting the session for subsequent evaluations.
+
+### Host-only OS cases on `wasm32`
+
+Because `wasm32-unknown-unknown` has no OS filesystem, process table, or native threads, the following host features are gated behind `native-host` and are unavailable on `wasm32`:
+
+- Native filesystem services (`Host.File`, `Host.FileSystem`).
+- Child process spawning (`Host.Process`).
+- Persistent Node `HostBridge` foreign calls (`ForeignCall` still enforces capability checks before reporting an unsupported operation).
+- Background OS job threads (`:bg`, `:jobs`, `:kill` in interactive REPL sessions).
+- Direct OS environment, current-working-directory, and system TZif zoneinfo file reads (environment lookups on `wasm32` come exclusively from installed JS `envVar`/`envVars` callbacks; IANA timezone lookup uses UTC when no OS zoneinfo files exist).
+
+Core language semantics (ownership, reference counting, effects, fibers, scopes, finalizers, and sandbox enforcement) are identical between native `flick-vm` and `flick-vm-wasm`; `flick-model` and the Lean formalization in `formal/` are unaffected.
 
 ## Migration examples
 

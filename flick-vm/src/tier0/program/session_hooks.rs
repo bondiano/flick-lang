@@ -32,6 +32,7 @@ pub(crate) struct SessionRunSpec<'a> {
     pub(crate) handlers: &'a [(Value, SessionHandlerKind)],
     pub(crate) fuel: u64,
     pub(crate) host_mode: HostMode,
+    pub(crate) program_args: &'a [String],
     pub(crate) external_interrupt: Option<Arc<AtomicBool>>,
     pub(crate) synthetic_codes: SessionSyntheticCodes,
     pub(crate) sandbox: &'a SandboxConfig,
@@ -46,12 +47,13 @@ pub(crate) fn allocate_execution_id() -> usize {
 
 /// Executes one global (and optionally auto-awaits its task under installed
 /// session layers and handlers) against persistent session roots.
-pub(crate) fn execute_session_step(
-    heap: &mut Heap,
+pub(crate) fn execute_session_step<'h>(
+    heap: &'h mut Heap,
     program: &Program,
     execution: usize,
     persistent: &mut SessionPersistentState,
     spec: &SessionRunSpec<'_>,
+    host_callbacks: Option<&'h mut (dyn HostCallbacks + 'static)>,
 ) -> ExecutionReport {
     if !program.globals.iter().any(|g| &g.name == spec.entry) {
         return ExecutionReport {
@@ -62,6 +64,8 @@ pub(crate) fn execute_session_step(
     }
     let mut machine = Machine::new(heap, program, execution, vec![], spec.fuel, MainStage::Done);
     machine.host_mode = spec.host_mode;
+    machine.program_args = spec.program_args.to_vec();
+    machine.host_callbacks = host_callbacks;
     machine.external_interrupt.clone_from(&spec.external_interrupt);
     machine.configure_sandbox(spec.sandbox);
     machine.load_persistent(persistent);
@@ -97,12 +101,13 @@ pub(crate) fn execute_session_step(
 
 /// Evaluates a layer global; static layers are returned as-is while dynamic
 /// layers are built into a `Data::Context` once under the active session layers.
-pub(crate) fn build_session_layer_value(
-    heap: &mut Heap,
+pub(crate) fn build_session_layer_value<'h>(
+    heap: &'h mut Heap,
     program: &Program,
     execution: usize,
     persistent: &mut SessionPersistentState,
     spec: &SessionRunSpec<'_>,
+    host_callbacks: Option<&'h mut (dyn HostCallbacks + 'static)>,
 ) -> ExecutionReport {
     if !program.globals.iter().any(|g| &g.name == spec.entry) {
         return ExecutionReport {
@@ -113,6 +118,8 @@ pub(crate) fn build_session_layer_value(
     }
     let mut machine = Machine::new(heap, program, execution, vec![], spec.fuel, MainStage::Done);
     machine.host_mode = spec.host_mode;
+    machine.program_args = spec.program_args.to_vec();
+    machine.host_callbacks = host_callbacks;
     machine.external_interrupt.clone_from(&spec.external_interrupt);
     machine.configure_sandbox(spec.sandbox);
     machine.load_persistent(persistent);

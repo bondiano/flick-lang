@@ -59,25 +59,25 @@ enum ClosePhase {
     Finalizers,
 }
 
-enum ScopeOutcome<'p> {
+enum ScopeOutcome {
     Normal {
         binding: Option<Local>,
         value: Value,
     },
     Failure(CauseToken),
-    Discard(Box<Discard<'p>>),
+    Discard(Box<Discard>),
     ChildClose {
-        parent: Box<ClosingScopeState<'p>>,
+        parent: Box<ClosingScopeState>,
         inherited_exit: Option<CauseToken>,
     },
 }
 
-struct ClosingScopeState<'p> {
+struct ClosingScopeState {
     owner: usize,
     previous: usize,
     phase: ClosePhase,
     remaining: Vec<Finalizer>,
-    outcome: ScopeOutcome<'p>,
+    outcome: ScopeOutcome,
     exit_override: Option<CauseToken>,
     finalizer_failure: Option<CauseToken>,
     elect_on_fail: bool,
@@ -162,7 +162,7 @@ pub fn execute_main_program_outcome_with_args(
     host_mode: HostMode,
     program_args: Vec<String>,
 ) -> ExecutionReport {
-    execute_with_host_args_and_bridge(
+    execute_with_host_and_args(
         heap,
         program,
         entry,
@@ -171,7 +171,6 @@ pub fn execute_main_program_outcome_with_args(
         MainStage::Function,
         host_mode,
         program_args,
-        None,
     )
 }
 
@@ -212,7 +211,7 @@ pub fn execute_rooted_main_program_outcome_with_args(
             stderr: String::new(),
         };
     }
-    execute_with_host_args_and_bridge(
+    execute_with_host_and_args(
         heap,
         program,
         root,
@@ -224,11 +223,11 @@ pub fn execute_rooted_main_program_outcome_with_args(
         },
         host_mode,
         program_args,
-        None,
     )
 }
 
 /// Runs the main apply/await protocol with an explicit [`HostBridge`].
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 pub fn execute_main_program_outcome_with_bridge(
     heap: &mut Heap,
     program: &Program,
@@ -250,6 +249,7 @@ pub fn execute_main_program_outcome_with_bridge(
 }
 
 /// [`execute_rooted_main_program_outcome`] with an explicit [`HostBridge`].
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 pub fn execute_rooted_main_program_outcome_with_bridge(
     heap: &mut Heap,
     program: &Program,
@@ -273,6 +273,7 @@ pub fn execute_rooted_main_program_outcome_with_bridge(
 
 /// Executes `entry` with optional root layer, optional entry-module eager
 /// top-level initializers, and an explicit [`HostBridge`].
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 #[expect(clippy::too_many_arguments, reason = "explicit bridge main runner")]
 pub fn execute_main_with_bridge_and_inits(
     heap: &mut Heap,
@@ -347,23 +348,7 @@ fn execute_with_host(
     main_stage: MainStage,
     host_mode: HostMode,
 ) -> ExecutionReport {
-    execute_with_host_and_bridge(
-        heap, program, entry, arguments, fuel, main_stage, host_mode, None,
-    )
-}
-
-#[expect(clippy::too_many_arguments, reason = "internal execution entrypoint")]
-fn execute_with_host_and_bridge(
-    heap: &mut Heap,
-    program: &Program,
-    entry: &Name,
-    arguments: Vec<Value>,
-    fuel: u64,
-    main_stage: MainStage,
-    host_mode: HostMode,
-    bridge: Option<&mut HostBridge>,
-) -> ExecutionReport {
-    execute_with_host_args_and_bridge(
+    execute_with_host_and_args(
         heap,
         program,
         entry,
@@ -372,12 +357,11 @@ fn execute_with_host_and_bridge(
         main_stage,
         host_mode,
         Vec::new(),
-        bridge,
     )
 }
 
 #[expect(clippy::too_many_arguments, reason = "internal execution entrypoint")]
-fn execute_with_host_args_and_bridge(
+fn execute_with_host_and_args(
     heap: &mut Heap,
     program: &Program,
     entry: &Name,
@@ -386,7 +370,6 @@ fn execute_with_host_args_and_bridge(
     main_stage: MainStage,
     host_mode: HostMode,
     program_args: Vec<String>,
-    bridge: Option<&mut HostBridge>,
 ) -> ExecutionReport {
     let arguments = match prepare_arguments(heap, program, entry, arguments) {
         Ok(arguments) => arguments,
@@ -404,6 +387,42 @@ fn execute_with_host_args_and_bridge(
     let mut machine = Machine::new(heap, program, execution, arguments, fuel, main_stage);
     machine.host_mode = host_mode;
     machine.program_args = program_args;
+    let result = machine.global(entry, None).and_then(|()| machine.run());
+    let outcome = machine.finish(result);
+    ExecutionReport {
+        outcome,
+        stdout: machine.stdout,
+        stderr: machine.stderr,
+    }
+}
+
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+#[expect(clippy::too_many_arguments, reason = "internal execution entrypoint")]
+fn execute_with_host_and_bridge(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    arguments: Vec<Value>,
+    fuel: u64,
+    main_stage: MainStage,
+    host_mode: HostMode,
+    bridge: Option<&mut HostBridge>,
+) -> ExecutionReport {
+    let arguments = match prepare_arguments(heap, program, entry, arguments) {
+        Ok(arguments) => arguments,
+        Err(error) => {
+            return ExecutionReport {
+                outcome: ProgramOutcome::Fault(error),
+                stdout: String::new(),
+                stderr: String::new(),
+            };
+        }
+    };
+    let execution = NEXT_EXECUTION
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .expect("fewer than usize::MAX model executions");
+    let mut machine = Machine::new(heap, program, execution, arguments, fuel, main_stage);
+    machine.host_mode = host_mode;
     machine.bridge = bridge;
     let result = machine.global(entry, None).and_then(|()| machine.run());
     let outcome = machine.finish(result);
@@ -500,7 +519,9 @@ impl<'p, 'h> Machine<'p, 'h> {
             root_defects: Vec::new(),
             runtime_fibers_started: 0,
             host_mode: HostMode::Deterministic,
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
             bridge: None,
+            host_callbacks: None,
             foreign: ForeignState::default(),
             external_interrupt: None,
             sandbox: SandboxRuntime::default(),

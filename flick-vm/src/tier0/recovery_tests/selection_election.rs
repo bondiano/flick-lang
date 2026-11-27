@@ -228,7 +228,7 @@ fn install_injected_catch(machine: &mut Machine<'_, '_>, cause: CauseToken) {
     machine.frames.push(Frame {
         recovery_id: None,
         evidence: None,
-        block,
+        block: BlockLoc::root(0),
         at: block.instructions.len(),
         locals: Locals::new(),
         vars: vec![],
@@ -238,7 +238,7 @@ fn install_injected_catch(machine: &mut Machine<'_, '_>, cause: CauseToken) {
     machine.frames.push(Frame {
         recovery_id: None,
         evidence: None,
-        block,
+        block: BlockLoc::root(0),
         at: 0,
         locals: Locals::new(),
         vars: vec![],

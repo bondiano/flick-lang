@@ -1,6 +1,6 @@
 // Layer merge_all, build completion, service lookup, and memo cleanup (Stage 4A).
 
-impl<'p> Machine<'p, '_> {
+impl Machine<'_, '_> {
     fn start_layer_merge_all(
         &mut self,
         layers: Vec<Value>,
@@ -338,7 +338,7 @@ impl<'p> Machine<'p, '_> {
 
     pub(super) fn find_dest_service<'a>(
         heap: &'a Heap,
-        dest: &'a Destination<'p>,
+        dest: &'a Destination,
         providers: &'a BTreeMap<usize, Provider>,
         effect: &str,
         fuel: &mut u64,

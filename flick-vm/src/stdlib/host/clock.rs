@@ -1,6 +1,8 @@
 //! Host wall-clock and monotonic-clock primitives (`Host.Clock`).
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::sync::OnceLock;
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use flick_core::ir::Lit;
@@ -10,8 +12,10 @@ use crate::tier0::{Error, Heap, Value};
 
 use super::{HostMode, MILLIS, MONOTONIC_NANOS, NANOS};
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 static PROCESS_MONOTONIC_START: OnceLock<Instant> = OnceLock::new();
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 fn process_monotonic_start() -> Instant {
     *PROCESS_MONOTONIC_START.get_or_init(Instant::now)
 }
@@ -25,12 +29,22 @@ pub(super) fn current_time_millis(hooks: &mut dyn VmHooks) -> Value {
     match hooks.host_mode() {
         HostMode::Deterministic => Value::Float(MILLIS),
         HostMode::LiveOs => {
-            let millis = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map_or(0, |d| d.as_millis());
-            #[expect(clippy::cast_precision_loss, reason = "epoch ms fits IEEE-754 f64")]
-            let ms = millis as f64;
-            Value::Float(ms)
+            if let Some(ms) = hooks.host_wall_time_millis() {
+                return Value::Float(ms);
+            }
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+            {
+                let millis = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map_or(0, |d| d.as_millis());
+                #[expect(clippy::cast_precision_loss, reason = "epoch ms fits IEEE-754 f64")]
+                let ms = millis as f64;
+                Value::Float(ms)
+            }
+            #[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+            {
+                Value::Float(MILLIS)
+            }
         }
     }
 }
@@ -42,10 +56,20 @@ pub(super) fn current_time_nanos(heap: &mut Heap, hooks: &mut dyn VmHooks) -> Re
     match hooks.host_mode() {
         HostMode::Deterministic => heap.literal(&Lit::BigInt(NANOS.to_string())),
         HostMode::LiveOs => {
-            let nanos = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map_or(0, |d| d.as_nanos());
-            heap.literal(&Lit::BigInt(nanos.to_string()))
+            if let Some(nanos) = hooks.host_wall_time_nanos() {
+                return heap.literal(&Lit::BigInt(nanos.to_string()));
+            }
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+            {
+                let nanos = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map_or(0, |d| d.as_nanos());
+                heap.literal(&Lit::BigInt(nanos.to_string()))
+            }
+            #[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+            {
+                heap.literal(&Lit::BigInt(NANOS.to_string()))
+            }
         }
     }
 }
@@ -60,11 +84,21 @@ pub(super) fn monotonic_time_nanos(
     match hooks.host_mode() {
         HostMode::Deterministic => heap.literal(&Lit::BigInt(MONOTONIC_NANOS.to_string())),
         HostMode::LiveOs => {
-            let start = hooks
-                .host_services()
-                .map_or_else(process_monotonic_start, |svc| svc.monotonic_start);
-            let nanos = start.elapsed().as_nanos();
-            heap.literal(&Lit::BigInt(nanos.to_string()))
+            if let Some(nanos) = hooks.host_monotonic_nanos() {
+                return heap.literal(&Lit::BigInt(nanos.to_string()));
+            }
+            #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+            {
+                let start = hooks
+                    .host_services()
+                    .map_or_else(process_monotonic_start, |svc| svc.monotonic_start);
+                let nanos = start.elapsed().as_nanos();
+                heap.literal(&Lit::BigInt(nanos.to_string()))
+            }
+            #[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+            {
+                heap.literal(&Lit::BigInt(MONOTONIC_NANOS.to_string()))
+            }
         }
     }
 }

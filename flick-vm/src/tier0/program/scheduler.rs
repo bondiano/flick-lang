@@ -1,6 +1,6 @@
 // Cooperative scheduler loop, timers, TestClock stepping, child completion, and async cleanup.
 
-impl<'p> Machine<'p, '_> {
+impl Machine<'_, '_> {
     fn schedule_next(&mut self, active_finished: bool) -> Result<(), Error> {
         if self.foreign.sync_task_fiber.is_some() {
             return Ok(());
@@ -357,7 +357,7 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    fn drain_fiber_ctx_roots(&mut self, mut ctx: FiberContext<'p>, roots: &mut Vec<Value>) {
+    fn drain_fiber_ctx_roots(&mut self, mut ctx: FiberContext, roots: &mut Vec<Value>) {
         roots.extend(ctx.scratch);
         roots.extend(ctx.pending);
         if let Some(c) = ctx.failure {

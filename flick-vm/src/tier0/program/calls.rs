@@ -8,8 +8,8 @@ enum AwaitTaskKind {
     ForeignHandle(u64),
 }
 
-impl<'p> Machine<'p, '_> {
-    fn deliver(&mut self, destination: &Destination<'p>, value: Value) -> Result<(), Error> {
+impl Machine<'_, '_> {
+    fn deliver(&mut self, destination: &Destination, value: Value) -> Result<(), Error> {
         self.scratch.push(value);
         self.heap
             .admit_ordinary(self.scratch.last().expect("delivery root"))?;
@@ -65,14 +65,14 @@ impl<'p> Machine<'p, '_> {
         Ok(())
     }
 
-    fn call(&mut self, code: CodeId, destination: Destination<'p>) -> Result<(), Error> {
+    fn call(&mut self, code: CodeId, destination: Destination) -> Result<(), Error> {
         self.call_inner(code, destination, true)
     }
 
     fn call_inner(
         &mut self,
         code: CodeId,
-        destination: Destination<'p>,
+        destination: Destination,
         allow_tco: bool,
     ) -> Result<(), Error> {
         let function = self
@@ -86,21 +86,28 @@ impl<'p> Machine<'p, '_> {
                 actual: self.scratch.len(),
             });
         }
-        if allow_tco
-            && let Destination::Bind(binding) = &destination
-            && let Some(top) = self.frames.last_mut()
-            && top.at == top.block.instructions.len()
-            && matches!(top.block.exit, Exit::Return(ret) if ret == *binding)
-            && top.locals.is_empty()
-            && top.vars.is_empty()
-            && top.iterators.is_empty()
-            && top.recovery_id.is_none()
-            && !matches!(
-                top.destination,
-                Destination::RecoverySelection { .. } | Destination::RecoveryHelper { .. }
-            )
-        {
-            top.block = &function.body;
+        let can_tco = allow_tco
+            && matches!(destination, Destination::Bind(_))
+            && self.frames.last().is_some_and(|top| {
+                let Destination::Bind(binding) = &destination else {
+                    return false;
+                };
+                top.locals.is_empty()
+                    && top.vars.is_empty()
+                    && top.iterators.is_empty()
+                    && top.recovery_id.is_none()
+                    && !matches!(
+                        top.destination,
+                        Destination::RecoverySelection { .. } | Destination::RecoveryHelper { .. }
+                    )
+                    && top.block.resolve(self.program).is_ok_and(|blk| {
+                        top.at == blk.instructions.len()
+                            && matches!(blk.exit, Exit::Return(ret) if ret == *binding)
+                    })
+            });
+        if can_tco {
+            let top = self.frames.last_mut().expect("tco frame");
+            top.block = BlockLoc::root(code);
             top.at = 0;
             for (&param, value) in function.params.iter().zip(self.scratch.drain(..)) {
                 top.locals.insert_one(param, value);
@@ -121,7 +128,7 @@ impl<'p> Machine<'p, '_> {
         };
         self.frames.push(Frame {
             recovery_id,
-            block: &function.body,
+            block: BlockLoc::root(code),
             at: 0,
             locals,
             vars: Vec::new(),
@@ -132,15 +139,15 @@ impl<'p> Machine<'p, '_> {
         Ok(())
     }
 
-    fn apply_fresh(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn apply_fresh(&mut self, destination: Destination) -> Result<(), Error> {
         self.apply_inner(destination, false)
     }
 
-    fn apply(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn apply(&mut self, destination: Destination) -> Result<(), Error> {
         self.apply_inner(destination, true)
     }
 
-    fn apply_inner(&mut self, destination: Destination<'p>, allow_tco: bool) -> Result<(), Error> {
+    fn apply_inner(&mut self, destination: Destination, allow_tco: bool) -> Result<(), Error> {
         let Value::Object(token) = &self.scratch[0] else {
             return Err(Error::ExpectedClosure);
         };
@@ -196,8 +203,10 @@ impl<'p> Machine<'p, '_> {
                     return Err(err);
                 }
                 let target_binding = if let Some(top) = self.frames.last()
-                    && top.at == top.block.instructions.len()
-                    && matches!(top.block.exit, Exit::Return(ret) if ret == binding)
+                    && top.block.resolve(self.program).is_ok_and(|blk| {
+                        top.at == blk.instructions.len()
+                            && matches!(blk.exit, Exit::Return(ret) if ret == binding)
+                    })
                     && top.locals.is_empty()
                     && top.vars.is_empty()
                     && top.iterators.is_empty()
@@ -238,11 +247,11 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    fn await_task(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn await_task(&mut self, destination: Destination) -> Result<(), Error> {
         self.await_task_inner(destination, true)
     }
 
-    fn await_task_fresh(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn await_task_fresh(&mut self, destination: Destination) -> Result<(), Error> {
         self.await_task_inner(destination, false)
     }
 
@@ -287,7 +296,7 @@ impl<'p> Machine<'p, '_> {
     fn await_cached_run(
         &mut self,
         cell_id: usize,
-        destination: Destination<'p>,
+        destination: Destination,
     ) -> Result<(), Error> {
         self.release_operands()?;
         let cached_rep = self.cached_cells.get(&cell_id).and_then(|cell| {
@@ -315,7 +324,7 @@ impl<'p> Machine<'p, '_> {
 
     fn await_task_inner(
         &mut self,
-        destination: Destination<'p>,
+        destination: Destination,
         allow_tco: bool,
     ) -> Result<(), Error> {
         if self.check_active_interrupt()? {

@@ -1,9 +1,5 @@
 #[test]
 fn exceptional_boundaries_use_saved_owner_not_current_selection() {
-    let block = Block {
-        instructions: vec![],
-        exit: Exit::Return(0),
-    };
     let program = Program {
         functions: BTreeMap::new(),
         globals: vec![],
@@ -24,7 +20,7 @@ fn exceptional_boundaries_use_saved_owner_not_current_selection() {
     let frame_with = |destination| Frame {
         recovery_id: None,
         evidence: None,
-        block: &block,
+        block: BlockLoc::root(0),
         at: 0,
         locals: Locals::new(),
         vars: vec![],
@@ -100,7 +96,6 @@ fn catching_releases_frame_locals_before_handler_execution() {
         captures: vec![],
     });
     let handler_id = handler.object_id().expect("selector closure identity");
-    let block = &program.functions[&0].body;
     let failure = heap
         .cause(&[Reason::Fail(&Value::Unit)], &mut 3)
         .expect("typed fixture cause");
@@ -127,7 +122,7 @@ fn catching_releases_frame_locals_before_handler_execution() {
         Frame {
             recovery_id: None,
             evidence: None,
-            block,
+            block: BlockLoc::root(0),
             at: 0,
             locals: Locals::new(),
             vars: vec![],
@@ -137,7 +132,7 @@ fn catching_releases_frame_locals_before_handler_execution() {
         Frame {
             recovery_id: None,
             evidence: None,
-            block,
+            block: BlockLoc::root(0),
             at: 0,
             locals: catch_locals,
             vars: vec![],

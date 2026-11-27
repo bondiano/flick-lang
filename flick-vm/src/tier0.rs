@@ -20,8 +20,10 @@ pub(crate) mod causes;
 pub use causes::{CauseToken, DefectClass, DefectCode, DefectSpec, LanguageExit, Reason};
 
 pub use crate::sandbox::{Capability, LimitKind};
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+pub use crate::stdlib::HostBridge;
 use crate::stdlib::cli::{CliMultiplicity, CliSpec};
-pub use crate::stdlib::{DRAW, HostBridge, HostMode, HostServices, MILLIS, MONOTONIC_NANOS, NANOS};
+pub use crate::stdlib::{DRAW, HostMode, HostServices, MILLIS, MONOTONIC_NANOS, NANOS};
 use crate::stdlib::{Unmetered, eval_binary, eval_neg, eval_not};
 
 pub(crate) mod patterns;
@@ -30,17 +32,22 @@ mod record_update;
 pub use program::{
     Executed, ExecutionReport, ProgramOutcome, TestCaseResult, execute_main_program,
     execute_main_program_outcome, execute_main_program_outcome_with_args,
-    execute_main_program_outcome_with_bridge, execute_main_program_outcome_with_host,
-    execute_main_with_bridge_and_inits, execute_program, execute_program_outcome,
+    execute_main_program_outcome_with_host, execute_program, execute_program_outcome,
     execute_rooted_main_program_outcome, execute_rooted_main_program_outcome_with_args,
-    execute_rooted_main_program_outcome_with_bridge, execute_rooted_main_program_outcome_with_host,
-    execute_sandboxed_main_program_outcome, execute_sandboxed_program_outcome,
-    execute_tests_program, execute_tests_program_with_bridge, execute_tests_program_with_host,
+    execute_rooted_main_program_outcome_with_host, execute_sandboxed_main_program_outcome,
+    execute_sandboxed_program_outcome, execute_tests_program, execute_tests_program_with_host,
 };
 pub(crate) use program::{
-    SessionHandlerKind, SessionPersistentState, SessionRunSpec, SessionSyntheticCodes,
-    allocate_execution_id, build_session_layer_value, execute_main_with_persistent_state,
+    SessionHandlerKind, SessionPersistentState, SessionRunSpec, SessionStepStatus,
+    SessionSyntheticCodes, SuspendedSessionEval, abandon_session_eval, allocate_execution_id,
+    build_session_layer_value, execute_main_with_persistent_state,
     execute_program_with_persistent_state, execute_session_step, shutdown_persistent_state,
+    start_session_eval, step_session_eval,
+};
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+pub use program::{
+    execute_main_program_outcome_with_bridge, execute_main_with_bridge_and_inits,
+    execute_rooted_main_program_outcome_with_bridge, execute_tests_program_with_bridge,
 };
 
 /// An allocation's identity includes its heap and generation. Recycled backing

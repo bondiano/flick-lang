@@ -1,8 +1,10 @@
 //! IANA `TZif` v2/v3 binary loader and POSIX `TZ` footer evaluator.
 
 use std::collections::BTreeMap;
+use std::str;
 use std::sync::{Mutex, OnceLock};
-use std::{env, fs, str};
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+use std::{env, fs};
 
 use super::datetime_date::{civil, days_from_civil};
 
@@ -145,6 +147,7 @@ fn read_tzif_with_aliases(
     None
 }
 
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 pub(super) fn local_tzif() -> Option<TzifZone> {
     static LOCAL_TZIF: OnceLock<Option<TzifZone>> = OnceLock::new();
     LOCAL_TZIF
@@ -171,6 +174,12 @@ pub(super) fn local_tzif() -> Option<TzifZone> {
         .clone()
 }
 
+#[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+pub(super) fn local_tzif() -> Option<TzifZone> {
+    None
+}
+
+#[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 fn read_tzif_file(id: &str) -> Option<Vec<u8>> {
     if let Ok(dir) = env::var("TZDIR")
         && !dir.is_empty()
@@ -190,6 +199,11 @@ fn read_tzif_file(id: &str) -> Option<Vec<u8>> {
             return Some(bytes);
         }
     }
+    None
+}
+
+#[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+fn read_tzif_file(_id: &str) -> Option<Vec<u8>> {
     None
 }
 

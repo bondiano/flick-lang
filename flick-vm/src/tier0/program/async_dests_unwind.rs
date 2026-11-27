@@ -1,7 +1,7 @@
 // Stage 4A destination unwind and cutoff-cleanup handlers.
 
-impl<'p> Machine<'p, '_> {
-    fn unwind_async_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+impl Machine<'_, '_> {
+    fn unwind_async_destination(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::RestoreMask {
                 saved_mask, next, ..
@@ -76,7 +76,7 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    fn unwind_context_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn unwind_context_destination(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::CatchCause { handler, binding } => {
                 if self.skip_interrupted_handler()? {
@@ -154,7 +154,7 @@ impl<'p> Machine<'p, '_> {
 
     pub(super) fn is_cutoff_cleanup_destination(
         &self,
-        dest: &Destination<'p>,
+        dest: &Destination,
     ) -> Result<bool, Error> {
         let has_int = |c: &CauseToken| -> Result<bool, Error> {
             Ok(self
@@ -201,7 +201,7 @@ impl<'p> Machine<'p, '_> {
 
     pub(super) fn complete_cutoff_destination(
         &mut self,
-        dest: Destination<'p>,
+        dest: Destination,
     ) -> Result<(), Error> {
         match dest {
             Destination::DiscardCleanupDone {

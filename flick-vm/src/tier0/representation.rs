@@ -323,11 +323,19 @@ pub(crate) enum Data {
         refs: BTreeMap<String, Value>,
     },
     /// Counted handle to a host object/function/Effect owned by the Node `HostBridge`.
+    #[cfg_attr(
+        not(all(feature = "native-host", not(target_arch = "wasm32"))),
+        allow(dead_code)
+    )]
     ForeignHandle {
         execution: usize,
         host_id: u64,
     },
     /// Counted handle marking a cycle back-edge in an untrusted host value.
+    #[cfg_attr(
+        not(all(feature = "native-host", not(target_arch = "wasm32"))),
+        allow(dead_code)
+    )]
     ForeignCycle {
         execution: usize,
         host_id: u64,

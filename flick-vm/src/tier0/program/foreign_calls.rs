@@ -1,10 +1,10 @@
 // Foreign call response waiting, completion, cancellation, and discarded handle cleanup.
 
-impl<'p> Machine<'p, '_> {
+impl Machine<'_, '_> {
     fn wait_for_call_response(
         &mut self,
         call_id: u64,
-        destination: Destination<'p>,
+        destination: Destination,
         mut catch_fn: Option<Value>,
     ) -> Result<(), Error> {
         self.foreign.active_sync_calls.insert(call_id);
@@ -63,7 +63,7 @@ impl<'p> Machine<'p, '_> {
     fn park_foreign_async(
         &mut self,
         call_id: u64,
-        destination: Destination<'p>,
+        destination: Destination,
         catch_fn: Option<Value>,
     ) -> Result<(), Error> {
         self.foreign.pending_calls.insert(
@@ -79,7 +79,7 @@ impl<'p> Machine<'p, '_> {
 
     fn drop_call_state(
         &mut self,
-        destination: Destination<'p>,
+        destination: Destination,
         catch_fn: Option<Value>,
     ) -> Result<(), Error> {
         let mut roots = Vec::new();
@@ -91,7 +91,7 @@ impl<'p> Machine<'p, '_> {
     fn complete_foreign_call_msg(
         &mut self,
         msg: &Json,
-        destination: Destination<'p>,
+        destination: Destination,
         catch_fn: Option<Value>,
     ) -> Result<(), Error> {
         if msg.get("sync_fd1").and_then(Json::as_bool) == Some(true)
@@ -122,7 +122,7 @@ impl<'p> Machine<'p, '_> {
     fn complete_foreign_call_error(
         &mut self,
         msg: &Json,
-        destination: Destination<'p>,
+        destination: Destination,
         catch_fn: Option<Value>,
     ) -> Result<(), Error> {
         let kind = msg.get("kind").and_then(Json::as_str).unwrap_or("die");

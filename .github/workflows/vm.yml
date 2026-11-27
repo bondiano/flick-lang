@@ -33,3 +33,44 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: just language-vm
       - run: just vm-cases
+
+  # wasm32 VM build, dependency gate, gzipped size budget, and Node corpus + cooperative stepping harness
+  vm-wasm:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: vm-wasm
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+      - uses: actions/cache@v6
+        with:
+          path: target/tools
+          key: tools-${{ runner.os }}-wasm-bindgen-0.2.130
+      - run: |
+          if [ ! -x target/tools/bin/wasm-bindgen ]; then
+            cargo install wasm-bindgen-cli --version 0.2.130 --locked --root target/tools
+          fi
+          echo "$PWD/target/tools/bin" >> "$GITHUB_PATH"
+      - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Install the pinned WASM optimizer
+        run: |
+          binaryen=$(nix build --no-link --print-out-paths .#binaryen)
+          echo "$binaryen/bin" >> "$GITHUB_PATH"
+      - run: cargo test -p flick-vm --test wasm_deps
+      - run: cargo build -p flick-vm --target wasm32-unknown-unknown
+      - run: cargo build -p flick-vm --no-default-features --target wasm32-unknown-unknown
+      - run: just vm-wasm

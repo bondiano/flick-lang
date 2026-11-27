@@ -1,5 +1,5 @@
-impl<'p> Machine<'p, '_> {
-    fn returned_frame(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+impl Machine<'_, '_> {
+    fn returned_frame(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::RecoverySelection { id } => self.complete_recovery(id)?,
             Destination::RecoveryHelper { id, binding } => {
@@ -100,7 +100,7 @@ impl<'p> Machine<'p, '_> {
         Ok(())
     }
 
-    fn returned_control_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn returned_control_destination(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::Loop {
                 id,
@@ -194,7 +194,7 @@ impl<'p> Machine<'p, '_> {
         Ok(())
     }
 
-    fn returned_foreign_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn returned_foreign_destination(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::RaiseFromCatch => {
                 let err_val = self.pending.take().expect("catch mapped error");
@@ -240,7 +240,7 @@ impl<'p> Machine<'p, '_> {
         Ok(())
     }
 
-    fn returned_resource_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn returned_resource_destination(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::LazyComplete { lazy, binding } => {
                 let value = self.pending.take().expect("lazy result");

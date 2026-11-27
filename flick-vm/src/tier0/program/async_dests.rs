@@ -1,6 +1,6 @@
 // Stage 4A destination normal-return and unwind handlers.
 
-impl<'p> Machine<'p, '_> {
+impl Machine<'_, '_> {
     fn finish_masked_cleanup_ok(
         &mut self,
         outcome: BracketOutcome,
@@ -56,7 +56,7 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    fn returned_async_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn returned_async_destination(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::RestoreMask {
                 saved_mask,
@@ -136,7 +136,7 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    fn returned_effect_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn returned_effect_destination(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::OnExitDecide {
                 interruptible,
@@ -201,7 +201,7 @@ impl<'p> Machine<'p, '_> {
         }
     }
 
-    fn complete_cached_cell(&mut self, cell_id: usize, next: Destination<'p>) -> Result<(), Error> {
+    fn complete_cached_cell(&mut self, cell_id: usize, next: Destination) -> Result<(), Error> {
         let val = self.pending.take().expect("cached ok");
         let dup = self.heap.dup(&val)?;
         if let Some(cell) = self.cached_cells.get_mut(&cell_id) {
@@ -225,7 +225,7 @@ impl<'p> Machine<'p, '_> {
         self.returned_frame(next)
     }
 
-    fn returned_context_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn returned_context_destination(&mut self, destination: Destination) -> Result<(), Error> {
         match destination {
             Destination::ProvideContext { context, binding } => {
                 self.heap.drop_value(context)?;

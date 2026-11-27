@@ -1,4 +1,4 @@
-impl<'p> Machine<'p, '_> {
+impl Machine<'_, '_> {
     /// Internal abort/discontinuation cannot be intercepted by ordinary Try.
     pub(super) fn discard_step(&mut self) -> Result<(), Error> {
         let frame = self.discard.as_mut().expect("active transfer").frames.pop();
@@ -94,7 +94,7 @@ impl<'p> Machine<'p, '_> {
         Ok(())
     }
 
-    fn discard_frame_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn discard_frame_destination(&mut self, destination: Destination) -> Result<(), Error> {
         let mut roots = Vec::new();
         match destination {
             Destination::RecoverySelection { id } => self.abandon_recovery(id)?,
@@ -191,7 +191,7 @@ impl<'p> Machine<'p, '_> {
         self.heap.drop_values(roots)
     }
 
-    fn discard_cleanup_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn discard_cleanup_destination(&mut self, destination: Destination) -> Result<(), Error> {
         let mut roots = Vec::new();
         match destination {
             Destination::AcquireRegister { release, .. } => roots.push(release),
@@ -318,7 +318,7 @@ impl<'p> Machine<'p, '_> {
         })
     }
 
-    fn discard_env_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+    fn discard_env_destination(&mut self, destination: Destination) -> Result<(), Error> {
         let mut roots = Vec::new();
         match destination {
             Destination::CatchCause { handler, .. }

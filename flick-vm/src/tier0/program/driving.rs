@@ -64,6 +64,13 @@ impl Machine<'_, '_> {
     }
 
     fn run(&mut self) -> Result<LanguageExit, Error> {
+        match self.run_slice(u64::MAX)? {
+            SliceExit::Completed(exit) => Ok(exit),
+            SliceExit::Yielded => Err(Error::OutOfFuel),
+        }
+    }
+
+    fn run_slice(&mut self, mut slice_budget: u64) -> Result<SliceExit, Error> {
         loop {
             if self.drain_pending_transitions()? {
                 continue;
@@ -74,7 +81,7 @@ impl Machine<'_, '_> {
             }
             self.drain_dropped_continuations();
             match self.check_run_completion()? {
-                RunPoll::Exit(exit) => return Ok(exit),
+                RunPoll::Exit(exit) => return Ok(SliceExit::Completed(exit)),
                 RunPoll::Continue => continue,
                 RunPoll::Step => {}
             }
@@ -91,7 +98,11 @@ impl Machine<'_, '_> {
                 }
                 return Err(Error::OutOfFuel);
             }
+            if slice_budget == 0 {
+                return Ok(SliceExit::Yielded);
+            }
             self.fuel -= 1;
+            slice_budget -= 1;
             self.maybe_quantum_preempt()?;
             if self.pending_resume_close.is_some() || self.pending_provide_result.is_some() {
                 continue;
@@ -135,6 +146,12 @@ impl Machine<'_, '_> {
                 return Ok(RunPoll::Continue);
             }
             if let Some(abort) = self.sandbox.abort.take() {
+                if matches!(abort, SandboxAbort::Abandoned) {
+                    let final_cause = self
+                        .combine_root_defects(Some(cause))?
+                        .expect("abandoned interrupt cause");
+                    return Ok(RunPoll::Exit(LanguageExit::Failure(final_cause)));
+                }
                 self.heap.drop_cause(cause)?;
                 return Err(abort.into_error());
             }
@@ -231,7 +248,7 @@ impl Machine<'_, '_> {
     fn step(&mut self) -> Result<(), Error> {
         let (block, at) = {
             let frame = self.frames.last().expect("a running code frame");
-            (frame.block, frame.at)
+            (frame.block.resolve(self.program)?, frame.at)
         };
         if let Some(instruction) = block.instructions.get(at) {
             self.frames.last_mut().expect("running frame").at += 1;
@@ -285,11 +302,7 @@ impl Machine<'_, '_> {
                 self.returned_frame(frame.destination)?;
                 self.queue_discard_frames(gen_frames);
             }
-            Exit::Branch {
-                condition,
-                then_,
-                else_,
-            } => {
+            Exit::Branch { condition, .. } => {
                 let frame = self.frames.last_mut().expect("branching frame");
                 self.heap.admit_ordinary(peek(&frame.locals, *condition)?)?;
                 let Value::Bool(condition_value) = peek(&frame.locals, *condition)? else {
@@ -297,7 +310,7 @@ impl Machine<'_, '_> {
                 };
                 let condition_value = *condition_value;
                 let _ = take(&mut frame.locals, *condition)?;
-                frame.block = if condition_value { then_ } else { else_ };
+                frame.block.push_branch(condition_value);
                 frame.at = 0;
             }
         }

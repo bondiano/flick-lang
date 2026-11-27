@@ -93,6 +93,9 @@ impl Machine<'_, '_> {
             | Intrinsic::RefModify => self.ref_intrinsic(kind, binding)?,
             Intrinsic::PrintLine | Intrinsic::Show => {
                 let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout);
+                if let Some(cb) = self.host_callbacks.as_deref_mut() {
+                    hooks = hooks.with_host_callbacks(cb);
+                }
                 let value = stdlib::eval_intrinsic(self.heap, kind, &self.scratch[0], &mut hooks)?;
                 self.primitive_result(binding, value)?;
             }
@@ -219,6 +222,9 @@ impl Machine<'_, '_> {
             .with_program_args(&self.program_args)
             .with_host_services(&mut self.host_services)
             .with_capabilities(self.sandbox.capabilities);
+        if let Some(cb) = self.host_callbacks.as_deref_mut() {
+            hooks = hooks.with_host_callbacks(cb);
+        }
         if self.host_mode == HostMode::Deterministic || self.test_clock_mode {
             hooks = hooks.with_virtual_now_ns(self.virtual_now_ns);
         }
@@ -236,6 +242,9 @@ impl Machine<'_, '_> {
             .with_program_args(&self.program_args)
             .with_host_services(&mut self.host_services)
             .with_capabilities(self.sandbox.capabilities);
+        if let Some(cb) = self.host_callbacks.as_deref_mut() {
+            hooks = hooks.with_host_callbacks(cb);
+        }
         if self.host_mode == HostMode::Deterministic || self.test_clock_mode {
             hooks = hooks.with_virtual_now_ns(self.virtual_now_ns);
         }
