@@ -109,7 +109,7 @@ impl Projection<'_> {
                 }))
             }
             // values the backend makes have no constructors to declare
-            (Form::Adt { .. }, _) if super::native_on_js(def) => Ok(Some(brand(&generics))),
+            (Form::Adt { .. }, _) if self.native_on_js(def) => Ok(Some(brand(&generics))),
             (Form::Adt { constructors, abi }, _) => {
                 let exported: Vec<&Export> = constructors
                     .iter()

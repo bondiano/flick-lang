@@ -215,6 +215,7 @@ impl Prepared {
             foreign: &foreign,
             path: &path,
             rt,
+            natives: compilation.native_overrides.as_ref(),
         };
         let library_needs_module_dts = if wants_library_headers {
             self.project_library_headers(compilation, &typing, iife_global, &mut projected)
