@@ -8,7 +8,7 @@ use crate::types;
 use flick_backend_support::opt as portable;
 pub use flick_backend_support::opt::tuple_match;
 pub use flick_backend_support::opt::{
-    Arity, Generic, arity, js_number, json_string, names_only, rename,
+    Arity, Generic, arity, js_log, js_number, json_string, names_only, rename,
 };
 #[cfg(feature = "native-project")]
 pub use flick_backend_support::opt::{strip_legacy_bare_generic, strip_legacy_bare_types};

@@ -1,10 +1,8 @@
 //! Counted `Float` / `Math` / `Number` primitive implementations (`packages/core/src/Float.fl`).
 
-use std::f64::consts::LN_2;
-
 use flick_core::ir::Lit;
 use flick_core::ir::memory::FloatIntrinsic;
-use flick_core::opt::js_number;
+use flick_core::opt::{js_log, js_number};
 use num_bigint::BigInt;
 use num_traits::Zero;
 
@@ -36,13 +34,8 @@ pub(super) fn run(
         FloatIntrinsic::Round => Ok(Value::Float(js_math_round(expect_f64(&args[0])?))),
         FloatIntrinsic::Trunc => Ok(Value::Float(expect_f64(&args[0])?.trunc())),
         FloatIntrinsic::Sqrt => Ok(Value::Float(expect_f64(&args[0])?.sqrt())),
-        FloatIntrinsic::NextPow2 => {
-            let n = expect_f64(&args[0])?;
-            let exp = (n.ln() / LN_2).ceil();
-            let pow = 2.0_f64.powf(exp);
-            let out = if pow.is_nan() { f64::NAN } else { pow.max(2.0) };
-            Ok(Value::Float(out))
-        }
+        FloatIntrinsic::Log => Ok(Value::Float(js_log(expect_f64(&args[0])?))),
+        FloatIntrinsic::NextPow2 => Ok(Value::Float(next_pow2(expect_f64(&args[0])?))),
         FloatIntrinsic::SafeInteger => {
             let n = expect_f64(&args[0])?;
             if is_safe_integer(n) {
@@ -258,4 +251,17 @@ fn decimal_remainder(self_val: f64, divisor: f64) -> f64 {
     } else {
         parsed
     }
+}
+
+/// The least power of two at least `n` and at least 2, NaN for NaN or a
+/// negative `n`: exactly, as a ratio of logarithms is not.
+fn next_pow2(n: f64) -> f64 {
+    if n.is_nan() || n < 0.0 {
+        return f64::NAN;
+    }
+    let mut p = 2.0;
+    while p < n {
+        p *= 2.0;
+    }
+    p
 }

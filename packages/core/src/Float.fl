@@ -76,10 +76,6 @@ foreign pure element_at from "flick:rt" "listGet"
 whole_of : Float -> Option BigInt
 foreign pure whole_of from "flick:rt" "bigintFromNumber"
 
-/// The decimal digits of a `BigInt`, `-` before a negative one.
-digits_of : BigInt -> String
-foreign pure digits_of from global "String"
-
 /// `trunc` of a whole `Float` as an `Int`, for the exponents `remainder`
 /// reads.
 to_int : Float -> Int
@@ -268,7 +264,9 @@ let remainder divisor self =
       if self < 0.0 || same_value self (-0.0) then -0.0 else 0.0
     else
       // `5e-324` is the least positive number: a remainder below it is not 0
-      match String.to_number (digits_of out ++ "e" ++ show e) with
+      // `show` writes a `BigInt` with its suffix `n`
+      let digits = show out
+      match String.to_number (String.slice 0 (String.length digits - 1) digits ++ "e" ++ show e) with
       | Some r -> if r == 0.0 then (if self < 0.0 then -5e-324 else 5e-324) else r
       | None -> 0.0 / 0.0
   @native "flick:Number" "remainder" when js || go
