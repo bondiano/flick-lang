@@ -406,8 +406,8 @@ let value b =
 ```
 
 The `@native` of a type names no binding. Only the Flick body of a definition
-whose `@native` clauses hold wherever the type's does, and the definitions local
-to it, may name its constructors: there a clause replaces the body wherever the
+whose `@native` clauses hold wherever the type's does, in the type's own package,
+and the definitions local to it, may name its constructors: there a clause replaces the body wherever the
 type is the backend's own. Anything else that builds or matches them, a
 definition without `@native`, an instance method or a `deriving` clause, is
 `FLICK-F017`; a type with `@native` and no constructors is `FLICK-F016`. Where the

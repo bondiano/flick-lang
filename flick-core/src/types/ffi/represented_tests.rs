@@ -238,3 +238,23 @@ fn a_type_that_is_not_native_keeps_its_hidden_storage() {
         "{diags:#?}"
     );
 }
+
+/// The representation of a native type is its package's: a covering body
+/// of another package may not forge a witness with it.
+#[test]
+fn a_native_type_of_another_package_keeps_its_constructors() {
+    let source = "\
+module Probe exposing (forged)
+
+import EqHash
+
+forged : EqHash.EqHash EqHash.Canonical Int
+let forged = EqHash.Witness (fun _ _ -> true) (fun _ -> 0)
+  @native \"./forge.mjs\" \"forged\" when js || go || vm
+";
+    let (diags, _) = check(source, &env(&["lua"]));
+    let refused: Vec<_> = (diags.iter())
+        .filter(|d| d.code == codes::F017 && d.message.contains("another package"))
+        .collect();
+    assert_eq!(refused.len(), 1, "{diags:#?}");
+}
