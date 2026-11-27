@@ -50,17 +50,30 @@ let constraints_header tier c =
   let zd = if c.requireZeroDowntime then "required" else "optional"
   "Constraints (\{Domain.tier_name tier}): budget <= $\{c.maxCostUsd}/mo, p95 <= \{c.maxLatencyMs}ms, SLA >= \{sla}, zero-downtime: \{zd}"
 
+plan_metrics : ReleasePlan -> String
+let plan_metrics plan =
+  let sla = Domain.format_sla plan.availabilityBps
+  let tag = downtime_tag plan.zeroDowntime
+  "$\{plan.monthlyCostUsd}/mo | p95 \{plan.p95LatencyMs}ms | SLA \{sla} | \{tag}"
+
 solve_success_report : Tier -> Constraints -> ReleasePlan -> SolverStats -> List String
-let solve_success_report tier constraints plan stats = [
-  constraints_header tier constraints,
-  "Solver: explored \{stats.explored} choice steps, backtracked \{stats.backtracks} times",
-  "Selected: \{plan.summary}",
-  "Metrics: $\{plan.monthlyCostUsd}/mo | p95 \{plan.p95LatencyMs}ms | SLA \{Domain.format_sla plan.availabilityBps} | \{downtime_tag plan.zeroDowntime}",
-]
+let solve_success_report tier constraints plan stats =
+  let metrics = plan_metrics plan
+  [
+    constraints_header tier constraints,
+    "Solver: explored \{stats.explored} choice steps, backtracked \{stats.backtracks} times",
+    "Selected: \{plan.summary}",
+    "Metrics: \{metrics}",
+  ]
 
 solve_failure_message : Tier -> Constraints -> SolverStats -> String
 let solve_failure_message tier constraints stats =
-  "No \{Domain.tier_name tier} release plan satisfies constraints (max $\{constraints.maxCostUsd}/mo, p95 <= \{constraints.maxLatencyMs}ms, SLA >= \{Domain.format_sla constraints.minAvailabilityBps}, zero-downtime=\{show constraints.requireZeroDowntime}) after \{stats.explored} choice steps and \{stats.backtracks} backtracks."
+  let tier_str = Domain.tier_name tier
+  let min_sla = Domain.format_sla constraints.minAvailabilityBps
+  let zd = show constraints.requireZeroDowntime
+  let bounds =
+    "max $\{constraints.maxCostUsd}/mo, p95 <= \{constraints.maxLatencyMs}ms, SLA >= \{min_sla}, zero-downtime=\{zd}"
+  "No \{tier_str} release plan satisfies constraints (\{bounds}) after \{stats.explored} choice steps and \{stats.backtracks} backtracks."
 
 sample_report : Tier -> Int -> List ReleasePlan -> List String
 let sample_report tier seed plans =
@@ -68,7 +81,10 @@ let sample_report tier seed plans =
     ++ indexed_lines plans
 
 wizard_report : ReleasePlan -> List String
-let wizard_report plan = [
-  "Configured \{Domain.tier_name plan.tier} release: \{plan.summary}",
-  "Estimated: $\{plan.monthlyCostUsd}/mo | p95 \{plan.p95LatencyMs}ms | SLA \{Domain.format_sla plan.availabilityBps} | \{downtime_tag plan.zeroDowntime}",
-]
+let wizard_report plan =
+  let tier_str = Domain.tier_name plan.tier
+  let metrics = plan_metrics plan
+  [
+    "Configured \{tier_str} release: \{plan.summary}",
+    "Estimated: \{metrics}",
+  ]
