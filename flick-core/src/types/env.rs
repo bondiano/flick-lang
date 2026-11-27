@@ -41,6 +41,14 @@ pub struct TypeDef {
     pub native: Option<String>,
 }
 
+/// How typing reads a type with `@native when …`: as the type without
+/// constructors it is where the condition holds, so that a module types the
+/// same on every target.
+static NATIVE: Form = Form::Nominal {
+    literals: Vec::new(),
+    hidden: false,
+};
+
 impl TypeDef {
     /// A definition of `kind` and `form`, without variance or `@native`.
     pub fn of(kind: Kind, form: Form) -> Self {
@@ -49,6 +57,16 @@ impl TypeDef {
             form,
             variance: Vec::new(),
             native: None,
+        }
+    }
+
+    /// The form that typing reads: its variance, hidden storage and identity.
+    /// A native type has its constructors only for the bodies that cover it.
+    pub fn typing(&self) -> &Form {
+        if self.native.is_some() {
+            &NATIVE
+        } else {
+            &self.form
         }
     }
 }

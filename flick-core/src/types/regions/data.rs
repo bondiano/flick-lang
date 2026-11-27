@@ -5,7 +5,7 @@ use crate::iface::{Entity, Namespace};
 use crate::types::Checker;
 use crate::types::Elem;
 use crate::types::Elided;
-use crate::types::env::Form;
+use crate::types::env::{Form, TypeDef};
 use crate::types::gadt::refine::Refined;
 use crate::types::gadt::scheme::{built, is_hidden_captures, is_indexed};
 use crate::types::kinds::Kind;
@@ -132,7 +132,7 @@ impl Checker<'_> {
                     return false;
                 }
                 let Some(Form::Adt { constructors, .. }) =
-                    self.env.type_def(module, name).map(|d| &d.form)
+                    self.env.type_def(module, name).map(TypeDef::typing)
                 else {
                     return true;
                 };

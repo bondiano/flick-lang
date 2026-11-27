@@ -358,6 +358,12 @@ impl<'a> Checker<'a> {
         });
     }
 
+    /// The top-level declaration whose text holds `span`, if any.
+    pub(super) fn decl_at(&self, span: Span) -> Option<&'a Node> {
+        let inside = |d: &Node| d.range().0 <= span.start && span.end <= d.range().1;
+        (self.top.items.iter()).map(|i| i.decl).find(|d| inside(d))
+    }
+
     /// Checks an item, with its whole `rec` group, in a fresh context.
     pub(super) fn check_item(&mut self, i: usize) {
         if self.top.items[i].state != State::Waiting {

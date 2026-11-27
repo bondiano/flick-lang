@@ -6,11 +6,13 @@
 use super::Checker;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::iface::{Entity, Namespace};
+use crate::source::Span;
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::when;
 use crate::types::env::Found;
 use crate::types::is_type;
+use crate::types::ty::Type;
 
 impl<'a> Checker<'a> {
     /// Reports each constructor of a native type that `decls` name where the
@@ -56,20 +58,27 @@ impl<'a> Checker<'a> {
         ));
     }
 
+    /// Whether the definition around `span` covers `ty`, a native type: its
+    /// `@native` clauses hold wherever the type is the backend's own. Such a
+    /// body stands for the binding, and G4 holds it, not the checker, to
+    /// what the binding promises of the regions its values reach
+    /// (`docs/formal/regions.md`, native types).
+    pub(in crate::types) fn covers_native(&self, ty: &Type, span: Span) -> bool {
+        let Type::Con { module, name } = self.whnf_captured(ty).0.spine().0.clone() else {
+            return false;
+        };
+        let condition = (self.env.type_def(&module, &name)).and_then(|d| d.native.as_deref());
+        let cover = self.decl_at(span).and_then(|decl| cover(decl, self.text));
+        let env = self.options.native_env();
+        condition.zip(cover).is_some_and(|(c, cover)| {
+            when::parse(c).is_ok_and(|native| env.implies(&native, &cover))
+        })
+    }
+
     /// The constructors of native types `decl` names, each checked against the
     /// `@native` clauses of `decl`.
     fn check_represented_decl(&mut self, decl: &Node) {
-        let clauses: Vec<when::Expr> = (decl.nodes())
-            .filter(|n| n.kind == K::NativeOverride)
-            .filter_map(|ov| ov.nodes().find(|n| n.kind == K::WhenCond))
-            .filter_map(|cond| {
-                let (start, end) = cond.range();
-                when::parse(self.text[start as usize..end as usize].trim()).ok()
-            })
-            .collect();
-        let cover = clauses
-            .into_iter()
-            .reduce(|a, b| when::Expr::Or(Box::new(a), Box::new(b)));
+        let cover = cover(decl, self.text);
         let mut uses = Vec::new();
         constructors(decl, self.text, &mut uses);
         for (qualifier, token) in uses {
@@ -125,6 +134,19 @@ impl<'a> Checker<'a> {
             self.token_span(token),
         ));
     }
+}
+
+/// Where the `@native` clauses of `decl` hold: the disjunction of their
+/// conditions, none without clauses.
+fn cover(decl: &Node, text: &str) -> Option<when::Expr> {
+    (decl.nodes())
+        .filter(|n| n.kind == K::NativeOverride)
+        .filter_map(|ov| ov.nodes().find(|n| n.kind == K::WhenCond))
+        .filter_map(|cond| {
+            let (start, end) = cond.range();
+            when::parse(text[start as usize..end as usize].trim()).ok()
+        })
+        .reduce(|a, b| when::Expr::Or(Box::new(a), Box::new(b)))
 }
 
 /// Each constructor token under `node` outside its types and `@native`

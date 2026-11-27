@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::mem;
 
 use super::classes::{NUMERIC_CLASSES, split, which};
-use super::env::{Abi, Form};
+use super::env::{Abi, Form, TypeDef};
 use super::gadt::branch::as_field_given;
 use super::gadt::scheme::dicts;
 use super::ty::Type;
@@ -327,7 +327,7 @@ impl Checker<'_> {
         let Type::Con { module, name } = head else {
             return None;
         };
-        let form = self.env.type_def(module, name).map(|d| &d.form);
+        let form = self.env.type_def(module, name).map(TypeDef::typing);
         // an enum's values are its literals, an opaque one's too
         if let Some(Form::Nominal { literals, .. }) = form
             && !literals.is_empty()

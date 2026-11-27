@@ -180,3 +180,61 @@ fn a_native_type_crosses_a_binding_uncopied() {
         .expect("make's clause");
     assert_eq!((make.args.clone(), make.result), (vec![true], false));
 }
+
+/// A collection whose representation keeps a function: typing reads it as
+/// the type without constructors it is on JS.
+const COLL: &str = "\
+module Probe exposing (Coll, Wit, remap, union)
+
+type Wit a = Wit (a -> Bool)
+  @native when js || go
+
+type Coll a v = Coll (Wit a) (List v)
+  @native when js || go
+
+remap : Coll a v -> Coll a b
+let remap c =
+  match c with
+  | Coll w _ -> Coll w []
+  @native \"./coll.mjs\" \"remap\" when js || go
+
+union : Coll a v -> Coll a v -> Coll a v
+let union l r =
+  match (l, r) with
+  | (Coll w xs, Coll _ ys) -> Coll w (xs ++ ys)
+  @native \"./coll.mjs\" \"union\" when js || go
+
+instance Semigroup (Coll a v) =
+  let combine left right = union left right
+";
+
+/// The body that stands for a binding moves what the representation holds
+/// between type arguments: G4 holds it, as the binding, to the regions it
+/// keeps. A user of the type reads it with no hidden row, so `combine`
+/// passes a `Coll` through as an opaque value.
+#[test]
+fn typing_reads_a_native_type_as_opaque_and_trusts_its_bodies() {
+    for tags in [&["lua"][..], &["js", "rt", "node"]] {
+        let (diags, _) = check(COLL, &env(tags));
+        assert!(
+            diags.iter().all(|d| d.severity != Severity::Error),
+            "{tags:?}: {diags:#?}"
+        );
+    }
+}
+
+/// The same data without `@native` has hidden storage: `combine` is held to
+/// the bound of its result, which the hidden row of `union`'s does not fit.
+#[test]
+fn a_type_that_is_not_native_keeps_its_hidden_storage() {
+    let source = COLL
+        .replace("  @native when js || go\n", "")
+        .replace("  @native \"./coll.mjs\" \"remap\" when js || go\n", "")
+        .replace("  @native \"./coll.mjs\" \"union\" when js || go\n", "");
+    let (diags, _) = check(&source, &env(&["lua"]));
+    let combine = u32::try_from(source.find("union left right").expect("combine")).expect("u32");
+    assert!(
+        (diags.iter()).any(|d| d.code == codes::G001 && d.span.is_some_and(|s| s.start == combine)),
+        "{diags:#?}"
+    );
+}

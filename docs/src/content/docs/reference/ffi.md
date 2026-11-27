@@ -416,6 +416,16 @@ without a copy, and its TypeScript declaration is a branded interface without
 its constructors. With `--no-native-overrides` every build uses the
 constructors and the bodies.
 
+Typing reads a native type as the type without constructors it is where its
+condition holds, on every target: its parameters are invariant, `===` does not
+decide its `==`, and it has no hidden storage, so a module types the same
+wherever it is built. The bodies that name its
+constructors stand for its bindings, and are held to what a binding promises of
+the regions its values keep (G4 of the
+[regions](https://github.com/bondiano/flick-lang/blob/main/docs/formal/regions.md)),
+not checked for them: what a body puts in a value of the type is not bounded by
+the type's qualifier.
+
 ## The go target
 
 On the go target, a non-relative package binding such as `foreign hypot from "math" "Hypot"`
