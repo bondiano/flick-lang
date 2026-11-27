@@ -96,15 +96,15 @@ pub struct OwnerHandle {
 /// Nonowning arena identity. Retention does not keep its storage alive.
 #[derive(Debug, PartialEq, Eq)]
 pub struct ArenaHandle {
-    id: ObjectId,
-    execution: usize,
+    pub(crate) id: ObjectId,
+    pub(crate) execution: usize,
 }
 
 /// Nonowning index into an arena. Dropping a stale view reads no storage.
 #[derive(Debug, PartialEq, Eq)]
 pub struct ArenaView {
-    arena: ArenaHandle,
-    index: usize,
+    pub(crate) arena: ArenaHandle,
+    pub(crate) index: usize,
 }
 
 /// Nonowning handle to a frame-owned mutable local variable (`let mut`).
@@ -117,15 +117,15 @@ pub struct VarHandle {
 /// Nonowning handle to a root-owned single-flight `Lazy` cell.
 #[derive(Debug, PartialEq, Eq)]
 pub struct LazyHandle {
-    id: ObjectId,
-    execution: usize,
+    pub(crate) id: ObjectId,
+    pub(crate) execution: usize,
 }
 
 /// Nonowning handle to a frame-owned `Seq`/list iteration cursor.
 #[derive(Debug, PartialEq, Eq)]
 pub struct IteratorHandle {
-    id: ObjectId,
-    execution: usize,
+    pub(crate) id: ObjectId,
+    pub(crate) execution: usize,
 }
 
 /// An owned memory-IR token. Inspecting an [`ObjectId`] does not duplicate

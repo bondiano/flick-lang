@@ -29,7 +29,7 @@ fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
-fn is_tier1_subset(program: &Program, entry: &Name) -> bool {
+fn is_tier1_subset(program: &Program, entry: &Name, root: Option<&Name>) -> bool {
     let initializers: BTreeMap<&Name, CodeId> = program
         .globals
         .iter()
@@ -40,6 +40,12 @@ fn is_tier1_subset(program: &Program, entry: &Name) -> bool {
     };
     let mut visited = BTreeSet::new();
     let mut queue = VecDeque::from([entry_code]);
+    if let Some(root_name) = root {
+        let Some(&root_code) = initializers.get(root_name) else {
+            return false;
+        };
+        queue.push_back(root_code);
+    }
     while let Some(code) = queue.pop_front() {
         if !visited.insert(code) {
             continue;
@@ -64,16 +70,7 @@ fn block_is_tier1_supported(
             continue;
         };
         match value {
-            Operation::Task { .. }
-            | Operation::Await(_)
-            | Operation::Within { .. }
-            | Operation::WithOwnerEvidence { .. }
-            | Operation::GenerateStrict { .. }
-            | Operation::GenerateLazy { .. }
-            | Operation::Yield(_)
-            | Operation::SeqOpen(_)
-            | Operation::SeqNext(_)
-            | Operation::ForeignCall { .. } => return false,
+            Operation::ForeignCall { .. } => return false,
             Operation::Intrinsic { kind, .. } if !intrinsic_is_tier1_supported(*kind) => {
                 return false;
             }
@@ -84,9 +81,14 @@ fn block_is_tier1_supported(
                 queue.push_back(code);
             }
             Operation::Closure { code, .. }
+            | Operation::Task { code, .. }
             | Operation::Call { code, .. }
+            | Operation::Within { code, .. }
+            | Operation::WithOwnerEvidence { code, .. }
             | Operation::Loop { code, .. }
-            | Operation::FunctionBoundary { code, .. } => queue.push_back(*code),
+            | Operation::FunctionBoundary { code, .. }
+            | Operation::GenerateStrict { code, .. }
+            | Operation::GenerateLazy { code, .. } => queue.push_back(*code),
             _ => {}
         }
     }
@@ -100,40 +102,7 @@ fn block_is_tier1_supported(
 }
 
 fn intrinsic_is_tier1_supported(kind: Intrinsic) -> bool {
-    stdlib::is_metered_primitive(kind)
-        || matches!(
-            kind,
-            Intrinsic::StringStartsWith
-                | Intrinsic::StringIncludes
-                | Intrinsic::PrintLine
-                | Intrinsic::Show
-                | Intrinsic::MatchFail
-                | Intrinsic::FromResult
-                | Intrinsic::Raise
-                | Intrinsic::EffectDie
-                | Intrinsic::FailureRethrow
-                | Intrinsic::Try
-                | Intrinsic::ScopeRun
-                | Intrinsic::ScopeCurrent
-                | Intrinsic::ScopeAddFinalizer
-                | Intrinsic::ScopeAddFinalizerExit
-                | Intrinsic::ScopeAddClose
-                | Intrinsic::AcquireRelease
-                | Intrinsic::Bracket
-                | Intrinsic::Uninterruptible
-                | Intrinsic::HostService(_)
-                | Intrinsic::Host(
-                    HostPrimitive::StderrLine
-                        | HostPrimitive::StdoutWrite
-                        | HostPrimitive::Env
-                        | HostPrimitive::Vars
-                        | HostPrimitive::Args
-                        | HostPrimitive::CurrentTimeMillis
-                        | HostPrimitive::CurrentTimeNanos
-                        | HostPrimitive::MonotonicTimeNanos
-                        | HostPrimitive::RandomNext
-                )
-        )
+    !matches!(kind, Intrinsic::Host(HostPrimitive::ProcessSpawn))
 }
 
 fn outcome_tag(outcome: &ProgramOutcome) -> &'static str {
@@ -220,12 +189,14 @@ fn values_structurally_equal(h0: &Heap, v0: &Value, h1: &Heap, v1: &Value) -> Re
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn check_run_profile(
     counted: &run::CountedMain,
     rel: &str,
     profile: &str,
     expected_stdout: Option<&str>,
     expects_nonzero: bool,
+    must_match_expected: bool,
     fuel: u64,
     failures: &mut Vec<String>,
 ) {
@@ -234,12 +205,19 @@ fn check_run_profile(
     let tag0 = outcome_tag(&r0.outcome);
 
     let mut heap1 = Heap::new();
-    let r1 = match tier1::execute_main_program_outcome(
-        &mut heap1,
-        &counted.program,
-        &counted.entry,
-        fuel,
-    ) {
+    let r1_res = match &counted.root {
+        Some(root) => tier1::execute_rooted_main_program_outcome(
+            &mut heap1,
+            &counted.program,
+            &counted.entry,
+            root,
+            fuel,
+        ),
+        None => {
+            tier1::execute_main_program_outcome(&mut heap1, &counted.program, &counted.entry, fuel)
+        }
+    };
+    let r1 = match r1_res {
         Ok(report) => report,
         Err(err) => {
             let _ = r0.outcome.release(&mut heap0);
@@ -264,6 +242,7 @@ fn check_run_profile(
         }
         if let Some(expected) = expected_stdout
             && !expects_nonzero
+            && (must_match_expected || r0.stdout == expected)
             && r1.stdout != expected
         {
             failures.push(format!(
@@ -290,12 +269,49 @@ fn check_run_profile(
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn pure_tests_run_cases_match_tier0_and_checked_in_stdout() {
+    const REQUIRED: &[&str] = &[
+        "tests/run/codegen/handlers.fl",
+        "tests/run/codegen/partial_handlers.fl",
+        "tests/run/codegen/prototype_operation.fl",
+        "tests/run/codegen/counted_failures.fl",
+        "tests/run/codegen/fail.fl",
+        "tests/run/codegen/errors.fl",
+        "tests/run/runtime/arena_scope.fl",
+        "tests/run/runtime/arena_layer_scope.fl",
+        "tests/run/runtime/arena_owner_list.fl",
+        "tests/run/runtime/arena_finalizers.fl",
+        "tests/run/runtime/arena_layer_finalizers.fl",
+        "tests/run/runtime/closing_hooks.fl",
+        "tests/run/runtime/group_in_closing.fl",
+        "tests/run/runtime/parallel.fl",
+        "tests/run/runtime/shared_layer.fl",
+        "tests/run/runtime/scope_close.fl",
+        "tests/run/runtime/interrupt_skips.fl",
+        "tests/run/runtime/abort_stops_children.fl",
+        "tests/run/runtime/lazy_shared.fl",
+        "tests/run/runtime/lazy_local_concurrent.fl",
+        "tests/run/runtime/defer_lifecycle.fl",
+        "tests/run/stdlib/seq.fl",
+        "tests/run/stdlib/seqs.fl",
+        "tests/run/stdlib/effect/stream.fl",
+        "tests/run/stdlib/effect/stream_core.fl",
+        "tests/run/stdlib/effect/stream_combine.fl",
+        "tests/run/stdlib/effect/stream_errors.fl",
+        "tests/run/stdlib/effect/stream_sink.fl",
+        "tests/run/stdlib/effect/stream_transform.fl",
+        "tests/rt/deep_control.fl",
+        "tests/rt/result_control_unwind.fl",
+        "tests/rt/defer_control.fl",
+    ];
+
     let mut files = fixture_files(&repo().join("tests/run"), "fl");
     files.sort();
     for rel in [
         "tests/rt/deep_control.fl",
         "tests/rt/result_control_unwind.fl",
+        "tests/rt/defer_control.fl",
     ] {
         files.push(repo().join(rel));
     }
@@ -324,13 +340,15 @@ fn pure_tests_run_cases_match_tier0_and_checked_in_stdout() {
         let expects_nonzero = fs::read_to_string(path.with_extension("exit"))
             .ok()
             .is_some_and(|s| s.trim() != "0");
+        let must_match_expected = REQUIRED.contains(&rel.as_str());
 
         for release in [false, true] {
             let profile = if release { "release" } else { "debug" };
             let Ok(counted) = run::counted_main(&modules, &main, release) else {
                 continue;
             };
-            if !counted.eager_inits.is_empty() || !is_tier1_subset(&counted.program, &counted.entry)
+            if !counted.eager_inits.is_empty()
+                || !is_tier1_subset(&counted.program, &counted.entry, counted.root.as_ref())
             {
                 continue;
             }
@@ -340,6 +358,7 @@ fn pure_tests_run_cases_match_tier0_and_checked_in_stdout() {
                 profile,
                 expected_stdout.as_deref(),
                 expects_nonzero,
+                must_match_expected,
                 fuel,
                 &mut failures,
             );
@@ -348,16 +367,7 @@ fn pure_tests_run_cases_match_tier0_and_checked_in_stdout() {
         }
     }
 
-    for required in [
-        "tests/run/codegen/handlers.fl",
-        "tests/run/codegen/partial_handlers.fl",
-        "tests/run/codegen/prototype_operation.fl",
-        "tests/run/codegen/counted_failures.fl",
-        "tests/run/codegen/fail.fl",
-        "tests/run/codegen/errors.fl",
-        "tests/rt/deep_control.fl",
-        "tests/rt/result_control_unwind.fl",
-    ] {
+    for &required in REQUIRED {
         assert!(
             checked_files.contains(required),
             "required fixture did not run on tier1: {required}"
@@ -370,8 +380,8 @@ fn pure_tests_run_cases_match_tier0_and_checked_in_stdout() {
         failures.join("\n")
     );
     assert!(
-        checked >= 120,
-        "expected >= 120 tier1 profiles, got {checked}"
+        checked >= 250,
+        "expected >= 250 tier1 profiles, got {checked}"
     );
 }
 
@@ -431,7 +441,9 @@ fn compare_generated_profile(
     r0.outcome.release(&mut heap0).expect("release tier0");
     heap0.finish().expect("zero leaks tier0");
     r1.outcome.release(&mut heap1).expect("release tier1");
-    let stats = heap1.finish().expect("zero leaks tier1");
+    let stats = heap1.finish().unwrap_or_else(|e| {
+        panic!("seed {seed} (release={release}) zero leaks tier1: {e}\n{source}")
+    });
     assert_eq!(stats.live_objects, 0);
     assert_eq!(stats.allocations, stats.frees);
 }
@@ -464,7 +476,7 @@ fn generated_programs_match_tier0_outcome_and_value_with_zero_leaks() {
             let Ok(counted) = run::counted_main(&modules, &entry_path, release) else {
                 continue;
             };
-            if !is_tier1_subset(&counted.program, &counted.entry) {
+            if !is_tier1_subset(&counted.program, &counted.entry, counted.root.as_ref()) {
                 continue;
             }
             compare_generated_profile(&counted, is_unit_fn, seed, release, &source, 100_000);
@@ -514,7 +526,11 @@ fn generated_handler_programs_match_tier0_outcome_and_value_with_zero_leaks() {
         for release in [false, true] {
             let counted = run::counted_main(&modules, &entry_path, release)
                 .unwrap_or_else(|e| panic!("seed {seed} lower failed: {e:?}\n{source}"));
-            assert!(is_tier1_subset(&counted.program, &counted.entry));
+            assert!(is_tier1_subset(
+                &counted.program,
+                &counted.entry,
+                counted.root.as_ref()
+            ));
             compare_generated_profile(&counted, true, seed, release, &source, 200_000);
             compared += 1;
         }

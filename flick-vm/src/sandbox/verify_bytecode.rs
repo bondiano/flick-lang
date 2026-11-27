@@ -125,6 +125,14 @@ fn verify_tables(prepared: &Prepared) -> Result<(), BytecodeVerifyError> {
             prepared.globals.len()
         )));
     }
+    if let Some(root) = prepared.root
+        && root >= prepared.globals.len()
+    {
+        return Err(BytecodeVerifyError::module(format!(
+            "root global index {root} out of bounds (globals: {})",
+            prepared.globals.len()
+        )));
+    }
     for (g_idx, &init_fn) in prepared.globals.iter().enumerate() {
         let Some(func) = prepared.functions.get(init_fn) else {
             return Err(BytecodeVerifyError::module(format!(

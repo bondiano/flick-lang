@@ -241,45 +241,48 @@ host-environment hooks (`Accounting`, `HostEnv`, `VmHooks`):
 
 ### Tier-1 register bytecode executor (`flick-vm/src/tier1/`)
 
-`flick_vm::tier1` compiles functions reachable from an entry global in
+`flick_vm::tier1` compiles functions reachable from an entry global (and
+optional `Σ₀` root service global via `prepare_rooted`) in
 `flick_ir::memory::Program` to a flat register bytecode with intra-block
 peephole fusion (`Compute`, `CompareBranch`, `ProjectOwned`, `MatchFlag`/
 `MatchBranch`, `ReadCell`/`WriteCell`/`UpdateCell`, `ReturnUnit`, and small
 static `TailCall`/`TailApply` frame reuse), compact captureless closures, and
 one dedicated `translate_*` function per IR operation (`prepare_ops.rs`,
-`prepare_ops_data.rs`, and `prepare_ops_handlers.rs`) to support direct
-per-operation refinement proofs (`#980`).
+`prepare_ops_data.rs`, `prepare_ops_handlers.rs`, and `prepare_ops_async.rs`)
+to support direct per-operation refinement proofs (`#980`).
 
 - **Shared primitive & heap boundary**: tier 1 executes directly over
-  `tier0::Heap` and delegates all binary operations, unary operations, and
-  standard-library intrinsics to `flick_vm::stdlib` without duplicating
-  primitives. `Heap::finish` verifies zero live slots on every normal,
-  raised, defect, and `OutOfFuel` outcome identically to tier 0.
-- **Effects, one-shot handlers, and LIFO unwinding**: tier 1 executes deep
-  one-shot `Handle`/`Perform` handlers across all operation classes
-  (`OpClass::Tail` without continuation capture, `OpClass::Abort` with frame
-  discard and LIFO scope finalizers before the abort arm, and
-  `OpClass::Control` with continuation capture, tail-resume frame reuse,
-  discontinuation on unused continuations, and `DefectCode::ResumeTwice`
-  carrying the preserved operation `MemorySpan` on a second `resume`), using
-  an epoch-invalidated handler lookup cache keyed by interned `(effect, op)`
-  ID. Unwinding through frames executes synchronous scope/resource finalizers
-  (`ScopeRun`, `ScopeCurrent`, `ScopeAddFinalizer`, `ScopeAddFinalizerExit`,
-  `ScopeAddClose`, `AcquireRelease`, `Bracket`, and `Uninterruptible`) once in
-  LIFO order across normal completion, typed failure, abort, and
-  discontinuation.
+  `tier0::Heap` and delegates all binary operations, unary operations,
+  cooperative/context/layer helpers, and standard-library intrinsics to
+  `flick_vm::stdlib` without duplicating primitives. `Heap::finish` verifies
+  zero live slots on every normal, raised, defect, and `OutOfFuel` outcome
+  identically to tier 0.
+- **Effects, one-shot handlers, sequences, fibers, layers, and C0–C6 scopes**:
+  tier 1 executes deep one-shot `Handle`/`Perform` handlers (`OpClass::Tail`,
+  `OpClass::Abort`, `OpClass::Control`, epoch-invalidated handler lookup cache
+  invalidated on provider/context boundaries and fiber switches), strict and
+  lazy sequences/generators (`GenerateStrict`, `GenerateLazy`, `Yield`,
+  `SeqOpen`, `SeqNext`, `SeqOfList`, `SeqToList` with frame-owned iterator
+  cleanup), `Task`/`Await`, single-threaded cooperative fibers with
+  instruction-batch preemption (`FIBER_QUANTUM`), `Deferred`, `FiberGroup`,
+  `Ref` cells (with atomic `Ref.modify`), shared/local `Lazy`, structured
+  concurrency (`race_first`, `race_success`, `timeout*`, `par_map`, `par_zip`,
+  `all`, `sleep`, `yield_now`, `TestClock`, `Random.with_seed`), dynamic
+  layers/contexts/`MemoMap` and `Host.live` rooted execution, and `Arena` /
+  `Within` / `WithOwnerEvidence` / manual scopes closing in exact C0–C6 order
+  (children, hooks, LIFO finalizers with captured services, and exact-once
+  arena retirement) across success, failure, cancellation, and nested scopes.
 - **Explicit unsupported-operation boundary (no silent fallback)**: any
-  reachable `Task`, `Await`, `Within`, `WithOwnerEvidence`, `GenerateStrict`/
-  `GenerateLazy`/`Yield`/`SeqOpen`/`SeqNext`, `ForeignCall`, or unsupported
-  async/fiber/layer/arena intrinsic fails `tier1::prepare` with
+  reachable `ForeignCall` or `Host(ProcessSpawn)` fails `tier1::prepare` with
   `PrepareError::Unsupported` naming the operation and its `MemorySpan` from
   `Program::op_spans`. The CLI renders this failure as `FLICK-P012` without
   falling back to tier 0.
-- **Lean impact**: adding per-instruction source spans, effect/handler
-  execution, and synchronous LIFO unwinding in `flick-vm/src/tier1/` does not
-  change typing, effects, regions, or the reference memory-IR ownership
-  semantics; existing Lean proofs in `formal/` remain unaffected (bytecode
-  translation refinement is tracked in `#980`).
+- **Lean impact**: extending `flick-vm/src/tier1/` to execute sequences,
+  tasks, cooperative fibers, layers, arenas, and C0–C6 scope closing adds no
+  new `Operation` or `Exit` form and does not change typing, effects, regions,
+  or the reference memory-IR ownership semantics; existing Lean proofs in
+  `formal/` remain unaffected (bytecode translation refinement is tracked in
+  `#980`).
 
 ### Per-module VM images and live module unloading (`flick-vm/src/image/`)
 

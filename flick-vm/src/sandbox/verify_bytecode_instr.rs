@@ -104,13 +104,23 @@ fn try_verify_slot_instr(
     slots: usize,
     instr: &Instr,
 ) -> Option<Result<(), BytecodeVerifyError>> {
+    try_verify_unary_slot_instr(func_idx, pc, slots, instr)
+        .or_else(|| try_verify_binary_slot_instr(func_idx, pc, slots, instr))
+}
+
+fn try_verify_unary_slot_instr(
+    func_idx: usize,
+    pc: usize,
+    slots: usize,
+    instr: &Instr,
+) -> Option<Result<(), BytecodeVerifyError>> {
     match instr {
         Instr::Literal { dst, .. }
         | Instr::String { dst, .. }
         | Instr::BigInt { dst, .. }
         | Instr::Label { dst, .. }
         | Instr::ServiceTag { dst, .. }
-        | Instr::NoOwner { dst } => Some(check_slot(func_idx, pc, slots, *dst, "dst")),
+        | Instr::ReadOwnerEvidence { dst } => Some(check_slot(func_idx, pc, slots, *dst, "dst")),
 
         Instr::Dup { src, dst }
         | Instr::Not { dst, src }
@@ -150,6 +160,19 @@ fn try_verify_slot_instr(
         | Instr::ScopeAddFinalizerExit { dst, func: src }
         | Instr::ScopeAddClose { dst, func: src }
         | Instr::Uninterruptible { dst, task: src }
+        | Instr::Await { dst, task: src }
+        | Instr::Yield { dst, value: src }
+        | Instr::SeqOpen { dst, source: src }
+        | Instr::SeqNext { dst, iterator: src }
+        | Instr::SeqOfList { dst, list: src }
+        | Instr::SeqToList { dst, seq: src }
+        | Instr::RefMake { dst, src }
+        | Instr::RefGet { dst, cell: src }
+        | Instr::ArenaMake { dst, unit: src }
+        | Instr::ArenaGet { dst, view: src }
+        | Instr::LazyMake { dst, task: src, .. }
+        | Instr::LazyForce { dst, lazy: src }
+        | Instr::EffectExit { dst, task: src }
         | Instr::FromResult { dst, src } => Some(
             check_slot(func_idx, pc, slots, *dst, "dst")
                 .and_then(|()| check_slot(func_idx, pc, slots, *src, "src")),
@@ -161,6 +184,17 @@ fn try_verify_slot_instr(
         | Instr::FailureRethrow { src }
         | Instr::Return { value: src } => Some(check_slot(func_idx, pc, slots, *src, "src")),
 
+        _ => None,
+    }
+}
+
+fn try_verify_binary_slot_instr(
+    func_idx: usize,
+    pc: usize,
+    slots: usize,
+    instr: &Instr,
+) -> Option<Result<(), BytecodeVerifyError>> {
+    match instr {
         Instr::Binary {
             dst, left, right, ..
         }
@@ -194,6 +228,38 @@ fn try_verify_slot_instr(
             dst,
             acquire: left,
             release: right,
+        }
+        | Instr::RefSet {
+            dst,
+            cell: left,
+            value: right,
+        }
+        | Instr::RefModify {
+            dst,
+            cell: left,
+            func: right,
+        }
+        | Instr::RefSame { dst, left, right }
+        | Instr::ArenaAlloc {
+            dst,
+            arena: left,
+            value: right,
+        }
+        | Instr::EffectCatchDefect {
+            dst,
+            handler: left,
+            task: right,
+        }
+        | Instr::LayerSucceed {
+            dst,
+            tag: left,
+            implementation: right,
+        }
+        | Instr::LayerMerge { dst, left, right }
+        | Instr::LayerRun {
+            dst,
+            layer: left,
+            body: right,
         } => Some(
             check_slot(func_idx, pc, slots, *dst, "dst")
                 .and_then(|()| check_slot(func_idx, pc, slots, *left, "left"))

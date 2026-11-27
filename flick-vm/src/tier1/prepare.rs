@@ -99,6 +99,29 @@ pub(super) struct Lowering<'a> {
 /// [`PrepareError::UnknownEntry`] if `entry` is not a global in `program`, or
 /// [`PrepareError::Unsupported`] if a reachable operation is unsupported.
 pub fn prepare(program: &Program, entry: &Name) -> Result<Prepared, PrepareError> {
+    prepare_inner(program, entry, None)
+}
+
+/// Validates `program` and prepares a tier-1 register bytecode image for `entry`
+/// together with a root service layer global `root` (such as `Host.live`).
+///
+/// # Errors
+/// Returns [`PrepareError::Invalid`] if memory-IR validation fails,
+/// [`PrepareError::UnknownEntry`] if `entry` or `root` is missing, or
+/// [`PrepareError::Unsupported`] if a reachable operation is unsupported.
+pub fn prepare_rooted(
+    program: &Program,
+    entry: &Name,
+    root: &Name,
+) -> Result<Prepared, PrepareError> {
+    prepare_inner(program, entry, Some(root))
+}
+
+fn prepare_inner(
+    program: &Program,
+    entry: &Name,
+    root: Option<&Name>,
+) -> Result<Prepared, PrepareError> {
     memory::validate_program(program).map_err(PrepareError::Invalid)?;
     let initializers: BTreeMap<_, _> = program
         .globals
@@ -107,6 +130,11 @@ pub fn prepare(program: &Program, entry: &Name) -> Result<Prepared, PrepareError
         .collect();
     if !initializers.contains_key(entry) {
         return Err(PrepareError::UnknownEntry(entry.clone()));
+    }
+    if let Some(root_name) = root
+        && !initializers.contains_key(root_name)
+    {
+        return Err(PrepareError::UnknownEntry(root_name.clone()));
     }
     let mut lowering = Lowering {
         program,
@@ -119,6 +147,7 @@ pub fn prepare(program: &Program, entry: &Name) -> Result<Prepared, PrepareError
         operations: Interner::default(),
     };
     let entry_id = lowering.intern_global(entry);
+    let root_id = root.map(|root_name| lowering.intern_global(root_name));
     let mut functions = Vec::new();
     while let Some(&code) = lowering.codes.values.get(functions.len()) {
         functions.push(lowering.prepare_function(code, &program.functions[&code])?);
@@ -158,6 +187,7 @@ pub fn prepare(program: &Program, entry: &Name) -> Result<Prepared, PrepareError
         globals,
         global_names: lowering.globals.values,
         entry: entry_id,
+        root: root_id,
         tags: lowering.tags.values,
         dictionary_fields: lowering.dictionary_fields.values,
         loops: lowering.loops.values,

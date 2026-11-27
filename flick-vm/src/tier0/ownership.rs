@@ -114,7 +114,7 @@ impl Heap {
             .ok_or(Error::InvalidObject(id))
     }
 
-    fn cell_contents<'a>(
+    pub(crate) fn cell_contents<'a>(
         &'a self,
         execution: usize,
         cell: &CellHandle,
@@ -135,7 +135,7 @@ impl Heap {
         contents.as_ref().ok_or(Error::ClosedCell)
     }
 
-    fn cell_contents_mut<'a>(
+    pub(crate) fn cell_contents_mut<'a>(
         &'a mut self,
         execution: usize,
         cell: &CellHandle,
@@ -156,7 +156,7 @@ impl Heap {
         contents.as_mut().ok_or(Error::ClosedCell)
     }
 
-    fn arena_contents<'a>(
+    pub(crate) fn arena_contents<'a>(
         &'a self,
         execution: usize,
         arena: &ArenaHandle,
@@ -187,7 +187,7 @@ impl Heap {
         Ok(contents)
     }
 
-    fn arena_contents_mut<'a>(
+    pub(crate) fn arena_contents_mut<'a>(
         &'a mut self,
         execution: usize,
         arena: &ArenaHandle,

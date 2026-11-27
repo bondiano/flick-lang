@@ -11,10 +11,14 @@ use super::machine_unwind::{Discard, TransferNext};
 
 impl Machine<'_, '_> {
     pub(super) fn invoke_step(&mut self, id: usize) -> Result<(), Error> {
-        let is_final_control = {
+        let (evidence, is_final_control) = {
             let inv = self.invocations.get(&id).expect("pending invocation");
-            inv.arguments.len() == 1 && matches!(inv.end, InvocationEnd::Control { .. })
+            (
+                inv.evidence,
+                inv.arguments.len() == 1 && matches!(inv.end, InvocationEnd::Control { .. }),
+            )
         };
+        self.current_evidence = evidence;
         if is_final_control {
             let mut inv = self.invocations.remove(&id).expect("final invocation step");
             let callee = inv.callee.take().expect("invocation function");
@@ -59,10 +63,15 @@ impl Machine<'_, '_> {
                 } else {
                     self.bump_handler_epoch();
                 }
+                self.restore_evidence();
                 self.store_reg(segment.dst, value)
             }
-            InvocationEnd::Abort(dst) => self.store_reg(dst, value),
+            InvocationEnd::Caller(dst) | InvocationEnd::Abort(dst) => {
+                self.restore_evidence();
+                self.store_reg(dst, value)
+            }
             InvocationEnd::Control { cont_id, dst } => {
+                self.restore_evidence();
                 if let Some(captured) = self
                     .continuations
                     .get_mut(&cont_id)
@@ -134,6 +143,7 @@ impl Machine<'_, '_> {
         let target_dst = if tail
             && let Some(top) = self.frames.last()
             && top.vars.is_empty()
+            && top.iterators.is_empty()
             && top.recovery_id.is_none()
             && self.registers[top.base..].iter().all(Option::is_none)
             && (matches!(top.end, End::Store(_))
@@ -158,6 +168,7 @@ impl Machine<'_, '_> {
         self.current_owner = captured.owner;
         self.restore_frames(captured.frames);
         self.bump_handler_epoch();
+        self.restore_evidence();
         let arg = self.pending.take().expect("resumed argument");
         self.store_reg(captured.dst, arg)
     }
@@ -187,6 +198,10 @@ impl Machine<'_, '_> {
         Self::activation_roots(activation, &mut roots);
         self.heap.drop_values(roots)?;
         if self.pending_handler.is_some() {
+            if self.skip_interrupted_handler()? {
+                let sel = self.pending_handler.take().expect("skipped error selector");
+                return self.drop_reg(sel);
+            }
             self.begin_recovery(dst)?;
         }
         Ok(())
@@ -257,7 +272,7 @@ impl Machine<'_, '_> {
                 });
             }
             InvocationEnd::Control { cont_id, .. } => self.unwind_discontinue(cont_id),
-            InvocationEnd::Abort(_) => {}
+            InvocationEnd::Abort(_) | InvocationEnd::Caller(_) => {}
         }
         Ok(())
     }

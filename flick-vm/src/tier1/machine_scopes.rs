@@ -1,11 +1,12 @@
-//! Synchronous scope ownership and LIFO finalizer state machine for tier 1.
+//! Full C0–C6 scope ownership, child cancellation, hooks, LIFO finalizers,
+//! and exact-once arena retirement for tier 1.
 
+use std::collections::{BTreeSet, VecDeque};
 use std::mem;
 
-use crate::stdlib::{FuelCounter, primitives};
-use crate::tier0::{CauseToken, Data, DefectSpec, Error, ExitData, OwnerHandle, Value};
+use crate::tier0::{CauseToken, Data, DefectSpec, Error, ObjectId, OwnerHandle, Value};
 
-use super::machine::{End, Machine, RegVal};
+use super::machine::{End, Machine, OwnerEvidence, RegVal};
 use super::machine_unwind::Discard;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -16,17 +17,53 @@ pub(super) enum OwnerPhase {
     Closed,
 }
 
+pub(super) enum OwnerHook {
+    StopFiberGroup(usize),
+}
+
 pub(super) enum Finalizer {
-    Task(RegVal),
-    WithCause(RegVal),
-    WithExit(RegVal),
-    Release { value: Value, release_fn: RegVal },
+    Task {
+        task: RegVal,
+        services: Vec<Value>,
+    },
+    WithCause {
+        func: RegVal,
+        services: Vec<Value>,
+    },
+    WithExit {
+        func: RegVal,
+        services: Vec<Value>,
+    },
+    Release {
+        value: Value,
+        release_fn: RegVal,
+        services: Vec<Value>,
+    },
+    CloseChildOwner(usize),
+    ReleaseMemo {
+        memo_id: usize,
+        layer_id: ObjectId,
+        entry_owner: usize,
+    },
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum ClosePhase {
+    Hooks,
+    Children,
+    PostHooks,
+    Finalizers,
 }
 
 pub(super) struct OwnerState {
     pub(super) phase: OwnerPhase,
     pub(super) exit_cause: Option<CauseToken>,
+    pub(super) hooks: VecDeque<OwnerHook>,
+    pub(super) children: BTreeSet<usize>,
+    pub(super) watchers: usize,
+    pub(super) close_waiter: Option<usize>,
     pub(super) finalizers: Vec<Finalizer>,
+    pub(super) arenas: Vec<Value>,
 }
 
 impl Default for OwnerState {
@@ -34,12 +71,25 @@ impl Default for OwnerState {
         Self {
             phase: OwnerPhase::Open,
             exit_cause: None,
+            hooks: VecDeque::new(),
+            children: BTreeSet::new(),
+            watchers: 0,
+            close_waiter: None,
             finalizers: Vec::new(),
+            arenas: Vec::new(),
         }
     }
 }
 
 impl OwnerState {
+    pub(super) fn is_open(&self) -> bool {
+        self.phase == OwnerPhase::Open
+    }
+
+    pub(super) fn is_closing_or_closed(&self) -> bool {
+        self.phase != OwnerPhase::Open
+    }
+
     pub(super) fn is_finalizing(&self) -> bool {
         self.phase == OwnerPhase::Finalizing
     }
@@ -59,18 +109,27 @@ pub(super) enum BracketOutcome {
 }
 
 pub(super) enum ScopeOutcome {
-    Normal { dst: usize, value: RegVal },
+    Normal {
+        dst: Option<usize>,
+        value: RegVal,
+    },
     Failure(CauseToken),
     Discard(Box<Discard>),
+    ChildClose {
+        parent: Box<ClosingScopeState>,
+        inherited_exit: Option<CauseToken>,
+    },
 }
 
 pub(super) struct ClosingScopeState {
     pub(super) owner: usize,
     pub(super) previous: usize,
+    pub(super) phase: ClosePhase,
     pub(super) remaining: Vec<Finalizer>,
     pub(super) outcome: ScopeOutcome,
     pub(super) exit_override: Option<CauseToken>,
     pub(super) finalizer_failure: Option<CauseToken>,
+    pub(super) elect_on_fail: bool,
     pub(super) saved_mask: usize,
     pub(super) masked: bool,
 }
@@ -84,15 +143,35 @@ impl Machine<'_, '_> {
         }
     }
 
+    pub(super) fn owner_index(&self, value: &Value) -> Result<usize, Error> {
+        let Value::Owner(owner) = value else {
+            return Err(Error::ExpectedOwner);
+        };
+        if owner.heap != self.heap.identity || owner.execution != self.execution {
+            return Err(Error::ForeignOwner);
+        }
+        self.owners.get(owner.index).ok_or(Error::ForeignOwner)?;
+        Ok(owner.index)
+    }
+
     pub(super) fn finalizer_roots(finalizer: Finalizer, roots: &mut Vec<Value>) {
         match finalizer {
-            Finalizer::Task(r) | Finalizer::WithCause(r) | Finalizer::WithExit(r) => {
+            Finalizer::Task { task: r, services }
+            | Finalizer::WithCause { func: r, services }
+            | Finalizer::WithExit { func: r, services } => {
                 Self::reg_into_roots(r, roots);
+                roots.extend(services);
             }
-            Finalizer::Release { value, release_fn } => {
+            Finalizer::Release {
+                value,
+                release_fn,
+                services,
+            } => {
                 roots.push(value);
                 Self::reg_into_roots(release_fn, roots);
+                roots.extend(services);
             }
+            Finalizer::CloseChildOwner(_) | Finalizer::ReleaseMemo { .. } => {}
         }
     }
 
@@ -102,14 +181,15 @@ impl Machine<'_, '_> {
         let owner = self.owners.len();
         self.owners.push(OwnerState::default());
         self.current_owner = owner;
-        let handle = Value::Owner(self.owner_handle(owner));
+        let handle = self.owner_handle(owner);
+        self.current_evidence = Some(OwnerEvidence::from_owner(&handle));
         self.apply_reg(
             body,
-            RegVal::Value(handle),
+            RegVal::Value(Value::Owner(handle)),
             End::CloseScope {
                 owner,
                 previous,
-                dst,
+                dst: Some(dst),
             },
             false,
         )
@@ -129,7 +209,8 @@ impl Machine<'_, '_> {
         task_slot: usize,
     ) -> Result<(), Error> {
         let task = self.take_reg(task_slot)?;
-        self.register_scope_finalizer(dst, Finalizer::Task(task))
+        let services = self.snapshot_active_services()?;
+        self.register_scope_finalizer(dst, Finalizer::Task { task, services })
     }
 
     pub(super) fn exec_scope_add_finalizer_exit(
@@ -138,7 +219,8 @@ impl Machine<'_, '_> {
         func_slot: usize,
     ) -> Result<(), Error> {
         let func = self.take_reg(func_slot)?;
-        self.register_scope_finalizer(dst, Finalizer::WithCause(func))
+        let services = self.snapshot_active_services()?;
+        self.register_scope_finalizer(dst, Finalizer::WithCause { func, services })
     }
 
     pub(super) fn exec_scope_add_close(
@@ -147,7 +229,8 @@ impl Machine<'_, '_> {
         func_slot: usize,
     ) -> Result<(), Error> {
         let func = self.take_reg(func_slot)?;
-        self.register_scope_finalizer(dst, Finalizer::WithExit(func))
+        let services = self.snapshot_active_services()?;
+        self.register_scope_finalizer(dst, Finalizer::WithExit { func, services })
     }
 
     fn register_scope_finalizer(&mut self, dst: usize, finalizer: Finalizer) -> Result<(), Error> {
@@ -165,6 +248,7 @@ impl Machine<'_, '_> {
             self.mask_depth += 1;
             let next = End::RestoreMask {
                 saved_mask,
+                check_on_exit: true,
                 next: Box::new(End::Store(dst)),
             };
             let res = self.run_single_finalizer(finalizer, exit_cause.as_ref(), next);
@@ -178,209 +262,13 @@ impl Machine<'_, '_> {
         Ok(())
     }
 
-    pub(super) fn owner_needs_close_work(&self, owner: usize) -> bool {
+    pub(super) fn owner_needs_async_close(&self, owner: usize) -> bool {
         let o = &self.owners[owner];
-        !o.is_closed() && !o.finalizers.is_empty()
-    }
-
-    pub(super) fn begin_close_scope(
-        &mut self,
-        owner: usize,
-        previous: usize,
-        outcome: ScopeOutcome,
-        exit_override: Option<CauseToken>,
-    ) -> Result<(), Error> {
-        if !self.owner_needs_close_work(owner) {
-            if !self.owners[owner].is_closed() {
-                self.owners[owner].phase = OwnerPhase::Closing;
-            }
-            if let Some(c) = exit_override {
-                self.heap.drop_cause(c)?;
-            }
-            self.close_owner(owner)?;
-            self.current_owner = previous;
-            return self.complete_scope_outcome(outcome, None);
-        }
-        let exit_cause = Self::outcome_exit_cause(exit_override.as_ref(), &outcome);
-        let exit_dup = match exit_cause {
-            Some(c) => Some(self.heap.dup_cause(c)?),
-            None => None,
-        };
-        let o = &mut self.owners[owner];
-        o.phase = OwnerPhase::Finalizing;
-        o.exit_cause = exit_dup;
-        let remaining = mem::take(&mut o.finalizers);
-        self.current_owner = owner;
-        let saved_mask = self.mask_depth;
-        self.mask_depth += 1;
-        let state = Box::new(ClosingScopeState {
-            owner,
-            previous,
-            remaining,
-            outcome,
-            exit_override,
-            finalizer_failure: None,
-            saved_mask,
-            masked: true,
-        });
-        self.step_close_scope(state)
-    }
-
-    fn outcome_exit_cause<'a>(
-        exit_override: Option<&'a CauseToken>,
-        outcome: &'a ScopeOutcome,
-    ) -> Option<&'a CauseToken> {
-        exit_override.or(match outcome {
-            ScopeOutcome::Failure(c) => Some(c),
-            ScopeOutcome::Discard(discard) => Self::peek_discard_exit_cause(&discard.next),
-            ScopeOutcome::Normal { .. } => None,
-        })
-    }
-
-    pub(super) fn step_close_scope(
-        &mut self,
-        mut state: Box<ClosingScopeState>,
-    ) -> Result<(), Error> {
-        self.current_owner = state.owner;
-        let Some(finalizer) = state.remaining.pop() else {
-            let owner = state.owner;
-            let previous = state.previous;
-            let outcome = state.outcome;
-            let finalizer_failure = state.finalizer_failure;
-            if let Some(c) = state.exit_override {
-                self.heap.drop_cause(c)?;
-            }
-            if state.masked {
-                self.mask_depth = state.saved_mask;
-            }
-            self.close_owner(owner)?;
-            self.current_owner = previous;
-            return self.complete_scope_outcome(outcome, finalizer_failure);
-        };
-        let exit_cause =
-            match Self::outcome_exit_cause(state.exit_override.as_ref(), &state.outcome) {
-                Some(c) => Some(self.heap.dup_cause(c)?),
-                None => None,
-            };
-        let res =
-            self.run_single_finalizer(finalizer, exit_cause.as_ref(), End::ClosingScope { state });
-        if let Some(c) = exit_cause {
-            self.heap.drop_cause(c)?;
-        }
-        res
-    }
-
-    fn run_single_finalizer(
-        &mut self,
-        finalizer: Finalizer,
-        exit_cause: Option<&CauseToken>,
-        next: End,
-    ) -> Result<(), Error> {
-        match finalizer {
-            Finalizer::Task(task) => self.await_task_reg(task, next),
-            Finalizer::WithCause(func) => {
-                let arg = match exit_cause {
-                    Some(cause) => {
-                        let dup = self.heap.dup_cause(cause)?;
-                        self.heap
-                            .construct("Prelude.Option.Some", vec![dup.into_value()])?
-                    }
-                    None => self.heap.construct("Prelude.Option.None", vec![])?,
-                };
-                self.apply_reg(func, RegVal::Value(arg), next, false)
-            }
-            Finalizer::WithExit(func) => {
-                let exit = match exit_cause {
-                    Some(cause) => {
-                        let dup = self.heap.dup_cause(cause)?;
-                        self.heap
-                            .allocate(Data::Exit(ExitData::Failure(dup.into_value())))
-                    }
-                    None => self
-                        .heap
-                        .allocate(Data::Exit(ExitData::Success(Value::Unit))),
-                };
-                self.apply_reg(func, RegVal::Value(exit), next, false)
-            }
-            Finalizer::Release { value, release_fn } => {
-                self.apply_reg(release_fn, RegVal::Value(value), next, false)
-            }
-        }
-    }
-
-    pub(super) fn finalizer_failed(
-        &mut self,
-        mut state: Box<ClosingScopeState>,
-    ) -> Result<(), Error> {
-        let cause = self.failure.take().expect("finalizer failure cause");
-        state.finalizer_failure = Some(match state.finalizer_failure.take() {
-            None => cause,
-            Some(prev) => {
-                let combined = primitives::concat_causes(
-                    self.heap,
-                    &prev,
-                    &cause,
-                    &mut FuelCounter(&mut self.fuel),
-                );
-                self.heap.drop_cause(prev)?;
-                self.heap.drop_cause(cause)?;
-                match combined {
-                    Ok(c) => c,
-                    Err(err) => {
-                        let mut roots = Vec::new();
-                        self.drain_closing_scope_roots(*state, &mut roots);
-                        self.heap.drop_values(roots)?;
-                        return Err(err);
-                    }
-                }
-            }
-        });
-        self.step_close_scope(state)
-    }
-
-    fn complete_scope_outcome(
-        &mut self,
-        outcome: ScopeOutcome,
-        finalizer_failure: Option<CauseToken>,
-    ) -> Result<(), Error> {
-        match outcome {
-            ScopeOutcome::Normal { dst, value } => {
-                if let Some(cause) = finalizer_failure {
-                    self.drop_reg(value)?;
-                    self.failure = Some(cause);
-                    self.failure_elected = true;
-                    Ok(())
-                } else {
-                    self.store_reg(dst, value)
-                }
-            }
-            ScopeOutcome::Failure(cause) => {
-                let joined = if let Some(fin_cause) = finalizer_failure {
-                    let res = primitives::join_causes(
-                        self.heap,
-                        &cause,
-                        &fin_cause,
-                        &mut FuelCounter(&mut self.fuel),
-                    );
-                    self.heap.drop_cause(cause)?;
-                    self.heap.drop_cause(fin_cause)?;
-                    res?
-                } else {
-                    cause
-                };
-                self.failure = Some(joined);
-                self.failure_elected = true;
-                Ok(())
-            }
-            ScopeOutcome::Discard(discard) => {
-                if let Some(fin_cause) = finalizer_failure {
-                    self.escalate_paused_discard(*discard, fin_cause)
-                } else {
-                    self.discard = Some(*discard);
-                    Ok(())
-                }
-            }
-        }
+        !o.is_closed()
+            && (!o.hooks.is_empty()
+                || !o.children.is_empty()
+                || o.watchers > 0
+                || !o.finalizers.is_empty())
     }
 
     pub(super) fn close_owner(&mut self, owner: usize) -> Result<(), Error> {
@@ -389,13 +277,37 @@ impl Machine<'_, '_> {
             return Ok(());
         }
         state.phase = OwnerPhase::Closed;
-        let mut roots = Vec::new();
-        if let Some(c) = state.exit_cause.take() {
+        state.hooks.clear();
+        state.children.clear();
+        state.close_waiter = None;
+        let mut roots = mem::take(&mut state.arenas);
+        let exit_cause = state.exit_cause.take();
+        let finalizers = mem::take(&mut state.finalizers);
+        let mut detached = Vec::new();
+        let mut failure = None;
+        for root in &roots {
+            let Value::Object(token) = root else {
+                failure.get_or_insert(Error::ExpectedArena);
+                continue;
+            };
+            match self.heap.object_mut(token.id).map(|obj| &mut obj.data) {
+                Ok(Data::Arena { contents, .. }) => detached.append(contents),
+                Ok(_) => {
+                    failure.get_or_insert(Error::ExpectedArena);
+                }
+                Err(error) => {
+                    failure.get_or_insert(error);
+                }
+            }
+        }
+        if let Some(c) = exit_cause {
             roots.push(c.into_value());
         }
-        for fin in mem::take(&mut state.finalizers) {
+        for fin in finalizers {
             Self::finalizer_roots(fin, &mut roots);
         }
-        self.heap.drop_values(roots)
+        roots.extend(detached);
+        let released = self.heap.drop_values(roots);
+        failure.map_or(released, Err)
     }
 }

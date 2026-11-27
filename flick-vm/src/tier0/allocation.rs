@@ -181,7 +181,7 @@ impl Heap {
         contents.as_mut().ok_or(Error::ClosedVar)
     }
 
-    fn lazy_state_mut<'a>(
+    pub(crate) fn lazy_state_mut<'a>(
         &'a mut self,
         execution: usize,
         lazy: &LazyHandle,
@@ -189,7 +189,7 @@ impl Heap {
         self.lazy_slot_mut(execution, lazy).map(|(state, _)| state)
     }
 
-    fn lazy_slot_mut<'a>(
+    pub(crate) fn lazy_slot_mut<'a>(
         &'a mut self,
         execution: usize,
         lazy: &LazyHandle,
@@ -220,7 +220,7 @@ impl Heap {
         Ok((state, *local_owner))
     }
 
-    fn iterator_state_mut<'a>(
+    pub(crate) fn iterator_state_mut<'a>(
         &'a mut self,
         execution: usize,
         iterator: &IteratorHandle,
@@ -248,6 +248,10 @@ impl Heap {
             return Err(Error::ForeignIterator);
         }
         Ok(state)
+    }
+
+    pub(crate) fn record_detached_cell(&mut self) {
+        self.stats.cells_detached_on_teardown += 1;
     }
 
     /// Canonicalizes simultaneous live tags within this heap, without a strong cache.

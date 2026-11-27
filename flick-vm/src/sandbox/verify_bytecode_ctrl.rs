@@ -118,6 +118,28 @@ fn check_handler(
     Ok(())
 }
 
+fn check_fixed_arity_op(
+    loc: (usize, usize, usize),
+    dst: usize,
+    expected: usize,
+    args: &[usize],
+    label: &str,
+) -> Result<(), BytecodeVerifyError> {
+    let (func_idx, pc, slots) = loc;
+    check_slot(func_idx, pc, slots, dst, "dst")?;
+    if args.len() != expected {
+        return Err(BytecodeVerifyError::at(
+            func_idx,
+            pc,
+            format!("{label} expects {expected} args, got {}", args.len()),
+        ));
+    }
+    for &arg in args {
+        check_slot(func_idx, pc, slots, arg, label)?;
+    }
+    Ok(())
+}
+
 pub(super) fn verify_control_and_call_instr(
     prepared: &Prepared,
     func_idx: usize,
@@ -126,38 +148,73 @@ pub(super) fn verify_control_and_call_instr(
     len: usize,
     instr: &Instr,
 ) -> Result<(), BytecodeVerifyError> {
+    let loc = (func_idx, pc, slots);
     match instr {
         Instr::HostService { dst, op, args } => {
-            check_slot(func_idx, pc, slots, *dst, "dst")?;
-            if args.len() != op.arity() {
-                return Err(BytecodeVerifyError::at(
-                    func_idx,
-                    pc,
-                    format!(
-                        "host service {op:?} expects {} args, got {}",
-                        op.arity(),
-                        args.len()
-                    ),
-                ));
-            }
-            for &arg in args {
-                check_slot(func_idx, pc, slots, arg, "host service arg")?;
-            }
-            Ok(())
+            check_fixed_arity_op(loc, *dst, op.arity(), args, &format!("host service {op:?}"))
+        }
+        Instr::AsyncOp { dst, op, args } => {
+            check_fixed_arity_op(loc, *dst, op.arity(), args, &format!("async op {op:?}"))
+        }
+        Instr::LayerOp { dst, op, args } => {
+            check_fixed_arity_op(loc, *dst, op.arity(), args, &format!("layer op {op:?}"))
         }
         Instr::Closure {
             dst,
             code,
             captures,
+        }
+        | Instr::Task {
+            dst,
+            code,
+            captures,
         } => {
             check_slot(func_idx, pc, slots, *dst, "dst")?;
-            check_call_target(prepared, func_idx, pc, *code, 2, "closure")?;
+            check_call_target(prepared, func_idx, pc, *code, 2, "closure/task")?;
             for &slot in captures {
-                check_slot(func_idx, pc, slots, slot, "closure capture")?;
+                check_slot(func_idx, pc, slots, slot, "capture")?;
             }
             Ok(())
         }
-        Instr::Call { dst, code, args } | Instr::FunctionBoundary { dst, code, args } => {
+        Instr::GenerateLazy {
+            dst,
+            code,
+            captures,
+            limit,
+        } => {
+            check_slot(func_idx, pc, slots, *dst, "dst")?;
+            check_call_target(prepared, func_idx, pc, *code, 2, "generate_lazy")?;
+            for &slot in captures {
+                check_slot(func_idx, pc, slots, slot, "generator capture")?;
+            }
+            if let Some(lim) = limit {
+                check_slot(func_idx, pc, slots, *lim, "generator limit")?;
+            }
+            Ok(())
+        }
+        Instr::Within {
+            dst,
+            owner,
+            code,
+            args,
+        }
+        | Instr::WithOwnerEvidence {
+            dst,
+            owner,
+            code,
+            args,
+        } => {
+            check_slot(func_idx, pc, slots, *dst, "dst")?;
+            check_slot(func_idx, pc, slots, *owner, "owner")?;
+            check_call_target(prepared, func_idx, pc, *code, args.len(), "within")?;
+            for &arg in args {
+                check_slot(func_idx, pc, slots, arg, "within arg")?;
+            }
+            Ok(())
+        }
+        Instr::Call { dst, code, args }
+        | Instr::FunctionBoundary { dst, code, args }
+        | Instr::GenerateStrict { dst, code, args } => {
             check_slot(func_idx, pc, slots, *dst, "dst")?;
             check_call_target(prepared, func_idx, pc, *code, args.len(), "call")?;
             for &arg in args {
@@ -165,6 +222,19 @@ pub(super) fn verify_control_and_call_instr(
             }
             Ok(())
         }
+        _ => verify_loop_and_branch_instr(prepared, func_idx, pc, slots, len, instr),
+    }
+}
+
+fn verify_loop_and_branch_instr(
+    prepared: &Prepared,
+    func_idx: usize,
+    pc: usize,
+    slots: usize,
+    len: usize,
+    instr: &Instr,
+) -> Result<(), BytecodeVerifyError> {
+    match instr {
         Instr::TailCall { dst, code, args } => {
             check_slot(func_idx, pc, slots, *dst, "dst")?;
             if args.len() > MAX_TAIL_ARGS {
