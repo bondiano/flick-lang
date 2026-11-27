@@ -64,15 +64,16 @@ impl<'a> Checker<'a> {
     /// what the binding promises of the regions its values reach
     /// (`docs/formal/regions.md`, native types).
     pub(in crate::types) fn covers_native(&self, ty: &Type, span: Span) -> bool {
+        // only a definition with `@native` clauses covers anything
+        let Some(cover) = self.decl_at(span).and_then(|decl| cover(decl, self.text)) else {
+            return false;
+        };
         let Type::Con { module, name } = self.whnf_captured(ty).0.spine().0.clone() else {
             return false;
         };
         let condition = (self.env.type_def(&module, &name)).and_then(|d| d.native.as_deref());
-        let cover = self.decl_at(span).and_then(|decl| cover(decl, self.text));
         let env = self.options.native_env();
-        condition.zip(cover).is_some_and(|(c, cover)| {
-            when::parse(c).is_ok_and(|native| env.implies(&native, &cover))
-        })
+        condition.is_some_and(|c| when::parse(c).is_ok_and(|native| env.implies(&native, &cover)))
     }
 
     /// The constructors of native types `decl` names, each checked against the
@@ -150,35 +151,39 @@ fn cover(decl: &Node, text: &str) -> Option<when::Expr> {
 }
 
 /// Each constructor token under `node` outside its types and `@native`
-/// clauses, with the qualifier written before it.
+/// clauses, with the qualifier written before it, in the order of the text.
+/// It walks with a stack of its own: an expression nests as deep as a chain
+/// of operators is long.
 fn constructors(node: &Node, text: &str, out: &mut Vec<(Option<String>, Token)>) {
-    if is_type(node.kind) || node.kind == K::NativeOverride || node.kind == K::Signature {
-        return;
-    }
-    let tokens: Vec<Token> = node.child_tokens().collect();
-    for (i, token) in tokens.iter().enumerate() {
-        if token.kind != K::Con {
+    let mut pending = vec![node];
+    while let Some(node) = pending.pop() {
+        if is_type(node.kind) || node.kind == K::NativeOverride || node.kind == K::Signature {
             continue;
         }
-        // `M.N.Con`: the qualifier is the module, not a constructor
-        let next_is_dot = tokens.get(i + 1).is_some_and(|t| t.kind == K::Dot);
-        if next_is_dot {
-            continue;
+        let tokens: Vec<Token> = node.child_tokens().collect();
+        for (i, token) in tokens.iter().enumerate() {
+            if token.kind != K::Con {
+                continue;
+            }
+            // `M.N.Con`: the qualifier is the module, not a constructor
+            let next_is_dot = tokens.get(i + 1).is_some_and(|t| t.kind == K::Dot);
+            if next_is_dot {
+                continue;
+            }
+            let mut qualifier = Vec::new();
+            let mut j = i;
+            while j >= 2 && tokens[j - 1].kind == K::Dot && tokens[j - 2].kind == K::Con {
+                qualifier.push(j - 2);
+                j -= 2;
+            }
+            qualifier.reverse();
+            let qualifier = (!qualifier.is_empty()).then(|| {
+                let names: Vec<&str> = qualifier.iter().map(|&k| tokens[k].text(text)).collect();
+                names.join(".")
+            });
+            out.push((qualifier, *token));
         }
-        let mut qualifier = Vec::new();
-        let mut j = i;
-        while j >= 2 && tokens[j - 1].kind == K::Dot && tokens[j - 2].kind == K::Con {
-            qualifier.push(j - 2);
-            j -= 2;
-        }
-        qualifier.reverse();
-        let qualifier = (!qualifier.is_empty()).then(|| {
-            let names: Vec<&str> = qualifier.iter().map(|&k| tokens[k].text(text)).collect();
-            names.join(".")
-        });
-        out.push((qualifier, *token));
-    }
-    for child in node.nodes() {
-        constructors(child, text, out);
+        let children: Vec<&Node> = node.nodes().collect();
+        pending.extend(children.into_iter().rev());
     }
 }
