@@ -177,7 +177,10 @@ representation of the program. Generated code calls `K` for:
 - `Bytes`, a Lua string of its bytes: `Bytes.from_list`, `to_list`,
   `encode_utf8` (a lone surrogate as U+FFFD) and `decode_utf8` (strict);
 - the kernel's defects: `defect` and a failed `let assert` stop with Lua's
-  `error` of the message alone, which a test reports as JS does;
+  `error` at level 0, so without a chunk's position: `defect` with its
+  message, a failed `let assert` with the message the compiler gives it and
+  the debug rendering of the value, as JS writes them, which a test reports
+  as JS does;
 - `Test.test`, `group`, `skip` and `only`.
 
 A string the host gives, as a result or to a callback, is UTF-8 to the
