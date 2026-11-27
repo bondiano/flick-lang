@@ -393,9 +393,9 @@ let main () = Platform.stdout_line VmOnly.Greeting.message
 }
 
 #[test]
-fn build_target_vm_refuses_cleanly_and_doctor_reports_vm() {
+fn build_target_vm_emits_image_and_doctor_reports_vm() {
     let dir = project(
-        "vm_build_refusal",
+        "vm_build_and_doctor",
         &[
             ("flick.toml", APP),
             (
@@ -406,13 +406,22 @@ fn build_target_vm_refuses_cleanly_and_doctor_reports_vm() {
     );
 
     let build_out = flick_no_path(&dir, &["build", "--target", "vm"]);
-    assert!(!build_out.status.success(), "{build_out:?}");
-    let err = stderr(&build_out);
     assert!(
-        err.contains("FLICK-P012")
-            && err.contains("flick run --target vm")
-            && err.contains("flick test --target vm"),
-        "expected informative build refusal, got:\n{err}"
+        build_out.status.success(),
+        "build --target vm failed:\n{}",
+        stderr(&build_out)
+    );
+    assert!(
+        dir.join("dist/main.fvm").is_file(),
+        "expected dist/main.fvm from build --target vm"
+    );
+
+    let dev_out = flick_no_path(&dir, &["dev", "--target", "vm"]);
+    assert!(!dev_out.status.success(), "{dev_out:?}");
+    let err = stderr(&dev_out);
+    assert!(
+        err.contains("FLICK-P012") && err.contains("flick dev --target vm"),
+        "expected informative dev refusal, got:\n{err}"
     );
 
     let doctor_out = flick_no_path(&dir, &["doctor", "--target", "vm"]);

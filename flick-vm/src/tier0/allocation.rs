@@ -12,6 +12,9 @@ impl Heap {
             service_tags: BTreeMap::new(),
             dropped_continuations: Vec::new(),
             released_foreign_handles: Vec::new(),
+            active_module: None,
+            module_names: Vec::new(),
+            module_indices: BTreeMap::new(),
         }
     }
 

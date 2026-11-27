@@ -250,13 +250,16 @@ impl VmSession {
             external_interrupt: interrupt,
             synthetic_codes: super::program::SessionProgram::synthetic_codes(),
         };
-        execute_session_step(
+        let prev_mod = self.heap.set_allocation_module(Some(&entry.module));
+        let report = execute_session_step(
             &mut self.heap,
             self.program.program(),
             self.execution,
             &mut self.persistent,
             &spec,
-        )
+        );
+        self.heap.restore_allocation_module(prev_mod);
+        report
     }
 
     fn classify_value_report(&mut self, report: ExecutionReport) -> EvalOutcome {

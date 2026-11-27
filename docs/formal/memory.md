@@ -273,6 +273,42 @@ one dedicated `translate_*` function per IR operation (`prepare_ops.rs` and
   `formal/` remain unaffected (bytecode translation refinement is tracked in
   `#980`).
 
+### Per-module VM images and live module unloading (`flick-vm/src/image/`)
+
+`flick_vm::image` serializes a selected set of modules (or an entire live
+`VmSession`) into a self-framing binary container (`FLKM` magic, format version,
+exact `compiler_hash` and `memory_ir_hash`, explicit non-overlapping section
+directory with strict bounds checks) containing closed module interfaces
+(`flick_core::iface::Interface`), memory-IR slices (`flick_ir::memory::Program`),
+optional tier-1 prepared bytecode metadata (`PreparedMetadata`), global table
+entries, and a sharing- and cycle-preserving heap snapshot (`HeapSnapshot`).
+
+- **Version and structural checks**: loading requires both `compiler_hash` and
+  `memory_ir_hash` to match exactly (reporting both expected and found digests
+  on mismatch, with no cross-version migration), checks that every imported
+  external module is already loaded in the target VM with an identical closed
+  interface, validates all section bounds, indices, tags, and non-cell
+  acyclicity without panicking, and rolls back all allocated slots on any load
+  error.
+- **Host resources**: live host and runtime handles (`Data::ForeignHandle`,
+  `Data::ForeignCycle`, open file/process tags `$vm_file`, `$vm_fs_file`,
+  `$vm_process`, sockets/timers, live fibers/continuations/arenas/vars/iterators)
+  are never serialized; saving a global that reaches one fails with the root
+  global name and exact field/index path (`App.server.socket`, `App.handles[0]`).
+- **Live module unloading (`unload_module`)**: removes a module's exported
+  interface and global table entries, reports all currently loaded dependent
+  modules, keeps values and code still referenced by live closures alive via
+  exact reference counting, and frees retired root-arena cells/lazies and
+  retired `CodeId`s once no live closure or root references them so per-module
+  heap inventory reaches zero live slots and `Heap::finish` confirms zero leaks.
+- **CLI integration**: `flick build --target vm` emits standalone `.fvm` images
+  and `flick run --target vm <path/to/image.fvm>` loads and executes them in
+  process on tier 0 or tier 1.
+- **Lean impact**: VM image serialization/deserialization and module unloading
+  add no new `Operation` or `Exit` form and do not alter typing, effects,
+  regions, or ownership-IR semantics; all Lean proofs in `formal/` remain
+  unaffected.
+
 ## 2. Owned tokens and objects
 
 An immediate value has no heap object. A string, arbitrary-sized integer or constructed value has

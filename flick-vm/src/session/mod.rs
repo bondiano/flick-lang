@@ -8,20 +8,25 @@
 mod eval;
 pub mod format;
 mod jobs;
-mod program;
+pub(crate) mod program;
 #[cfg(test)]
 mod tests;
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 
+use flick_core::iface::Interface;
 use flick_core::ir::memory::Name;
 
 pub use format::render_value;
 pub use jobs::{JobId, JobInfo, JobStatus, KillOutcome};
 
 use jobs::JobTable;
-use program::SessionProgram;
+pub(crate) use program::SessionProgram;
 
+use crate::image::{
+    self, HeapInventory, ImageError, LoadReport, SaveSelection, UnloadReport, VmImage,
+};
 use crate::tier0::{
     Error, Heap, HostMode, SessionHandlerKind, SessionPersistentState, Value,
     allocate_execution_id, shutdown_persistent_state,
@@ -71,29 +76,32 @@ pub enum EvalOutcome {
     },
 }
 
-struct InstalledHandler {
-    global: Name,
-    closure: Value,
-    kind: HandlerKind,
-    handled_effects: Vec<String>,
+pub(crate) struct InstalledHandler {
+    pub(crate) global: Name,
+    pub(crate) closure: Value,
+    pub(crate) kind: HandlerKind,
+    pub(crate) handled_effects: Vec<String>,
 }
 
-struct InstalledLayer {
-    global: Name,
-    value: Value,
-    provided_services: Vec<String>,
+pub(crate) struct InstalledLayer {
+    pub(crate) global: Name,
+    pub(crate) value: Value,
+    pub(crate) provided_services: Vec<String>,
 }
 
 /// One live VM REPL session sharing a single counted [`Heap`] across phrases.
 pub struct VmSession {
-    heap: Heap,
-    execution: usize,
-    program: SessionProgram,
-    persistent: SessionPersistentState,
-    root_layer: Option<Value>,
-    root_layer_name: Option<Name>,
-    layers: Vec<InstalledLayer>,
-    handlers: Vec<InstalledHandler>,
+    pub(crate) heap: Heap,
+    pub(crate) execution: usize,
+    pub(crate) program: SessionProgram,
+    pub(crate) persistent: SessionPersistentState,
+    pub(crate) modules: BTreeMap<String, Interface>,
+    pub(crate) retired_cells: Vec<(String, Value)>,
+    pub(crate) retired_lazies: Vec<(String, Value)>,
+    pub(crate) root_layer: Option<Value>,
+    pub(crate) root_layer_name: Option<Name>,
+    pub(crate) layers: Vec<InstalledLayer>,
+    pub(crate) handlers: Vec<InstalledHandler>,
     jobs: JobTable,
     host_mode: HostMode,
     fuel: u64,
@@ -119,6 +127,9 @@ impl VmSession {
             execution: allocate_execution_id(),
             program: SessionProgram::new(),
             persistent: SessionPersistentState::default(),
+            modules: BTreeMap::new(),
+            retired_cells: Vec::new(),
+            retired_lazies: Vec::new(),
             root_layer: None,
             root_layer_name: None,
             layers: Vec::new(),
@@ -128,6 +139,65 @@ impl VmSession {
             fuel: u64::MAX,
             shutdown_done: false,
         }
+    }
+
+    /// Registers the closed type [`Interface`] for a loaded module.
+    pub fn register_module_interface(&mut self, interface: Interface) {
+        self.modules.insert(interface.module.clone(), interface);
+    }
+
+    /// Returns the registered [`Interface`] for `module`, if loaded.
+    #[must_use]
+    pub fn module_interface(&self, module: &str) -> Option<&Interface> {
+        self.modules.get(module)
+    }
+
+    /// Returns the names of all modules currently present in this session
+    /// (registered interfaces and modules with live globals).
+    #[must_use]
+    pub fn loaded_modules(&self) -> BTreeSet<String> {
+        let mut names: BTreeSet<String> = self.modules.keys().cloned().collect();
+        for g in &self.program.program().globals {
+            names.insert(g.name.module.clone());
+        }
+        names
+    }
+
+    /// Saves the entire live session into a binary-encodable [`VmImage`].
+    pub fn save_image(&self, entry: Option<Name>) -> Result<VmImage, ImageError> {
+        image::save_session_image(self, entry)
+    }
+
+    /// Saves selected modules (or the whole session) into a [`VmImage`].
+    pub fn save_modules(
+        &self,
+        selection: SaveSelection<'_>,
+        entry: Option<Name>,
+    ) -> Result<VmImage, ImageError> {
+        image::save_session_modules(self, selection, entry)
+    }
+
+    /// Loads and links a decoded [`VmImage`] into this session.
+    pub fn load_image(&mut self, image: &VmImage) -> Result<LoadReport, ImageError> {
+        image::load_image_into_session(self, image)
+    }
+
+    /// Unloads `module` from this live session, returning a report of dependents
+    /// and remaining live heap slots still referenced by surviving closures.
+    pub fn unload_module(&mut self, module: &str) -> Result<UnloadReport, ImageError> {
+        image::unload_module(self, module)
+    }
+
+    /// Reclaims retired cells, lazies, and code bodies of previously unloaded
+    /// modules once no live session root or closure references them.
+    pub fn reclaim_unloaded(&mut self) -> Result<(), ImageError> {
+        image::reclaim_unloaded(self)
+    }
+
+    /// Returns the per-module live heap-slot inventory for this session.
+    #[must_use]
+    pub fn heap_inventory(&self) -> HeapInventory {
+        image::session_heap_inventory(self)
     }
 
     /// Lists effect names currently handled by installed `:handle` wrappers.
@@ -169,6 +239,14 @@ impl VmSession {
             && let Err(err) = self.heap.drop_value(root)
         {
             heap_err.get_or_insert(err);
+        }
+        // Move any still-retired cells/lazies back into persistent state so
+        // `shutdown_persistent_state` detaches and releases them cleanly.
+        for (_, cell) in mem::take(&mut self.retired_cells) {
+            self.persistent.cells.push(cell);
+        }
+        for (_, lazy) in mem::take(&mut self.retired_lazies) {
+            self.persistent.lazies.push(lazy);
         }
         if let Err(err) = shutdown_persistent_state(&mut self.heap, &mut self.persistent) {
             heap_err.get_or_insert(err);

@@ -145,6 +145,10 @@ impl DefectSpec {
         }
     }
 
+    pub(crate) const fn from_code(code: DefectCode) -> Self {
+        Self { code }
+    }
+
     pub fn code(&self) -> &DefectCode {
         &self.code
     }

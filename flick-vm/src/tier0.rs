@@ -36,8 +36,8 @@ pub use program::{
 };
 pub(crate) use program::{
     SessionHandlerKind, SessionPersistentState, SessionRunSpec, SessionSyntheticCodes,
-    allocate_execution_id, build_session_layer_value, execute_session_step,
-    shutdown_persistent_state,
+    allocate_execution_id, build_session_layer_value, execute_main_with_persistent_state,
+    execute_program_with_persistent_state, execute_session_step, shutdown_persistent_state,
 };
 
 /// An allocation's identity includes its heap and generation. Recycled backing
@@ -289,6 +289,7 @@ include!("tier0/aggregates.rs");
 include!("tier0/ownership.rs");
 include!("tier0/reuse.rs");
 include!("tier0/standalone.rs");
+include!("tier0/image_support.rs");
 include!("tier0/heap_tests.rs");
 #[cfg(test)]
 include!("tier0/aggregate_tests.rs");

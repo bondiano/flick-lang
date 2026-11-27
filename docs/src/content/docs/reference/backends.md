@@ -14,7 +14,7 @@ Without an explicit component pin, Flick selects an official backend from `[buil
 | - | - | - | - |
 | `flick/js` | `js` (default) | `js/node` | Official JavaScript and TypeScript backend; also supports `js/browser`, `js/bun` and `js/cloudflare`. |
 | `flick/go` | `go` | `go/native` | Official Go backend; emits a Go module per entry/test suite and runs `go build` under `[tools] "flick/go" = ["go"]`. |
-| `flick/vm` | `vm` | `vm/native` | Built-in in-process Rust VM (`flick run --target vm` and `flick test --target vm`) with native Rust host services (`Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem`, `Process`); requires no Node or Go. |
+| `flick/vm` | `vm` | `vm/native` | Built-in in-process Rust VM (`flick build --target vm`, `flick run --target vm`, and `flick test --target vm`) emitting and executing `.fvm` images with native Rust host services (`Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem`, `Process`); requires no Node or Go. |
 | `flick/lua` | `lua` | — | Preview component (not in the official release index); select with `[build.backend]` and an explicit environment (`lua/love`, `lua/wow-retail` or `lua/wow-forever`). |
 
 `[build] environment` selects a `<backend>/<host>` pair such as `"js/node"`, `"js/browser"`, `"js/bun"`, `"js/cloudflare"`, `"go/native"`, or a host contributed by a `[host]` library package:

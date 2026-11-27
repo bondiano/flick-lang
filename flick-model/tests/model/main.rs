@@ -38,6 +38,7 @@ pub mod memory_derived_dictionaries;
 pub mod memory_dictionaries;
 pub mod memory_failures;
 pub mod memory_handlers;
+pub mod memory_image_roundtrip;
 pub mod memory_int_string_primitives;
 pub mod memory_inventory;
 pub mod memory_kernel;

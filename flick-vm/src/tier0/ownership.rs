@@ -55,6 +55,7 @@ impl Heap {
             let slot = &mut self.objects[index];
             slot.object = Some(Object {
                 references: 1,
+                owner_module: self.active_module,
                 data,
             });
             (index, slot.generation)
@@ -64,6 +65,7 @@ impl Heap {
                 generation: 0,
                 object: Some(Object {
                     references: 1,
+                    owner_module: self.active_module,
                     data,
                 }),
             });

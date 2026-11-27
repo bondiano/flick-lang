@@ -1,6 +1,8 @@
 //! Built-in in-process VM target (`--target vm`) on `flick_vm::{tier0, tier1}`.
 
 #[cfg(feature = "vm")]
+mod build;
+#[cfg(feature = "vm")]
 pub(crate) mod lower;
 #[cfg(feature = "vm")]
 mod run;
@@ -16,16 +18,17 @@ use std::process::ExitCode;
 #[cfg(any(test, feature = "vm"))]
 use flick_core::diagnostics::suggest;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::Project;
 #[cfg(feature = "vm")]
 use flick_core::project::TargetOverride;
 #[cfg(any(test, feature = "vm"))]
 use flick_core::project::config::TargetValue;
+use flick_core::project::{Compilation, Project};
 #[cfg(not(feature = "vm"))]
 use flick_core::source::SourceMap;
 
 use crate::args::{GlobalArguments, RunArguments, TestArguments};
 use crate::backends::options;
+use crate::commands::build::{BuildPlan, Emission};
 #[cfg(not(feature = "vm"))]
 use crate::report;
 
@@ -164,14 +167,24 @@ pub(super) fn target_override(
     }
 }
 
-/// Diagnostic emitted when `flick build --target vm` is invoked.
-pub(crate) fn unsupported_build_diagnostic() -> Diagnostic {
-    Diagnostic::new(
-        codes::P012,
-        Severity::Error,
-        "building standalone VM images (`flick build --target vm`) is not supported yet; \
-         use `flick run --target vm` or `flick test --target vm`",
-    )
+/// Emits standalone `.fvm` VM image artifacts for `flick build --target vm`.
+pub(crate) fn build_artifacts(
+    project: Option<&Project>,
+    compilation: &Compilation,
+    output: &BuildPlan,
+) -> Emission {
+    #[cfg(feature = "vm")]
+    {
+        build::artifacts(project, compilation, output)
+    }
+    #[cfg(not(feature = "vm"))]
+    {
+        let _ = (project, compilation, output);
+        Emission {
+            artifacts: Vec::new(),
+            diagnostics: vec![disabled_diagnostic()],
+        }
+    }
 }
 
 /// Diagnostic emitted when `flick dev --target vm` is invoked.

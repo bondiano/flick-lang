@@ -66,6 +66,7 @@ pub mod test_hooks;
 pub mod test_suite;
 pub mod vm;
 pub mod vm_host;
+pub mod vm_image;
 pub mod wasm_demo;
 pub mod workflows;
 pub mod workspace;

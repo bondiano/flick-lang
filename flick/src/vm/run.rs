@@ -1,5 +1,6 @@
 //! In-process `flick run --target vm` execution on `flick_vm::{tier0, tier1}`.
 
+use std::fs;
 use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -9,6 +10,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::memory::Name as MemoryName;
 use flick_core::project::{self, Compiled, Project};
 use flick_core::source::{FileId, SourceMap, Span};
+use flick_vm::image::{IMAGE_MAGIC, VmImage, execute_image_main_with_args};
 use flick_vm::stdlib::{format_uncaught_cause, format_uncaught_raised};
 use flick_vm::tier0::{
     ExecutionReport, Heap, HostMode, ProgramOutcome, execute_main_program_outcome_with_args,
@@ -25,12 +27,29 @@ use crate::sources::FsHost;
 use crate::{builtins, package_cache, report};
 
 enum RunSource {
+    Image(PathBuf),
     Standalone(PathBuf),
     Project {
         project: Box<Project>,
         roots: Vec<PathBuf>,
         entry_module: String,
     },
+}
+
+fn is_image_path(cwd: &Path, name: &str) -> bool {
+    if Path::new(name)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("fvm"))
+    {
+        return true;
+    }
+    let candidate = cwd.join(name);
+    if !candidate.is_file() {
+        return false;
+    }
+    fs::read(&candidate)
+        .ok()
+        .is_some_and(|bytes| bytes.starts_with(IMAGE_MAGIC))
 }
 
 fn is_standalone_path(cwd: &Path, name: &str) -> bool {
@@ -93,20 +112,22 @@ fn resolve_source(
 ) -> Result<RunSource, Vec<Diagnostic>> {
     let explicit = global.project.as_deref().map(Path::new);
     let discovered = project::discover(host, sources, &host.cwd, explicit).map_err(|d| vec![d])?;
-    if options.entry.is_none()
-        && let Some(name) = &options.name
-    {
+    if let Some(name) = &options.name {
         let is_project_entry = discovered
             .as_ref()
             .is_some_and(|p| p.config.entries.iter().any(|e| &e.name == name));
-        if !is_project_entry && is_standalone_path(&host.cwd, name) {
+        if !is_project_entry && is_image_path(&host.cwd, name) {
+            let path = project::normalize(&host.cwd.join(name));
+            return Ok(RunSource::Image(path));
+        }
+        if options.entry.is_none() && !is_project_entry && is_standalone_path(&host.cwd, name) {
             let path = project::normalize(&host.cwd.join(name));
             return Ok(RunSource::Standalone(path));
         }
     }
     let Some(project) = discovered else {
         let message = format!(
-            "no `{}` in the working directory or any parent (pass a `.fl` file path to run standalone)",
+            "no `{}` in the working directory or any parent (pass a `.fl` file or `.fvm` image path to run standalone)",
             project::CONFIG_FILE
         );
         return Err(vec![project::no_project(message)]);
@@ -132,7 +153,7 @@ pub(super) fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode 
         }
     };
     let project_ref = match &run_source {
-        RunSource::Standalone(_) => None,
+        RunSource::Image(_) | RunSource::Standalone(_) => None,
         RunSource::Project { project, .. } => Some(project.as_ref()),
     };
     let tier = match resolve_tier(options.vm_tier.as_deref(), project_ref) {
@@ -142,6 +163,9 @@ pub(super) fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode 
             return report::exit_code(&diagnostics);
         }
     };
+    if let RunSource::Image(path) = run_source {
+        return run_image(&path, tier, options, &sources, global);
+    }
     let target_overridden = options::resolve_target(options.target.as_deref(), project_ref)
         .is_ok_and(|(_, overridden)| overridden);
     if let Err(diagnostic) = builtins::prepare_in(false) {
@@ -149,6 +173,7 @@ pub(super) fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode 
         return ExitCode::from(2);
     }
     let (roots, explicit_entry) = match &run_source {
+        RunSource::Image(_) => unreachable!("handled above"),
         RunSource::Standalone(path) => (vec![path.clone()], None),
         RunSource::Project {
             roots,
@@ -212,6 +237,105 @@ pub(super) fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode 
     match tier {
         VmTier::Tier0 => execute_tier0(&lowered, &entry, options.args.clone()),
         VmTier::Tier1 => execute_tier1(&lowered, &entry, options.args.clone(), &sources, global),
+    }
+}
+
+fn run_image(
+    path: &Path,
+    tier: VmTier,
+    options: &RunArguments,
+    sources: &SourceMap,
+    global: &GlobalArguments,
+) -> ExitCode {
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            let diagnostic = Diagnostic::new(
+                codes::P013,
+                Severity::Error,
+                format!("cannot read VM image `{}`: {err}", path.display()),
+            );
+            report::render(global, sources, &[diagnostic]);
+            return ExitCode::from(1);
+        }
+    };
+    let image = match VmImage::decode(&bytes) {
+        Ok(image) => image,
+        Err(err) => {
+            let diagnostic = Diagnostic::new(
+                codes::P012,
+                Severity::Error,
+                format!("invalid VM image `{}`: {err}", path.display()),
+            );
+            report::render(global, sources, &[diagnostic]);
+            return ExitCode::from(1);
+        }
+    };
+    let Some(entry) = options
+        .entry
+        .as_deref()
+        .map(|module| MemoryName::new(module, "main"))
+        .or_else(|| image.entry().cloned())
+    else {
+        let diagnostic = Diagnostic::new(
+            codes::P011,
+            Severity::Error,
+            format!(
+                "VM image `{}` has no `main` entry; pass `--entry Module`",
+                path.display()
+            ),
+        );
+        report::render(global, sources, &[diagnostic]);
+        return ExitCode::from(1);
+    };
+    let mut heap = Heap::new();
+    match tier {
+        VmTier::Tier0 => {
+            let report = match execute_image_main_with_args(
+                &mut heap,
+                &image,
+                &entry,
+                u64::MAX,
+                HostMode::LiveOs,
+                options.args.clone(),
+            ) {
+                Ok(report) => report,
+                Err(err) => {
+                    let diagnostic = Diagnostic::new(codes::P012, Severity::Error, err.to_string());
+                    report::render(global, sources, &[diagnostic]);
+                    return ExitCode::from(1);
+                }
+            };
+            finish_report(&mut heap, report)
+        }
+        VmTier::Tier1 => {
+            if image.has_initialized_globals() {
+                let diagnostic = Diagnostic::new(
+                    codes::P012,
+                    Severity::Error,
+                    "tier 1 does not support warm VM images with pre-initialized globals; \
+                     run with `--vm-tier 0`",
+                );
+                report::render(global, sources, &[diagnostic]);
+                return ExitCode::from(1);
+            }
+            let report = match tier1::execute_main_program_outcome_with_args(
+                &mut heap,
+                image.program(),
+                &entry,
+                u64::MAX,
+                HostMode::LiveOs,
+                options.args.clone(),
+            ) {
+                Ok(report) => report,
+                Err(err) => {
+                    let diagnostic = Diagnostic::new(codes::P012, Severity::Error, err.to_string());
+                    report::render(global, sources, &[diagnostic]);
+                    return ExitCode::from(1);
+                }
+            };
+            finish_report(&mut heap, report)
+        }
     }
 }
 

@@ -337,6 +337,7 @@ pub(crate) enum Data {
 #[derive(Debug)]
 pub(crate) struct Object {
     references: usize,
+    owner_module: Option<u32>,
     pub(crate) data: Data,
 }
 
@@ -359,6 +360,10 @@ pub struct Heap {
     dropped_continuations: Vec<(usize, usize)>,
     // Freed foreign handles queued for deterministic release on the Node HostBridge.
     released_foreign_handles: Vec<(usize, u64)>,
+    // Optional module attribution for live heap inventory and module unloading.
+    active_module: Option<u32>,
+    module_names: Vec<String>,
+    module_indices: BTreeMap<String, u32>,
 }
 
 static NEXT_HEAP: AtomicUsize = AtomicUsize::new(0);
