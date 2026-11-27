@@ -101,7 +101,12 @@ function compare(expected, got) {
     const other = lua.get(test.name);
     lua.delete(test.name);
     if (other === undefined) differences.push(`${test.name}: not on Lua`);
-    else if (other.reason === EFFECT && test.status !== "skipped" && Object.keys(other).length === 3) {
+    else if (
+      other.reason === EFFECT &&
+      other.status === "skipped" &&
+      test.status !== "skipped" &&
+      Object.keys(other).length === 3
+    ) {
       effects.add(test.name);
     } else if (JSON.stringify(other) !== JSON.stringify(test)) {
       differences.push(`${test.name}: ${JSON.stringify(other)}, not ${JSON.stringify(test)}`);
@@ -121,6 +126,7 @@ function compare(expected, got) {
   const skip = { name: "M > e", status: "skipped", reason: EFFECT };
   assert.deepEqual(compare(js([a, e]), js([a, skip])), { differences: [], effects: 1 });
   assert.ok(compare(js([a, e]), js([a, { ...skip, reason: "other" }])).differences.length > 0);
+  assert.ok(compare(js([a, e]), js([a, { ...skip, status: "failed" }])).differences.length > 0);
   assert.ok(compare(js([a, { ...e, status: "skipped" }]), js([a, skip])).differences.length > 0);
   assert.ok(compare(js([a, e]), js([a])).differences.length > 0);
   assert.ok(compare(js([a, e]), js([e, a])).differences.length > 0);

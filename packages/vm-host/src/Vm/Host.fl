@@ -1,0 +1,57 @@
+/// Native Rust host layers for the `vm/native` environment (`flick/vm`).
+/// Provides `Host.live`, `File.FileSystem`, and `FileSystem.FileSystem`
+/// backed directly by `flick-vm`'s Rust host services.
+@when "vm"
+module Vm.Host exposing (
+  live,
+  console,
+  clock,
+  random,
+  environment,
+  arguments,
+  process,
+  file,
+  file_system,
+)
+
+import File
+import FileSystem
+import Host
+import Layer
+
+/// All six live host services (`Console`, `Clock`, `Random`, `Environment`,
+/// `Arguments`, `Process`) backed by the VM's Rust host implementation.
+live : Layer none none Host.Live
+let live = Host.live
+
+/// Live stdout/stderr console layer on `vm/native`.
+console : Layer none none {Host.Console}
+let console = Host.console
+
+/// Live OS wall/monotonic clock layer on `vm/native`.
+clock : Layer none none {Host.Clock}
+let clock = Host.clock
+
+/// Live OS randomness layer on `vm/native`.
+random : Layer none none {Host.Random}
+let random = Host.random
+
+/// Live OS environment variables layer on `vm/native`.
+environment : Layer none none {Host.Environment}
+let environment = Host.environment
+
+/// Live CLI arguments layer on `vm/native`.
+arguments : Layer none none {Host.Arguments}
+let arguments = Host.arguments
+
+/// Live child-process spawning layer on `vm/native`.
+process : Layer none none {Host.Process}
+let process = Host.process
+
+/// Live `File.FileSystem` layer backed by Rust `std::fs` with scoped handle cleanup.
+file : Layer none none {File.FileSystem}
+let file = File.node
+
+/// Live `FileSystem.FileSystem` layer backed by Rust `std::fs` with scoped handles and temp cleanup.
+file_system : Layer none none {FileSystem.FileSystem}
+let file_system = FileSystem.node

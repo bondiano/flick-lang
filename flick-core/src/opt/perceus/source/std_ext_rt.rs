@@ -34,6 +34,12 @@ pub(super) fn ext_rt_intrinsic(name: &str) -> Option<Intrinsic> {
     if name == "Prelude.FromResult" {
         return Some(Intrinsic::FromResult);
     }
+    if name == "AcquireRelease" {
+        return Some(Intrinsic::AcquireRelease);
+    }
+    if let Some(op) = name.strip_prefix("HostService.") {
+        return super::std_host_vm::host_service_intrinsic_by_name(op).map(Intrinsic::HostService);
+    }
     if name == "Host.RandomNext" {
         return Some(Intrinsic::Host(HostPrimitive::RandomNext));
     }

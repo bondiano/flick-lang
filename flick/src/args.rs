@@ -76,6 +76,8 @@ pub enum Commands {
     Inspect(InspectArguments),
     /// Run the language server.
     Lsp(LspArguments),
+    /// Start an interactive Flick REPL session.
+    Repl(ReplArguments),
     /// A command the project's backend or one of its plugins adds, flat or
     /// as `contributor:command`.
     #[command(external_subcommand)]

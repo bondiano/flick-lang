@@ -33,20 +33,8 @@ impl Lower<'_> {
         let result = self.expr(no, &inside, &mut else_)?;
         let else_ = else_.finish(result).body;
         let code = self.reserve(span)?;
-        self.finish(
-            code,
-            &Function {
-                params,
-                body: Block {
-                    instructions: vec![],
-                    exit: Exit::Branch {
-                        condition: 0,
-                        then_: Box::new(then_),
-                        else_: Box::new(else_),
-                    },
-                },
-            },
-        )?;
+        let body = Code::new(params.clone()).branch(0, then_, else_);
+        self.finish(code, &SpannedFunction { params, body })?;
         block.emit(Operation::Call { code, args }, span)
     }
 

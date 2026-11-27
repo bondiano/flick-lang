@@ -28,6 +28,8 @@ mod package_cache;
 mod plugins;
 mod progress;
 mod publish;
+#[cfg(feature = "vm")]
+mod repl;
 mod report;
 mod saved;
 mod sources;
@@ -283,6 +285,7 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::Doctor(o) => report(commands::doctor(&o, global), global),
         Commands::Inspect(o) => report(commands::inspect(&o, project), global),
         Commands::Lsp(_) => lsp::serve(),
+        Commands::Repl(o) => commands::repl(&o, global),
         Commands::External(words) => external(&words, global),
     }
 }

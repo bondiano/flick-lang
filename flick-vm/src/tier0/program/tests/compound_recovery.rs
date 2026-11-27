@@ -44,6 +44,7 @@ fn compound_first_fail_reaches_recovery_selection_before_final_reporting() {
             ),
         ]),
         globals: vec![],
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let original = heap
@@ -150,6 +151,7 @@ fn compound_miss_keeps_identity_order_interrupt_metadata_and_all_prefix_roots() 
         let program = Program {
             functions: BTreeMap::from([(0, caller), (1, selector)]),
             globals: vec![],
+        op_spans: BTreeMap::new(),
         };
         let mut complete = false;
         for fuel in 0..1000 {

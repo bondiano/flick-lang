@@ -144,7 +144,7 @@ fn scalar_intrinsic(from: Option<&str>, bind: &str, stages: usize) -> Option<Int
         (Some("flick:rt"), "bigintRemainder") => Intrinsic::BigInt(BigIntIntrinsic::Remainder),
         (Some("flick:BigInt"), "gcd") => Intrinsic::BigInt(BigIntIntrinsic::Gcd),
         (Some("flick:BigInt"), "lcm") => Intrinsic::BigInt(BigIntIntrinsic::Lcm),
-        (Some("flick:rt"), "flickTodo") => Intrinsic::Debug(DebugIntrinsic::Todo),
+        (Some("flick:rt"), "flickTodo" | "defect") => Intrinsic::Debug(DebugIntrinsic::Todo),
         (Some("flick:rt"), "flickEcho") => Intrinsic::Debug(DebugIntrinsic::Echo),
         (Some("flick:rt"), "flickAssert") => Intrinsic::Debug(DebugIntrinsic::Assert),
         _ => return None,

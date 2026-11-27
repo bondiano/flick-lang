@@ -173,10 +173,11 @@ impl Command for BuildCommand {
                     };
                 }
             };
+        #[cfg(not(feature = "vm"))]
         if matches!(backend, Selected::Vm) {
             return Outcome {
                 sources,
-                diagnostics: vec![vm::unsupported_build_diagnostic()],
+                diagnostics: vec![vm::disabled_diagnostic()],
             };
         }
         let descriptor = backend.descriptor();
@@ -588,10 +589,7 @@ pub fn artifacts(
 ) -> Emission {
     match &output.backend {
         Selected::Native => native::artifacts(host, sources, project, compilation, output),
-        Selected::Vm => Emission {
-            artifacts: Vec::new(),
-            diagnostics: vec![vm::unsupported_build_diagnostic()],
-        },
+        Selected::Vm => vm::build_artifacts(project, compilation, output),
         #[cfg(feature = "wasm-backends")]
         Selected::Component(package) => {
             package.artifacts(host, sources, project, compilation, output)

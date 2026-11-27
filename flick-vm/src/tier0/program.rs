@@ -1,6 +1,7 @@
 //! One counted execution: explicit frames, global roots and error unwinding.
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use std::{iter, mem};
 
@@ -8,14 +9,15 @@ use flick_core::ir::{BinOp, Lit, Pat};
 use flick_core::types::OpClass;
 
 use flick_core::ir::memory::{
-    self, Block, CodeId, Exit, HostPrimitive, Instruction, Intrinsic, Local, Name, Operation,
-    Program,
+    self, Block, CodeId, Exit, HostPrimitive, HostServiceIntrinsic, Instruction, Intrinsic, Local,
+    Name, Operation, Program,
 };
 
 use super::{
     ArenaHandle, ArenaView, CellHandle, Data, Error, ExitData, Heap, HostBridge, HostMode,
-    IteratorHandle, IteratorState, LayerData, LazyHandle, LazyState, Locals, ObjectId, ObjectToken,
-    OwnerHandle, SeqData, Value, VarHandle, patterns, peek, tagged_boundary, take,
+    HostServices, IteratorHandle, IteratorState, LayerData, LazyHandle, LazyState, Locals,
+    ObjectId, ObjectToken, OwnerHandle, SeqData, Value, VarHandle, patterns, peek, tagged_boundary,
+    take,
 };
 use crate::stdlib::runtime::coop::{HOST_CTX_KEY, MEMO_REF_KEY};
 use crate::stdlib::{
@@ -72,6 +74,7 @@ impl ProgramOutcome {
 pub struct ExecutionReport {
     pub outcome: ProgramOutcome,
     pub stdout: String,
+    pub stderr: String,
 }
 
 /// Evaluates with a caller-owned heap and transfers all valid argument tokens.
@@ -113,6 +116,7 @@ pub fn execute_rooted_main_program_outcome(
         return ExecutionReport {
             outcome: ProgramOutcome::Fault(Error::UnknownGlobal(entry.clone())),
             stdout: String::new(),
+            stderr: String::new(),
         };
     }
     let stage = MainStage::Root {
@@ -142,6 +146,12 @@ fn success_only(heap: &mut Heap, report: ExecutionReport) -> Result<Executed, Er
 }
 
 static NEXT_EXECUTION: AtomicUsize = AtomicUsize::new(0);
+
+pub(crate) fn next_execution_id() -> usize {
+    NEXT_EXECUTION
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .expect("fewer than usize::MAX VM executions")
+}
 
 /// Evaluates a global once, then applies the supplied unary arguments.
 /// All accepted argument tokens are transferred into this execution.
@@ -614,6 +624,9 @@ struct Machine<'p, 'h> {
     pending_handler: Option<Value>,
     top: Option<Value>,
     stdout: String,
+    stderr: String,
+    program_args: Vec<String>,
+    host_services: HostServices,
     fuel: u64,
     main_stage: MainStage,
     /// The provider of `Σ₀`, which no frame holds.
@@ -660,6 +673,7 @@ struct Machine<'p, 'h> {
     host_mode: HostMode,
     bridge: Option<&'h mut HostBridge>,
     foreign: ForeignState<'p>,
+    external_interrupt: Option<Arc<AtomicBool>>,
 }
 
 include!("program/async_state.rs");
@@ -699,6 +713,8 @@ include!("program/manual_scope.rs");
 include!("program/layer_build.rs");
 include!("program/layer_merge.rs");
 include!("program/test_runner.rs");
+include!("program/session_hooks.rs");
+include!("program/image_hooks.rs");
 
 #[cfg(test)]
 mod tests {

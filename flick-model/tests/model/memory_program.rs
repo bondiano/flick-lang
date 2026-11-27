@@ -32,6 +32,7 @@ fn program(functions: Vec<Function>) -> Program {
             name: Name::new("Main", "main"),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     }
 }
 include!("memory_program/closures_globals.rs");

@@ -134,6 +134,7 @@ fn global_initializer_cycles_fail_without_leaking_execution_roots() {
                 initializer: 1,
             },
         ],
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     assert!(matches!(

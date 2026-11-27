@@ -13,5 +13,8 @@
     reason = "primitive and VM algorithms use concise mathematical names matching the formal specs"
 )]
 
+pub mod image;
+pub mod session;
 pub mod stdlib;
 pub mod tier0;
+pub mod tier1;

@@ -87,6 +87,17 @@ pub struct RunArguments {
 }
 
 #[derive(Args)]
+pub struct ReplArguments {
+    /// Execution backend for the REPL (`vm`; defaults to `vm`).
+    #[arg(long, value_name = "NAME")]
+    pub target: Option<String>,
+
+    /// VM execution tier for `--target vm` (`0` or `tier0`; defaults to tier 0).
+    #[arg(long = "vm-tier", value_name = "TIER")]
+    pub vm_tier: Option<String>,
+}
+
+#[derive(Args)]
 pub struct CleanArguments {
     /// Also remove the project's Flick cache.
     #[arg(long)]

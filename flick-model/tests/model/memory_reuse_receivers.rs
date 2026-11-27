@@ -11,6 +11,7 @@ use flick_core::types::{Constructor, Rep};
 use flick_vm::tier0::{
     Error, Heap, ObjectId, ProgramOutcome, Value, execute_program, execute_program_outcome,
 };
+use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug)]
 enum Receiver {
@@ -61,6 +62,7 @@ fn program(body: Function) -> (Name, Program) {
             name: name.clone(),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     };
     (name, program)
 }

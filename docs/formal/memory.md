@@ -214,9 +214,16 @@ host-environment hooks (`Accounting`, `HostEnv`, `VmHooks`):
 - `Accounting::charge_fuel` meters all primitive work before execution, and
   `Accounting::record_allocation_delta` observes heap allocation/free deltas
   per call.
-- `HostEnv` supplies `HostMode` (`Deterministic` vs `LiveOs`), stdout capture,
+- `HostEnv` supplies `HostMode` (`Deterministic` vs `LiveOs`), stdout/stderr
+  capture, forwarded CLI program arguments, live [`HostServices`] (open files,
+  scoped temp paths, child processes, monotonic clock anchor, OS-seeded PRNG),
   and optional virtual clock (`Clock`/`TestClock`) and seeded RNG
-  (`Random.with_seed`) overrides.
+  (`Random.with_seed`) overrides. Native Rust host services (`HostServiceIntrinsic`
+  in `flick-vm/src/stdlib/host/`) back `Console`, `Clock`, `Random`,
+  `Environment`, `Arguments`, `File`, `FileSystem`, and `ChildProcess` without
+  Node `HostBridge`, registering scoped cleanup via `AcquireRelease` so every
+  VM tier shares the same implementation and exact `PlatformError` / `File`
+  OS error mapping.
 - `tier0` contains no primitive implementations; it delegates every primitive,
   host, and pure Stage 4 context/layer call to `flick_vm::stdlib` through
   `FuelCounter` and `HostContext`, preserving its exact fuel, allocation, reuse,
@@ -227,9 +234,88 @@ host-environment hooks (`Accounting`, `HostEnv`, `VmHooks`):
   and `tests/kernel/language.txt`) in debug and release against `flick_vm::stdlib`
   as a third verified kernel implementation alongside JS and Go, with zero heap
   leaks.
-- **Lean impact**: extracting the shared primitive library and hook boundary
-  introduces no IR, typing, effect, region, or ownership-semantics contract
-  change; all Lean proofs in `formal/` remain unaffected.
+- **Lean impact**: extracting the shared primitive library and adding consuming
+  `HostServiceIntrinsic` variants introduces no new `Operation` or `Exit` form
+  and no typing, effect, region, or ownership-semantics contract change; all
+  Lean proofs in `formal/` remain unaffected.
+
+### Tier-1 register bytecode executor (`flick-vm/src/tier1/`)
+
+`flick_vm::tier1` compiles functions reachable from an entry global in
+`flick_ir::memory::Program` to a flat register bytecode with intra-block
+peephole fusion (`Compute`, `CompareBranch`, `ProjectOwned`, `MatchFlag`/
+`MatchBranch`, `ReadCell`/`WriteCell`/`UpdateCell`, `ReturnUnit`, and small
+static `TailCall`/`TailApply` frame reuse), compact captureless closures, and
+one dedicated `translate_*` function per IR operation (`prepare_ops.rs`,
+`prepare_ops_data.rs`, and `prepare_ops_handlers.rs`) to support direct
+per-operation refinement proofs (`#980`).
+
+- **Shared primitive & heap boundary**: tier 1 executes directly over
+  `tier0::Heap` and delegates all binary operations, unary operations, and
+  standard-library intrinsics to `flick_vm::stdlib` without duplicating
+  primitives. `Heap::finish` verifies zero live slots on every normal,
+  raised, defect, and `OutOfFuel` outcome identically to tier 0.
+- **Effects, one-shot handlers, and LIFO unwinding**: tier 1 executes deep
+  one-shot `Handle`/`Perform` handlers across all operation classes
+  (`OpClass::Tail` without continuation capture, `OpClass::Abort` with frame
+  discard and LIFO scope finalizers before the abort arm, and
+  `OpClass::Control` with continuation capture, tail-resume frame reuse,
+  discontinuation on unused continuations, and `DefectCode::ResumeTwice`
+  carrying the preserved operation `MemorySpan` on a second `resume`), using
+  an epoch-invalidated handler lookup cache keyed by interned `(effect, op)`
+  ID. Unwinding through frames executes synchronous scope/resource finalizers
+  (`ScopeRun`, `ScopeCurrent`, `ScopeAddFinalizer`, `ScopeAddFinalizerExit`,
+  `ScopeAddClose`, `AcquireRelease`, `Bracket`, and `Uninterruptible`) once in
+  LIFO order across normal completion, typed failure, abort, and
+  discontinuation.
+- **Explicit unsupported-operation boundary (no silent fallback)**: any
+  reachable `Task`, `Await`, `Within`, `WithOwnerEvidence`, `GenerateStrict`/
+  `GenerateLazy`/`Yield`/`SeqOpen`/`SeqNext`, `ForeignCall`, or unsupported
+  async/fiber/layer/arena intrinsic fails `tier1::prepare` with
+  `PrepareError::Unsupported` naming the operation and its `MemorySpan` from
+  `Program::op_spans`. The CLI renders this failure as `FLICK-P012` without
+  falling back to tier 0.
+- **Lean impact**: adding per-instruction source spans, effect/handler
+  execution, and synchronous LIFO unwinding in `flick-vm/src/tier1/` does not
+  change typing, effects, regions, or the reference memory-IR ownership
+  semantics; existing Lean proofs in `formal/` remain unaffected (bytecode
+  translation refinement is tracked in `#980`).
+
+### Per-module VM images and live module unloading (`flick-vm/src/image/`)
+
+`flick_vm::image` serializes a selected set of modules (or an entire live
+`VmSession`) into a self-framing binary container (`FLKM` magic, format version,
+exact `compiler_hash` and `memory_ir_hash`, explicit non-overlapping section
+directory with strict bounds checks) containing closed module interfaces
+(`flick_core::iface::Interface`), memory-IR slices (`flick_ir::memory::Program`),
+optional tier-1 prepared bytecode metadata (`PreparedMetadata`), global table
+entries, and a sharing- and cycle-preserving heap snapshot (`HeapSnapshot`).
+
+- **Version and structural checks**: loading requires both `compiler_hash` and
+  `memory_ir_hash` to match exactly (reporting both expected and found digests
+  on mismatch, with no cross-version migration), checks that every imported
+  external module is already loaded in the target VM with an identical closed
+  interface, validates all section bounds, indices, tags, and non-cell
+  acyclicity without panicking, and rolls back all allocated slots on any load
+  error.
+- **Host resources**: live host and runtime handles (`Data::ForeignHandle`,
+  `Data::ForeignCycle`, open file/process tags `$vm_file`, `$vm_fs_file`,
+  `$vm_process`, sockets/timers, live fibers/continuations/arenas/vars/iterators)
+  are never serialized; saving a global that reaches one fails with the root
+  global name and exact field/index path (`App.server.socket`, `App.handles[0]`).
+- **Live module unloading (`unload_module`)**: removes a module's exported
+  interface and global table entries, reports all currently loaded dependent
+  modules, keeps values and code still referenced by live closures alive via
+  exact reference counting, and frees retired root-arena cells/lazies and
+  retired `CodeId`s once no live closure or root references them so per-module
+  heap inventory reaches zero live slots and `Heap::finish` confirms zero leaks.
+- **CLI integration**: `flick build --target vm` emits standalone `.fvm` images
+  and `flick run --target vm <path/to/image.fvm>` loads and executes them in
+  process on tier 0 or tier 1.
+- **Lean impact**: VM image serialization/deserialization and module unloading
+  add no new `Operation` or `Exit` form and do not alter typing, effects,
+  regions, or ownership-IR semantics; all Lean proofs in `formal/` remain
+  unaffected.
 
 ## 2. Owned tokens and objects
 

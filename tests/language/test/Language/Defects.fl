@@ -1,0 +1,34 @@
+// What a handler of defects receives from `Flick.Defect.defect`, the
+// kernel's defect: its message as it is, and the message of the functions
+// that promise a defect through it.
+module Language.Defects exposing (tests)
+
+same : a -> a
+let same x = x
+
+/// The message of the defect `t` stops with, or what it gives instead.
+defect_of : Eff none e String ->{} String
+let defect_of t =
+  let exit = Effect.exit t
+  match Exit.find_defect exit with
+  | Ok text -> text
+  | Err _ -> "no defect: " ++ show (Exit.value exit)
+
+tests : List Test.Test
+let tests = [
+  Test.effect_test
+    "a defect stops with its message"
+    (task { Test.check (Test.equal "boom" (defect_of (task { Flick.Defect.defect "boom" }))) }),
+  Test.effect_test
+    "the message is kept as it is"
+    (task {
+      let text = defect_of (task { "kept " ++ Flick.Defect.defect "a: \"b\" π" })
+      Test.check (Test.equal "a: \"b\" π" text)
+    }),
+  Test.effect_test
+    "an unsafe division by zero is a defect"
+    (task {
+      let text = defect_of (task { show (Int.unsafe_div 1 (List.length (same []))) })
+      Test.check (Test.equal "Int.unsafe_div: division by zero" text)
+    }),
+]

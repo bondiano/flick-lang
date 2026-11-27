@@ -22,7 +22,8 @@ assert_at : CallSite => String -> a -> b
 let assert_at message value = assert_failed (CallSite.place ++ ": " ++ message) value
 
 todo_failed : String -> a
-foreign pure todo_failed from "flick:rt" "flickTodo"
+let todo_failed message = Flick.Defect.defect message
+  @native "flick:rt" "flickTodo" when js || go
 
 echoed : String -> a -> a
 foreign pure echoed from "flick:rt" "flickEcho"

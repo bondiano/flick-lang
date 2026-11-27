@@ -2,6 +2,7 @@ fn assert_arena_protocol_fault(kind: Intrinsic, case: &str) {
     let program = Program {
         functions: BTreeMap::new(),
         globals: vec![],
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let foreign = Heap::new();
@@ -180,6 +181,7 @@ fn arena_die_unwind_program() -> Program {
                 ),
             ),
         ]),
+        op_spans: BTreeMap::new(),
     }
 }
 

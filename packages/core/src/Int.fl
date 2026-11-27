@@ -113,11 +113,15 @@ let checked_rem a b =
 
 /// `a / b`, a defect when `b` is 0.
 unsafe_div : Int -> Int -> Int
-foreign pure unsafe_div from "flick:rt" "intUnsafeDiv"
+let unsafe_div a b =
+  if b == 0 then Flick.Defect.defect "Int.unsafe_div: division by zero" else a / b
+  @native "flick:rt" "intUnsafeDiv" when js || go
 
 /// `a % b`, a defect when `b` is 0.
 unsafe_rem : Int -> Int -> Int
-foreign pure unsafe_rem from "flick:rt" "intUnsafeRem"
+let unsafe_rem a b =
+  if b == 0 then Flick.Defect.defect "Int.unsafe_rem: division by zero" else a % b
+  @native "flick:rt" "intUnsafeRem" when js || go
 
 bit_and : Int -> Int -> Int
 foreign pure bit_and from "flick:rt" "bitAnd"

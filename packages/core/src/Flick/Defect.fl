@@ -1,0 +1,9 @@
+/// A defect raised by pure code: the computation stops, and the nearest
+/// handler of defects receives `message`, as it receives what a foreign
+/// function throws. A function that promises a defect, such as
+/// `Int.unsafe_div` by zero, raises it here; `todo` raises one too.
+module Flick.Defect exposing (defect)
+
+/// Stops the computation with the defect `message`.
+defect : String -> a
+foreign pure defect from "flick:rt" "defect"

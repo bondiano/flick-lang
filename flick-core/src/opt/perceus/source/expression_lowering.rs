@@ -438,7 +438,7 @@ impl Lower<'_> {
         };
         self.finish_closure(
             code,
-            &Function {
+            &SpannedFunction {
                 params: vec![0, 1],
                 body: body_block,
             },
@@ -484,7 +484,7 @@ impl Lower<'_> {
         };
         self.finish_closure(
             code,
-            &Function {
+            &SpannedFunction {
                 params: vec![0, 1],
                 body: body_block,
             },

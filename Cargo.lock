@@ -961,11 +961,14 @@ name = "flick-vm"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "ciborium",
  "flick-core",
  "num-bigint",
  "num-traits",
  "regex-automata",
+ "serde",
  "serde_json",
+ "sha2",
  "unicode-normalization",
 ]
 

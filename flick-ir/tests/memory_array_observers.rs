@@ -1,6 +1,7 @@
 use flick_ir::memory::{
     self, Block, Error, Exit, Function, Instruction, Intrinsic, Operation, Program,
 };
+use std::collections::BTreeMap;
 
 fn function(args: Vec<u32>) -> Function {
     Function {
@@ -33,6 +34,7 @@ fn array_normalization_consumes_exactly_one_token_even_in_unselected_code() {
         let program = Program {
             globals: vec![],
             functions: [(17, function(args))].into(),
+            op_spans: BTreeMap::new(),
         };
         assert_eq!(
             memory::validate_program(&program),

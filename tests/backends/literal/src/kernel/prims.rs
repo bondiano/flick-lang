@@ -19,9 +19,12 @@ use super::values::{
 use flick_ir::{Binding, Constructor, ItemKind, Lang, Program};
 
 /// The kernel primitives the evaluator cannot run: they call back into
-/// Flick, need the runtime stage, or read a record row by its label.
+/// Flick, need the runtime stage, read a record row by its label, or stop
+/// with a defect, which the evaluator has no outcome for.
 pub(super) const NOT_EVALUATED: &[(&str, &str)] = &[
     ("flick:rt", "listInitialize"),
+    ("flick:rt", "defect"),
+    ("flick:rt", "flickAssert"),
     ("flick:rt", "refMake"),
     ("flick:rt", "refGet"),
     ("flick:rt", "refSet"),

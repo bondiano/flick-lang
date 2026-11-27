@@ -852,6 +852,7 @@
 @flick-lang/runtime/rt decimalScale
 @flick-lang/runtime/rt decimalSubtract
 @flick-lang/runtime/rt decimalToString
+@flick-lang/runtime/rt defect
 @flick-lang/runtime/rt derive
 @flick-lang/runtime/rt describeReport
 @flick-lang/runtime/rt divBigInt

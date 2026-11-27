@@ -12,6 +12,7 @@ use flick_core::numeric::{Arith, Num};
 use flick_core::opt::perceus;
 use flick_core::types::OpClass;
 use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
+use std::collections::BTreeMap;
 
 fn bind(binding: Local, value: Operation) -> Instruction {
     Instruction::Let { binding, value }
@@ -46,6 +47,7 @@ fn program(functions: Vec<Function>) -> Program {
             name: entry(),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     }
 }
 fn entry() -> Name {

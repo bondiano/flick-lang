@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 // Shared raw MIR fixtures for actual current-selection handler transfers.
 use flick_core::{
     ir::{
@@ -169,6 +170,7 @@ pub fn selection_effects(handler_errors: bool, abort: bool, arm_fails: bool) -> 
             (5, selected_body()),
         ]
         .into(),
+        op_spans: BTreeMap::new(),
     }
 }
 

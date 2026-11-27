@@ -30,6 +30,7 @@ fn merge_requires_two_distinct_owned_tokens() {
             let result = memory::validate_program(&Program {
                 functions: BTreeMap::from([(0, function)]),
                 globals: vec![],
+                op_spans: BTreeMap::new(),
             });
             if args.len() == 2 {
                 assert_eq!(result, Ok(()));

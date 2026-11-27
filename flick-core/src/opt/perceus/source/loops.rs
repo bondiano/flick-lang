@@ -5,8 +5,8 @@ use std::collections::BTreeSet;
 use flick_ir::{Constructor, Rep};
 
 use super::{
-    Block, Code, Env, Exit, Expr, ExprKind, Function, Intrinsic, Lit, Local, Lower, LowerError,
-    Operation, Pat, Span, ValueRep, free, lookup, memory,
+    Code, Env, Expr, ExprKind, Intrinsic, Lit, Local, Lower, LowerError, Operation, Pat, Span,
+    SpannedBlock, SpannedFunction, ValueRep, free, lookup, memory,
 };
 
 pub(super) fn contains_direct_unwrap(expr: &Expr) -> bool {
@@ -108,7 +108,7 @@ impl Lower<'_> {
         };
         let had_in_each = self.in_for_each_body.remove(id);
 
-        let lowered = (|| -> Result<Function, LowerError> {
+        let lowered = (|| -> Result<SpannedFunction, LowerError> {
             let mut helper = Code::new(params.clone());
             if let Some(cond) = condition {
                 let cond_local = self.expr(cond, &inside, &mut helper)?;
@@ -123,17 +123,12 @@ impl Lower<'_> {
                     },
                     span,
                 )?;
-                Ok(Function {
-                    params,
-                    body: Block {
-                        instructions: helper.instructions,
-                        exit: Exit::Branch {
-                            condition: cond_local,
-                            then_: Box::new(then_.finish(then_res).body),
-                            else_: Box::new(else_.finish(exit).body),
-                        },
-                    },
-                })
+                let body = helper.branch(
+                    cond_local,
+                    then_.finish(then_res).body,
+                    else_.finish(exit).body,
+                );
+                Ok(SpannedFunction { params, body })
             } else if iterable {
                 let _ = self.expr(body, &inside, &mut helper)?;
                 let unit = helper.emit(Operation::Literal(Lit::Unit), span)?;
@@ -358,14 +353,7 @@ impl Lower<'_> {
                 &loop_id,
                 span,
             )?;
-            Block {
-                instructions: helper.instructions,
-                exit: Exit::Branch {
-                    condition: stop_cond,
-                    then_: Box::new(on_stop.finish(exit).body),
-                    else_: Box::new(on_continue),
-                },
-            }
+            helper.branch(stop_cond, on_stop.finish(exit).body, on_continue)
         } else {
             self.each_step_block(
                 Code::new(params.clone()),
@@ -382,7 +370,7 @@ impl Lower<'_> {
         let code = self.reserve(span)?;
         self.finish(
             code,
-            &Function {
+            &SpannedFunction {
                 params,
                 body: helper_body,
             },
@@ -434,7 +422,7 @@ impl Lower<'_> {
         owning_for: Option<&str>,
         loop_id: &str,
         span: Span,
-    ) -> Result<Block, LowerError> {
+    ) -> Result<SpannedBlock, LowerError> {
         let next = step.emit(Operation::SeqNext(0), span)?;
         let some_pat = Pat::Con(
             Constructor {
@@ -491,14 +479,11 @@ impl Lower<'_> {
         let mut on_pat_skip = on_some.successor();
         let skip_unit = on_pat_skip.emit(Operation::Literal(Lit::Unit), span)?;
 
-        let on_some_block = Block {
-            instructions: on_some.instructions,
-            exit: Exit::Branch {
-                condition: pat_ok,
-                then_: Box::new(on_pat_ok.finish(body_res).body),
-                else_: Box::new(on_pat_skip.finish(skip_unit).body),
-            },
-        };
+        let on_some_block = on_some.branch(
+            pat_ok,
+            on_pat_ok.finish(body_res).body,
+            on_pat_skip.finish(skip_unit).body,
+        );
 
         let mut on_none = step.successor();
         let unit = on_none.emit(Operation::Literal(Lit::Unit), span)?;
@@ -510,14 +495,7 @@ impl Lower<'_> {
             span,
         )?;
 
-        Ok(Block {
-            instructions: step.instructions,
-            exit: Exit::Branch {
-                condition: is_some,
-                then_: Box::new(on_some_block),
-                else_: Box::new(on_none.finish(exit).body),
-            },
-        })
+        Ok(step.branch(is_some, on_some_block, on_none.finish(exit).body))
     }
 
     pub(super) fn yield_expr(

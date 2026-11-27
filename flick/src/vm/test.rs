@@ -10,7 +10,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::memory::Name as MemoryName;
 use flick_core::project;
 use flick_core::source::SourceMap;
-use flick_vm::tier0::{Heap, TestCaseResult, execute_tests_program};
+use flick_vm::tier0::{Heap, HostMode, TestCaseResult, execute_tests_program_with_host};
 
 use super::{VmTier, lower, resolve_tier, target_override};
 use crate::args::{Color, GlobalArguments, Reporter, TestArguments};
@@ -170,14 +170,22 @@ fn execute_suites(
     options: &TestArguments,
     global: &GlobalArguments,
 ) -> ExitCode {
-    let VmTier::Tier0 = tier;
+    if tier == VmTier::Tier1 {
+        let diag = Diagnostic::new(
+            codes::P012,
+            Severity::Error,
+            "tier 1 VM does not support `flick test --target vm` yet; use `--vm-tier 0`",
+        );
+        report::render(global, &SourceMap::default(), &[diag]);
+        return ExitCode::from(1);
+    }
     let started = Instant::now();
     #[allow(clippy::cast_possible_wrap)]
     let seed_i32 = seed as i32;
     let mut raw_results: Vec<TestCaseResult> = Vec::new();
     for entry in entries {
         let mut heap = Heap::new();
-        let results = match execute_tests_program(
+        let results = match execute_tests_program_with_host(
             &mut heap,
             &lowered.program,
             entry,
@@ -185,6 +193,7 @@ fn execute_suites(
             seed_i32,
             u64::MAX,
             &[],
+            HostMode::LiveOs,
         ) {
             Ok(results) => results,
             Err(err) => {

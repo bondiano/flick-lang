@@ -13,6 +13,11 @@ export const absent = (module: string, name: string): (() => never) => {
   return missing;
 };
 
+/** The kernel's defect: pure code that stops with `message`. */
+export const defect = (message: string): never => {
+  throw new Error(message);
+};
+
 /** `todo`: code not written yet fails when it runs. */
 export const flickTodo = (message: string): never => {
   throw new Error(message);
