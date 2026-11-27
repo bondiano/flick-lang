@@ -11,8 +11,8 @@ use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::when;
 use crate::types::env::Found;
-use crate::types::is_type;
 use crate::types::ty::Type;
+use crate::types::{implicit_package_of, is_type};
 
 impl<'a> Checker<'a> {
     /// Reports each constructor of a native type that `decls` name where the
@@ -122,18 +122,37 @@ impl<'a> Checker<'a> {
             return;
         };
         let env = self.options.native_env();
-        if cover.is_some_and(|cover| env.implies(&native, cover)) {
+        let covered = cover.is_some_and(|cover| env.implies(&native, cover));
+        let message = if !self.same_package(&module) {
+            format!(
+                "`{name}` is a constructor of `{ty}`, a native type of another package: its \
+                 representation is that package's, which only its own bodies may build or match"
+            )
+        } else if covered {
             return;
-        }
-        self.diagnostics.push(Diagnostic::error(
-            codes::F017,
+        } else {
             format!(
                 "`{name}` is a constructor of `{ty}`, which is the backend's own where `{condition}` \
                  holds: only the Flick body of a definition whose `@native` clauses hold there \
                  too may build or match it"
-            ),
+            )
+        };
+        self.diagnostics.push(Diagnostic::error(
+            codes::F017,
+            message,
             self.token_span(token),
         ));
+    }
+
+    /// Whether `module` is of the package of the module being checked: the
+    /// same implicit package, or both of the package being compiled.
+    fn same_package(&self, module: &str) -> bool {
+        let here = self.env.module.as_str();
+        match (implicit_package_of(module), implicit_package_of(here)) {
+            (Some(theirs), Some(ours)) => theirs == ours,
+            (None, None) => (self.options.local)(module) && (self.options.local)(here),
+            _ => false,
+        }
     }
 }
 
