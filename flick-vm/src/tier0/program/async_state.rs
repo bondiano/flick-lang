@@ -150,7 +150,19 @@ pub fn execute_main_program_outcome_with_host(
     fuel: u64,
     host_mode: HostMode,
 ) -> ExecutionReport {
-    execute_with_host_and_bridge(
+    execute_main_program_outcome_with_args(heap, program, entry, fuel, host_mode, Vec::new())
+}
+
+/// Runs the main apply/await protocol with forwarded CLI `program_args`.
+pub fn execute_main_program_outcome_with_args(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    fuel: u64,
+    host_mode: HostMode,
+    program_args: Vec<String>,
+) -> ExecutionReport {
+    execute_with_host_args_and_bridge(
         heap,
         program,
         entry,
@@ -158,6 +170,7 @@ pub fn execute_main_program_outcome_with_host(
         fuel,
         MainStage::Function,
         host_mode,
+        program_args,
         None,
     )
 }
@@ -171,13 +184,35 @@ pub fn execute_rooted_main_program_outcome_with_host(
     fuel: u64,
     host_mode: HostMode,
 ) -> ExecutionReport {
+    execute_rooted_main_program_outcome_with_args(
+        heap,
+        program,
+        entry,
+        root,
+        fuel,
+        host_mode,
+        Vec::new(),
+    )
+}
+
+/// [`execute_rooted_main_program_outcome`] with forwarded CLI `program_args`.
+pub fn execute_rooted_main_program_outcome_with_args(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    root: &Name,
+    fuel: u64,
+    host_mode: HostMode,
+    program_args: Vec<String>,
+) -> ExecutionReport {
     if !program.globals.iter().any(|global| &global.name == entry) {
         return ExecutionReport {
             outcome: ProgramOutcome::Fault(Error::UnknownGlobal(entry.clone())),
             stdout: String::new(),
+            stderr: String::new(),
         };
     }
-    execute_with_host_and_bridge(
+    execute_with_host_args_and_bridge(
         heap,
         program,
         root,
@@ -188,6 +223,7 @@ pub fn execute_rooted_main_program_outcome_with_host(
             eager_inits: VecDeque::new(),
         },
         host_mode,
+        program_args,
         None,
     )
 }
@@ -252,6 +288,7 @@ pub fn execute_main_with_bridge_and_inits(
         return ExecutionReport {
             outcome: ProgramOutcome::Fault(Error::UnknownGlobal(entry.clone())),
             stdout: String::new(),
+            stderr: String::new(),
         };
     }
     let mut pending: VecDeque<Name> = eager_inits
@@ -326,12 +363,38 @@ fn execute_with_host_and_bridge(
     host_mode: HostMode,
     bridge: Option<&mut HostBridge>,
 ) -> ExecutionReport {
+    execute_with_host_args_and_bridge(
+        heap,
+        program,
+        entry,
+        arguments,
+        fuel,
+        main_stage,
+        host_mode,
+        Vec::new(),
+        bridge,
+    )
+}
+
+#[expect(clippy::too_many_arguments, reason = "internal execution entrypoint")]
+fn execute_with_host_args_and_bridge(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    arguments: Vec<Value>,
+    fuel: u64,
+    main_stage: MainStage,
+    host_mode: HostMode,
+    program_args: Vec<String>,
+    bridge: Option<&mut HostBridge>,
+) -> ExecutionReport {
     let arguments = match prepare_arguments(heap, program, entry, arguments) {
         Ok(arguments) => arguments,
         Err(error) => {
             return ExecutionReport {
                 outcome: ProgramOutcome::Fault(error),
                 stdout: String::new(),
+                stderr: String::new(),
             };
         }
     };
@@ -340,12 +403,14 @@ fn execute_with_host_and_bridge(
         .expect("fewer than usize::MAX model executions");
     let mut machine = Machine::new(heap, program, execution, arguments, fuel, main_stage);
     machine.host_mode = host_mode;
+    machine.program_args = program_args;
     machine.bridge = bridge;
     let result = machine.global(entry, None).and_then(|()| machine.run());
     let outcome = machine.finish(result);
     ExecutionReport {
         outcome,
         stdout: machine.stdout,
+        stderr: machine.stderr,
     }
 }
 
@@ -390,6 +455,9 @@ impl<'p, 'h> Machine<'p, 'h> {
             pending_handler: None,
             top: None,
             stdout: String::new(),
+            stderr: String::new(),
+            program_args: Vec::new(),
+            host_services: HostServices::new(),
             fuel,
             main_stage,
             root: None,
@@ -434,6 +502,7 @@ impl<'p, 'h> Machine<'p, 'h> {
             host_mode: HostMode::Deterministic,
             bridge: None,
             foreign: ForeignState::default(),
+            external_interrupt: None,
         }
     }
 }

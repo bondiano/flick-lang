@@ -1,4 +1,6 @@
 //! Immutable owned causes. Representation builders do not activate VM producers.
+use flick_core::ir::memory::MemorySpan;
+
 use super::{Data, Error, Heap, ObjectToken, Value, charge};
 use crate::stdlib::{Fuel, FuelCounter, charge as charge_hooks};
 
@@ -124,29 +126,46 @@ pub enum DefectCode {
 #[derive(Debug, PartialEq, Eq)]
 pub struct DefectSpec {
     code: DefectCode,
+    span: Option<MemorySpan>,
 }
 
 impl DefectSpec {
-    pub(super) fn arena_owner_closed() -> Self {
+    pub(crate) fn arena_owner_closed() -> Self {
         Self {
             code: DefectCode::ArenaOwnerClosed,
+            span: None,
         }
     }
 
     pub(super) fn arena_closed() -> Self {
         Self {
             code: DefectCode::ArenaClosed,
+            span: None,
         }
     }
 
     pub(crate) fn custom(msg: impl Into<String>) -> Self {
         Self {
             code: DefectCode::Assert(msg.into()),
+            span: None,
         }
+    }
+
+    pub(crate) const fn from_code(code: DefectCode) -> Self {
+        Self { code, span: None }
+    }
+
+    pub(crate) const fn with_span(mut self, span: Option<MemorySpan>) -> Self {
+        self.span = span;
+        self
     }
 
     pub fn code(&self) -> &DefectCode {
         &self.code
+    }
+
+    pub const fn span(&self) -> Option<MemorySpan> {
+        self.span
     }
 
     pub(crate) fn message(&self) -> String {
@@ -222,13 +241,13 @@ impl DefectSpec {
 }
 
 /// Classification is used at the running operation boundary, never on final Err.
-pub(super) enum StepFailure {
+pub(crate) enum StepFailure {
     Language(DefectSpec),
     Evaluator(Error),
 }
 
 impl StepFailure {
-    pub(super) fn classify(error: Error) -> Self {
+    pub(crate) fn classify(error: Error) -> Self {
         let code = match error {
             Error::NoMatch => DefectCode::NoMatch,
             Error::MissingHandler { effect, op } => DefectCode::MissingHandler { effect, op },
@@ -244,7 +263,7 @@ impl StepFailure {
             Error::RangeError(msg) => DefectCode::RangeError(msg),
             evaluator => return Self::Evaluator(evaluator),
         };
-        Self::Language(DefectSpec { code })
+        Self::Language(DefectSpec { code, span: None })
     }
 }
 
@@ -345,14 +364,14 @@ impl Heap {
         Ok(spec)
     }
 
-    pub(super) fn ordinary_failure(&self, cause: &CauseToken) -> Result<Option<&Value>, Error> {
+    pub(crate) fn ordinary_failure(&self, cause: &CauseToken) -> Result<Option<&Value>, Error> {
         Ok(match self.cause_data(cause)? {
             [StoredReason::Fail(value)] => Some(value),
             _ => None,
         })
     }
 
-    pub(super) fn first_fail(
+    pub(crate) fn first_fail(
         &self,
         cause: &CauseToken,
         fuel: &mut u64,
@@ -366,7 +385,7 @@ impl Heap {
         Ok(None)
     }
 
-    pub(super) fn elect_failure(
+    pub(crate) fn elect_failure(
         &mut self,
         cause: &CauseToken,
         fuel: &mut u64,

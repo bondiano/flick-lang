@@ -2,6 +2,7 @@ use flick_ir::{
     Lit,
     memory::{self, Block, Exit, Function, Instruction, Operation, Program},
 };
+use std::collections::BTreeMap;
 
 #[test]
 fn recovery_result_owns_only_selected_edge_and_does_not_borrow() {
@@ -68,6 +69,7 @@ fn invalid_selected_closure_arity_is_rejected_even_in_unselected_code() {
         let program = Program {
             globals: vec![],
             functions: [(7, selector), (8, target)].into(),
+            op_spans: BTreeMap::new(),
         };
         assert_eq!(
             memory::validate_program(&program),
@@ -172,6 +174,7 @@ fn invalid_arity_in_a_dead_branch_is_still_rejected_before_execution() {
     let program = Program {
         globals: vec![],
         functions: [(7, function), (8, target)].into(),
+        op_spans: BTreeMap::new(),
     };
     assert_eq!(
         memory::validate_program(&program),

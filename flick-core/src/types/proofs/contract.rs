@@ -65,7 +65,7 @@ impl<'a> Checker<'a> {
         [check, value, prove]: [&str; 3],
     ) -> Option<Contract<'a>> {
         let module = self.env.module.clone();
-        let Form::Adt { constructors, abi } = &self.env.type_def(&module, ty)?.form else {
+        let Form::Adt { constructors, abi } = self.env.type_def(&module, ty)?.typing() else {
             return None;
         };
         let [constructor] = &constructors[..] else {

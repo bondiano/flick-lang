@@ -375,6 +375,7 @@ mod aggregate_tests {
                     },
                 },
             )]),
+        op_spans: BTreeMap::new(),
         };
         let mut heap = Heap::new();
         let report = execute_program_outcome(&mut heap, &program, &entry, vec![], 10_000);

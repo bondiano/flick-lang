@@ -50,6 +50,7 @@ impl Checker<'_> {
                             requirements: requirements.clone(),
                         },
                         variance: Vec::new(),
+                        native: None,
                     };
                     for (head, dictionary) in
                         module_local_dictionaries(&contract, &abstract_interface)

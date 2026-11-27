@@ -9,6 +9,7 @@ use flick_core::{
     opt::perceus,
 };
 use flick_vm::tier0::{Error, Heap, ProgramOutcome, execute_program_outcome};
+use std::collections::BTreeMap;
 
 fn function(params: &[u32], instructions: Vec<Instruction>, result: u32) -> Function {
     perceus::insert(&Function {
@@ -87,6 +88,7 @@ fn program(op: Arith) -> Program {
             ),
         ]
         .into(),
+        op_spans: BTreeMap::new(),
     }
 }
 

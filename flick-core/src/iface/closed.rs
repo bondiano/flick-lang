@@ -289,6 +289,7 @@ mod tests {
                 kind: Kind::meta(3),
                 form: Form::NOMINAL,
                 variance: Vec::new(),
+                native: None,
             },
             owner_path: vec!["Nested".into()],
         });
@@ -390,6 +391,7 @@ mod tests {
                 effect: false,
             },
             variance: Vec::new(),
+            native: None,
         });
         assert!(!export_is_closed(&open_service));
         assert!(serde_json::to_value(&open_service).is_err());

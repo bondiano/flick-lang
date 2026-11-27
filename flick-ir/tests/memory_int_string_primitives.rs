@@ -35,6 +35,7 @@ fn exact_new_arity_and_consuming_ownership_are_validated_even_in_unselected_code
         let program = Program {
             globals: vec![],
             functions: BTreeMap::from([(17, function(kind, vec![]))]),
+            op_spans: BTreeMap::new(),
         };
         assert_eq!(
             memory::validate_program(&program),

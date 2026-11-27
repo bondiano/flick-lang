@@ -27,6 +27,7 @@ fn contract(manifest: Option<Type>) -> TypeDef {
             ],
         },
         variance: Vec::new(),
+        native: None,
     }
 }
 
@@ -71,6 +72,7 @@ fn actual(key_type: Type) -> Interface {
                         opaque: false,
                     },
                     variance: Vec::new(),
+                    native: None,
                 }),
                 None,
             ),
@@ -138,6 +140,7 @@ fn manifest_class_requires_nominal_identity() {
             }],
         },
         variance: Vec::new(),
+        native: None,
     };
     let actual = Interface {
         module: "Keys".into(),

@@ -1,0 +1,14 @@
+schema-version = 1
+
+[package]
+name = "vm-host"
+version = "0.2.0"
+flick = ">=0.2, <0.3"
+when = "vm"
+
+[project]
+kind = "lib"
+
+[host]
+name = "native"
+backend = "flick/vm"

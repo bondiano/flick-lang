@@ -287,6 +287,7 @@ fn support_projection_closure_handles_cycles_and_drops_unused_records() {
                 opaque: false,
             },
             variance: Vec::new(),
+            native: None,
         },
         owner_path: vec![],
     };
@@ -365,6 +366,7 @@ fn parameterized_projection_keeps_only_required_type_support() {
             kind: Kind::Type,
             form: Form::NOMINAL,
             variance: Vec::new(),
+            native: None,
         },
         owner_path: vec![],
     };

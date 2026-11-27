@@ -59,6 +59,7 @@ fn scope_reclaims_storage_before_resuming_the_live_caller() {
             name: Name::new("Main", "main"),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     };
     memory::validate_program(&program).expect("valid scope-boundary test operation");
     let mut heap = Heap::new();
@@ -158,6 +159,7 @@ fn modify_rejects_a_reserved_tuple_evidence_suffix_before_committing() {
             name: Name::new("Main", "main"),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let hidden = heap

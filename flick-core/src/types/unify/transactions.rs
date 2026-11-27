@@ -294,6 +294,7 @@ mod transaction_tests {
                         opaque: false,
                     },
                     variance: Vec::new(),
+                    native: None,
                 },
             );
             let variable = checker.fresh();

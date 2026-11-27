@@ -8,7 +8,7 @@
 //! reference-count and allocation accounting across every tier.
 
 use flick_core::ir::BinOp;
-use flick_core::ir::memory::{HostPrimitive, Intrinsic};
+use flick_core::ir::memory::{HostPrimitive, HostServiceIntrinsic, Intrinsic};
 use flick_core::numeric::Num;
 
 use crate::tier0::{Error, Heap, Value};
@@ -21,7 +21,10 @@ pub(crate) mod runtime;
 
 pub use hooks::{Accounting, CountingHooks, FuelCounter, HostContext, HostEnv, Unmetered, VmHooks};
 pub(crate) use hooks::{Fuel, charge, with_alloc_accounting};
-pub use host::{DRAW, HostMode, MILLIS, MONOTONIC_NANOS, NANOS};
+pub use host::{
+    DRAW, HostMode, HostServices, MILLIS, MONOTONIC_NANOS, NANOS, format_uncaught_cause,
+    format_uncaught_raised,
+};
 pub use host_bridge::HostBridge;
 pub use primitives::{is_metered_primitive, show_value};
 pub use runtime::{DEFAULT_VIRTUAL_NOW_NS, FIBER_QUANTUM, QUANTUM_VIRTUAL_NS};
@@ -110,7 +113,8 @@ pub fn eval_intrinsic(
 }
 
 /// Evaluates a Stage 5 host primitive (`HostPrimitive`) using the caller's
-/// [`VmHooks`] (mode, stdout sink, optional virtual clock and seeded RNG).
+/// [`VmHooks`] (mode, stdout/stderr sinks, CLI args, optional virtual clock,
+/// seeded RNG, and live host services).
 pub fn eval_host_primitive(
     heap: &mut Heap,
     primitive: HostPrimitive,
@@ -118,6 +122,25 @@ pub fn eval_host_primitive(
     hooks: &mut dyn VmHooks,
 ) -> Result<Value, Error> {
     eval_intrinsic(heap, Intrinsic::Host(primitive), value, hooks)
+}
+
+/// Evaluates a native Rust VM host service intrinsic (`HostServiceIntrinsic`)
+/// using the caller's [`VmHooks`]. Shared across all VM tiers.
+pub fn eval_host_service(
+    heap: &mut Heap,
+    op: HostServiceIntrinsic,
+    args: &[Value],
+    hooks: &mut dyn VmHooks,
+) -> Result<Value, Error> {
+    let before = heap.stats();
+    let result = host::run_service_with_hooks(heap, op, args, hooks);
+    let after = heap.stats();
+    let alloc_delta = after.allocations.saturating_sub(before.allocations);
+    let free_delta = after.frees.saturating_sub(before.frees);
+    if alloc_delta > 0 || free_delta > 0 {
+        hooks.record_allocation_delta(alloc_delta, free_delta);
+    }
+    result
 }
 
 /// Structural value equality (`==`) with caller-supplied fuel accounting.

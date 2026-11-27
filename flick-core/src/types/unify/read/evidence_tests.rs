@@ -20,6 +20,7 @@ mod read_tests {
                         requirements: requirements.clone(),
                     },
                     variance: Vec::new(),
+                    native: None,
                 },
             );
             let issued = checker
@@ -58,6 +59,7 @@ mod read_tests {
                         requirements: requirements.clone(),
                     },
                     variance: Vec::new(),
+                    native: None,
                 },
             );
             checker.env.define_type(
@@ -66,6 +68,7 @@ mod read_tests {
                     kind: Kind::Type,
                     form: Form::NOMINAL,
                     variance: Vec::new(),
+                    native: None,
                 },
             );
             let signature = ModuleSignature::Structure { requirements };
@@ -237,6 +240,7 @@ mod read_tests {
                         }],
                     },
                     variance: Vec::new(),
+                    native: None,
                 },
             );
             let ty = Type::Exists {
@@ -425,6 +429,7 @@ mod read_tests {
                         hidden: false,
                     },
                     variance: Vec::new(),
+                    native: None,
                 },
             );
             checker.env.define_type(
@@ -441,6 +446,7 @@ mod read_tests {
                         derive: false,
                     },
                     variance: Vec::new(),
+                    native: None,
                 },
             );
             let read = checker.read_types();

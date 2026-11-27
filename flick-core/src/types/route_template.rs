@@ -10,7 +10,7 @@
 //! the time this one's types are.
 
 use super::Checker;
-use super::env::{Form, Found};
+use super::env::{Form, Found, TypeDef};
 use super::kinds::Kind;
 use super::schemas::companion_name;
 use super::ty::Type;
@@ -163,7 +163,7 @@ impl Checker<'_> {
             && self.env.parent(&c) == Some((field_module.clone(), field_ty.clone()))
         {
             let words = matches!(
-                self.env.type_def(field_module, field_ty).map(|d| &d.form),
+                self.env.type_def(field_module, field_ty).map(TypeDef::typing),
                 Some(Form::Adt { constructors, .. })
                     if constructors.iter().all(|k| self.entity_fields(&Entity {
                         module: field_module.clone(),

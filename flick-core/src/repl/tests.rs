@@ -215,3 +215,101 @@ fn a_layout_places_spans_of_the_input_and_moves_them_past_insertions() {
     );
     assert_eq!(at(&signed, 21, 26), Some(Span::new(input, 10, 15)));
 }
+
+#[test]
+fn vm_target_session_metadata_rollback_and_commands() {
+    use super::HandlerStyle;
+    use crate::types::show_type;
+
+    let mut session = Session::with_target("vm");
+    let decl = accept(&mut session, "let n = 41");
+    assert!(!decl.expression);
+    assert!(!decl.is_task);
+    assert!(decl.value_type.is_none());
+
+    let expr = accept(&mut session, "n + 1");
+    assert!(expr.expression);
+    assert!(!expr.is_task);
+    assert_eq!(
+        expr.value_type.as_ref().map(show_type).as_deref(),
+        Some("Int")
+    );
+    assert!(expr.effects.is_empty());
+
+    // Direct host-effect call auto-wraps in a task and resolves Host.Console ambiently
+    let printed = accept(&mut session, "Platform.stdout_line \"hi\"");
+    assert!(printed.expression);
+    assert!(printed.is_task);
+    assert_eq!(
+        printed.ok_type.as_ref().map(show_type).as_deref(),
+        Some("Unit")
+    );
+    assert!(printed.effects.is_empty(), "{:?}", printed.effects);
+
+    // Rollback restores phrase list and scope cleanly
+    assert!(session.rollback_last());
+    assert_eq!(session.phrases().len(), 2);
+    assert_eq!(type_of(&session, "it"), "Int");
+
+    // Task expression reports ok_type and err_type
+    accept(&mut session, "type error Boom = Boom String");
+    let ok_task = accept(&mut session, "task { 7 }");
+    assert!(ok_task.is_task);
+    assert_eq!(
+        ok_task.ok_type.as_ref().map(show_type).as_deref(),
+        Some("Int")
+    );
+    assert!(ok_task.err_type.is_none());
+
+    let fail_task = accept(&mut session, "task { Fail.fail (Boom \"oops\") }");
+    assert!(fail_task.is_task);
+    assert!(fail_task.err_type.is_some());
+
+    // User effect is reported as unresolved until `:handle` installs a handler
+    accept(&mut session, "effect Ask =\n  ask : Unit ->{} Int");
+    let unhandled = accept(&mut session, "Ask.ask ()");
+    assert!(unhandled.is_task);
+    assert_eq!(unhandled.effects.len(), 1);
+    assert!(
+        unhandled.effects[0].ends_with(".Ask"),
+        "{:?}",
+        unhandled.effects
+    );
+    assert!(session.rollback_last());
+
+    let handle = session
+        .enter_handle("fun body -> try body () with | Ask.ask () -> 42")
+        .unwrap_or_else(|d| panic!("handle rejected: {}", shown(&d)));
+    assert_eq!(
+        handle.style,
+        HandlerStyle::Thunk {
+            returns_task: false
+        }
+    );
+    assert_eq!(handle.handled_effects.len(), 1);
+    assert!(handle.handled_effects[0].ends_with(".Ask"));
+
+    let handled = accept(&mut session, "Ask.ask ()");
+    assert!(handled.is_task);
+    assert!(handled.effects.is_empty(), "{:?}", handled.effects);
+
+    // `:provide` checks a layer and records its provided service
+    accept(&mut session, "service Cfg =\n  port : Unit ->{} Int");
+    let provide = session
+        .enter_provide("Layer.succeed Cfg { port = fun () -> 8080 }")
+        .unwrap_or_else(|d| panic!("provide rejected: {}", shown(&d)));
+    assert_eq!(provide.provided_services.len(), 1);
+    assert!(provide.provided_services[0].ends_with(".Cfg"));
+    let used_cfg = accept(&mut session, "Cfg.port ()");
+    assert!(used_cfg.effects.is_empty(), "{:?}", used_cfg.effects);
+
+    // `:bg` accepts tasks without overwriting `it` and rejects non-tasks
+    accept(&mut session, "1 + 2");
+    assert_eq!(type_of(&session, "it"), "Int");
+    let bg = session
+        .enter_bg("task { 99 }")
+        .unwrap_or_else(|d| panic!("bg rejected: {}", shown(&d)));
+    assert_eq!(bg.ok_type.as_ref().map(show_type).as_deref(), Some("Int"));
+    assert_eq!(type_of(&session, "it"), "Int");
+    assert!(session.enter_bg("123").is_err());
+}

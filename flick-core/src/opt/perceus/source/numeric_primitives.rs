@@ -263,6 +263,9 @@ impl Lower<'_> {
         if let Some(result) = self.std_sql_foreign(value, span, block) {
             return Some(result);
         }
+        if let Some(result) = self.std_host_vm_foreign(value, span, block) {
+            return Some(result);
+        }
         self.std_layer_foreign(value, span, block)
     }
 

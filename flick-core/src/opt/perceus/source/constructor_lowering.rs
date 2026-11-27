@@ -203,20 +203,13 @@ impl Lower<'_> {
         expr: &Expr,
         env: &Env,
         mut block: Code,
-    ) -> Result<Block, LowerError> {
+    ) -> Result<SpannedBlock, LowerError> {
         match &expr.kind {
             ExprKind::If(condition, yes, no) => {
                 let condition = self.expr(condition, env, &mut block)?;
                 let then_ = self.expr_tail(yes, env, block.successor())?;
                 let else_ = self.expr_tail(no, env, block.successor())?;
-                Ok(Block {
-                    instructions: block.instructions,
-                    exit: Exit::Branch {
-                        condition,
-                        then_: Box::new(then_),
-                        else_: Box::new(else_),
-                    },
-                })
+                Ok(block.branch(condition, then_, else_))
             }
             ExprKind::Block(statements, result) => {
                 let env = self.block_statements(statements, env, &mut block)?;

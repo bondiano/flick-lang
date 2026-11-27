@@ -56,6 +56,7 @@ fn program(mut bodies: Vec<Function>) -> Program {
             name: Name::new("Main", "main"),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     }
 }
 fn run(heap: &mut Heap, p: &Program, args: Vec<Value>, fuel: u64) -> Result<Executed, Error> {

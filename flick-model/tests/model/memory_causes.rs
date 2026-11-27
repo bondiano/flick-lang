@@ -13,6 +13,7 @@ use flick_vm::tier0::{
     DefectClass, DefectCode, Error, Heap, LanguageExit, ProgramOutcome, Reason, Value,
     execute_program_outcome,
 };
+use std::collections::BTreeMap;
 
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }
@@ -46,6 +47,7 @@ fn program(mut body: Vec<Instruction>, result: u32) -> Program {
             name: entry(),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     }
 }
 fn entry() -> Name {

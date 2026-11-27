@@ -116,6 +116,7 @@ fn handler_metadata_is_checked_even_in_unreferenced_code() {
         let program = Program {
             functions: BTreeMap::from([(7, function)]),
             globals: vec![],
+            op_spans: BTreeMap::new(),
         };
         assert_eq!(
             memory::validate_program(&program),

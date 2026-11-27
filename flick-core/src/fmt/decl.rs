@@ -16,11 +16,13 @@ impl<'a> Printer<'a> {
     pub fn type_decl(&mut self, n: &'a Node) -> Doc<'a> {
         let a = self.a;
         let deriving = node_position(n, K::DerivingClause);
-        let rest = deriving.unwrap_or(n.children.len());
+        let native = node_position(n, K::NativeOverride);
+        let rest = deriving.or(native).unwrap_or(n.children.len());
         let Some(eq) = position(n, K::Eq) else {
             let head = self.elements(n, &n.children[..rest]);
             let deriving = self.deriving(n, deriving);
-            return docvec![a, head, deriving];
+            let native = self.deriving(n, native);
+            return docvec![a, head, deriving, native];
         };
         let head = self.elements(n, &n.children[..=eq]);
         let value = &n.children[eq + 1..rest];
@@ -54,10 +56,12 @@ impl<'a> Printer<'a> {
             }
         };
         let deriving = self.deriving(n, deriving);
-        docvec![a, doc, deriving]
+        let native = self.deriving(n, native);
+        docvec![a, doc, deriving, native]
     }
 
-    /// `deriving …` on its own line after a type declaration.
+    /// `deriving …`, or `@native when …`, on its own line after a type
+    /// declaration.
     fn deriving(&mut self, n: &'a Node, at: Option<usize>) -> Doc<'a> {
         let a = self.a;
         match at.and_then(|at| n.children.get(at)) {

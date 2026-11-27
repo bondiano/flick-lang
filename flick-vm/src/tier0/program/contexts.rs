@@ -100,6 +100,10 @@ impl Machine<'_, '_> {
                 let value = self.host_primitive(primitive)?;
                 self.primitive_result(binding, value)?;
             }
+            Intrinsic::HostService(op) => {
+                let value = self.host_service(op)?;
+                self.primitive_result(binding, value)?;
+            }
             _ => unreachable!("control and metered intrinsics dispatched above"),
         }
         Ok(())
@@ -210,13 +214,34 @@ impl Machine<'_, '_> {
 
     fn host_primitive(&mut self, primitive: HostPrimitive) -> Result<Value, Error> {
         let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout)
-            .with_virtual_now_ns(self.virtual_now_ns);
+            .with_stderr(&mut self.stderr)
+            .with_program_args(&self.program_args)
+            .with_host_services(&mut self.host_services);
+        if self.host_mode == HostMode::Deterministic || self.test_clock_mode {
+            hooks = hooks.with_virtual_now_ns(self.virtual_now_ns);
+        }
         if let Some(rng_id) = self.seeded_random
             && let Some(rng) = self.isaac_rngs.get_mut(&rng_id)
         {
             hooks = hooks.with_seeded_rng(rng);
         }
         stdlib::eval_host_primitive(self.heap, primitive, &self.scratch[0], &mut hooks)
+    }
+
+    fn host_service(&mut self, op: HostServiceIntrinsic) -> Result<Value, Error> {
+        let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout)
+            .with_stderr(&mut self.stderr)
+            .with_program_args(&self.program_args)
+            .with_host_services(&mut self.host_services);
+        if self.host_mode == HostMode::Deterministic || self.test_clock_mode {
+            hooks = hooks.with_virtual_now_ns(self.virtual_now_ns);
+        }
+        if let Some(rng_id) = self.seeded_random
+            && let Some(rng) = self.isaac_rngs.get_mut(&rng_id)
+        {
+            hooks = hooks.with_seeded_rng(rng);
+        }
+        stdlib::eval_host_service(self.heap, op, &self.scratch, &mut hooks)
     }
 
     fn unwrap_result(&mut self, binding: Local) -> Result<(), Error> {

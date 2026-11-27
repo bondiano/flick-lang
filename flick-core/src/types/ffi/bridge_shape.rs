@@ -189,6 +189,7 @@ mod tests {
                             opaque: false,
                         },
                         variance: Vec::new(),
+                        native: None,
                     },
                 );
             }
@@ -226,6 +227,7 @@ mod tests {
                         ),
                     },
                     variance: Vec::new(),
+                    native: None,
                 },
             );
             assert_eq!(
@@ -258,6 +260,7 @@ mod tests {
                             opaque: true,
                         },
                         variance: Vec::new(),
+                        native: None,
                     },
                 );
                 body = Type::con("Probe", &name);

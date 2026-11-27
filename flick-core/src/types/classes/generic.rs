@@ -11,7 +11,7 @@ use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::types::Checker;
-use crate::types::env::{Form, Instance};
+use crate::types::env::{Form, Instance, TypeDef};
 use crate::types::gadt::scheme::is_indexed;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Binder, Type};
@@ -28,7 +28,7 @@ impl<'n> Checker<'_> {
         span: Span,
     ) -> Option<Declared<'n>> {
         let module = self.env.module.clone();
-        let names = match self.env.type_def(&module, name).map(|d| &d.form) {
+        let names = match self.env.type_def(&module, name).map(TypeDef::typing) {
             Some(Form::Adt { constructors, .. }) if !constructors.is_empty() => {
                 constructors.clone()
             }

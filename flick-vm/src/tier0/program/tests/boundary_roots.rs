@@ -7,6 +7,7 @@ fn exceptional_boundaries_use_saved_owner_not_current_selection() {
     let program = Program {
         functions: BTreeMap::new(),
         globals: vec![],
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let first = heap.allocate(Data::Arena {
@@ -86,6 +87,7 @@ fn catching_releases_frame_locals_before_handler_execution() {
     let program = Program {
         functions: BTreeMap::from([(0, caller), (1, handler)]),
         globals: vec![],
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let local = heap
@@ -174,6 +176,7 @@ fn owner_selection_validates_identity_but_not_resource_admission() {
     let program = Program {
         functions: BTreeMap::new(),
         globals: vec![],
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let mut machine = Machine::new(&mut heap, &program, 7, vec![], 100, MainStage::Done);

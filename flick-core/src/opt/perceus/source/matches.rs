@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::ir::Arm;
 
 use super::{
-    Block, CandidateShape, Code, CodeId, Env, Exit, Expr, Function, Intrinsic, Local, Lower,
-    LowerError, Operation, Param, Pat, Span, Stage, ValueRep, free, lookup, memory, reuse,
+    CandidateShape, Code, CodeId, Env, Expr, Intrinsic, Local, Lower, LowerError, Operation, Param,
+    Pat, Span, SpannedBlock, SpannedFunction, Stage, ValueRep, free, lookup, memory, reuse,
 };
 
 #[derive(Clone, Copy)]
@@ -197,16 +197,9 @@ impl Lower<'_> {
         }
         self.finish_with_hints(
             code,
-            &Function {
+            &SpannedFunction {
                 params,
-                body: Block {
-                    instructions: block.instructions,
-                    exit: Exit::Branch {
-                        condition,
-                        then_: Box::new(yes),
-                        else_: Box::new(no.finish(fallback).body),
-                    },
-                },
+                body: block.branch(condition, yes, no.finish(fallback).body),
             },
             &hints,
         )?;
@@ -225,7 +218,7 @@ impl Lower<'_> {
         mut block: Code,
         suffix: &Suffix,
         span: Span,
-    ) -> Result<Block, LowerError> {
+    ) -> Result<SpannedBlock, LowerError> {
         let Some(guard) = &arm.guard else {
             return self.matched_body_block(arm, inside, block, suffix.mode, span);
         };
@@ -235,14 +228,7 @@ impl Lower<'_> {
         // The successful pattern may shadow an outer name. A false guard
         // resumes the suffix with the original environment, not its bindings.
         let fallback = suffix.call(0, outer, &mut no, span)?;
-        Ok(Block {
-            instructions: block.instructions,
-            exit: Exit::Branch {
-                condition,
-                then_: Box::new(yes),
-                else_: Box::new(no.finish(fallback).body),
-            },
-        })
+        Ok(block.branch(condition, yes, no.finish(fallback).body))
     }
     fn matched_body_block(
         &mut self,
@@ -251,7 +237,7 @@ impl Lower<'_> {
         mut block: Code,
         mode: MatchMode,
         span: Span,
-    ) -> Result<Block, LowerError> {
+    ) -> Result<SpannedBlock, LowerError> {
         match mode {
             MatchMode::Ordinary => self.expr_tail(&arm.body, inside, block),
             MatchMode::RecoverySelection => {

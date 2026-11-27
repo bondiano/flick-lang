@@ -6,6 +6,15 @@ break programs.
 
 ## Unreleased
 
+- **Native types.** A `type` with constructors can say where it is the
+  backend's own: `@native when js || go` on its own line after the
+  variants. Where the condition holds, its values are the backend's and it
+  has no constructors; elsewhere the constructors are its Flick
+  representation. Only the Flick body of a definition whose `@native`
+  clauses cover the condition may build or match them (`FLICK-F017`), a
+  native type derives nothing, and one without constructors is
+  `FLICK-F016`.
+
 - **Plugin protocol `0.5.0`: deterministic declaration metadata & plugin-declared
   heads/watch.** `DeriveTarget`, `CaseTarget`, and `Written` carry visibility,
   attributes, `///` documentation on types/variants/record fields, exact spans,

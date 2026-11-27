@@ -1,5 +1,6 @@
-//! In-process `flick run --target vm` execution on `flick_vm::tier0`.
+//! In-process `flick run --target vm` execution on `flick_vm::{tier0, tier1}`.
 
+use std::fs;
 use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -8,11 +9,14 @@ use std::slice;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::memory::Name as MemoryName;
 use flick_core::project::{self, Compiled, Project};
-use flick_core::source::SourceMap;
+use flick_core::source::{FileId, SourceMap, Span};
+use flick_vm::image::{IMAGE_MAGIC, VmImage, execute_image_main_with_args};
+use flick_vm::stdlib::{format_uncaught_cause, format_uncaught_raised};
 use flick_vm::tier0::{
-    Heap, HostMode, ProgramOutcome, Reason, execute_main_program_outcome_with_host,
-    execute_rooted_main_program_outcome_with_host,
+    ExecutionReport, Heap, HostMode, ProgramOutcome, execute_main_program_outcome_with_args,
+    execute_rooted_main_program_outcome_with_args,
 };
+use flick_vm::tier1;
 
 use super::{VmTier, lower, resolve_tier, target_override};
 use crate::args::{GlobalArguments, RunArguments};
@@ -23,12 +27,29 @@ use crate::sources::FsHost;
 use crate::{builtins, package_cache, report};
 
 enum RunSource {
+    Image(PathBuf),
     Standalone(PathBuf),
     Project {
         project: Box<Project>,
         roots: Vec<PathBuf>,
         entry_module: String,
     },
+}
+
+fn is_image_path(cwd: &Path, name: &str) -> bool {
+    if Path::new(name)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("fvm"))
+    {
+        return true;
+    }
+    let candidate = cwd.join(name);
+    if !candidate.is_file() {
+        return false;
+    }
+    fs::read(&candidate)
+        .ok()
+        .is_some_and(|bytes| bytes.starts_with(IMAGE_MAGIC))
 }
 
 fn is_standalone_path(cwd: &Path, name: &str) -> bool {
@@ -91,20 +112,22 @@ fn resolve_source(
 ) -> Result<RunSource, Vec<Diagnostic>> {
     let explicit = global.project.as_deref().map(Path::new);
     let discovered = project::discover(host, sources, &host.cwd, explicit).map_err(|d| vec![d])?;
-    if options.entry.is_none()
-        && let Some(name) = &options.name
-    {
+    if let Some(name) = &options.name {
         let is_project_entry = discovered
             .as_ref()
             .is_some_and(|p| p.config.entries.iter().any(|e| &e.name == name));
-        if !is_project_entry && is_standalone_path(&host.cwd, name) {
+        if !is_project_entry && is_image_path(&host.cwd, name) {
+            let path = project::normalize(&host.cwd.join(name));
+            return Ok(RunSource::Image(path));
+        }
+        if options.entry.is_none() && !is_project_entry && is_standalone_path(&host.cwd, name) {
             let path = project::normalize(&host.cwd.join(name));
             return Ok(RunSource::Standalone(path));
         }
     }
     let Some(project) = discovered else {
         let message = format!(
-            "no `{}` in the working directory or any parent (pass a `.fl` file path to run standalone)",
+            "no `{}` in the working directory or any parent (pass a `.fl` file or `.fvm` image path to run standalone)",
             project::CONFIG_FILE
         );
         return Err(vec![project::no_project(message)]);
@@ -130,7 +153,7 @@ pub(super) fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode 
         }
     };
     let project_ref = match &run_source {
-        RunSource::Standalone(_) => None,
+        RunSource::Image(_) | RunSource::Standalone(_) => None,
         RunSource::Project { project, .. } => Some(project.as_ref()),
     };
     let tier = match resolve_tier(options.vm_tier.as_deref(), project_ref) {
@@ -140,6 +163,9 @@ pub(super) fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode 
             return report::exit_code(&diagnostics);
         }
     };
+    if let RunSource::Image(path) = run_source {
+        return run_image(&path, tier, options, &sources, global);
+    }
     let target_overridden = options::resolve_target(options.target.as_deref(), project_ref)
         .is_ok_and(|(_, overridden)| overridden);
     if let Err(diagnostic) = builtins::prepare_in(false) {
@@ -147,6 +173,7 @@ pub(super) fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode 
         return ExitCode::from(2);
     }
     let (roots, explicit_entry) = match &run_source {
+        RunSource::Image(_) => unreachable!("handled above"),
         RunSource::Standalone(path) => (vec![path.clone()], None),
         RunSource::Project {
             roots,
@@ -207,7 +234,109 @@ pub(super) fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode 
             return ExitCode::from(1);
         }
     };
-    execute_tier0(tier, &lowered, &entry)
+    match tier {
+        VmTier::Tier0 => execute_tier0(&lowered, &entry, options.args.clone()),
+        VmTier::Tier1 => execute_tier1(&lowered, &entry, options.args.clone(), &sources, global),
+    }
+}
+
+fn run_image(
+    path: &Path,
+    tier: VmTier,
+    options: &RunArguments,
+    sources: &SourceMap,
+    global: &GlobalArguments,
+) -> ExitCode {
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            let diagnostic = Diagnostic::new(
+                codes::P013,
+                Severity::Error,
+                format!("cannot read VM image `{}`: {err}", path.display()),
+            );
+            report::render(global, sources, &[diagnostic]);
+            return ExitCode::from(1);
+        }
+    };
+    let image = match VmImage::decode(&bytes) {
+        Ok(image) => image,
+        Err(err) => {
+            let diagnostic = Diagnostic::new(
+                codes::P012,
+                Severity::Error,
+                format!("invalid VM image `{}`: {err}", path.display()),
+            );
+            report::render(global, sources, &[diagnostic]);
+            return ExitCode::from(1);
+        }
+    };
+    let Some(entry) = options
+        .entry
+        .as_deref()
+        .map(|module| MemoryName::new(module, "main"))
+        .or_else(|| image.entry().cloned())
+    else {
+        let diagnostic = Diagnostic::new(
+            codes::P011,
+            Severity::Error,
+            format!(
+                "VM image `{}` has no `main` entry; pass `--entry Module`",
+                path.display()
+            ),
+        );
+        report::render(global, sources, &[diagnostic]);
+        return ExitCode::from(1);
+    };
+    let mut heap = Heap::new();
+    match tier {
+        VmTier::Tier0 => {
+            let report = match execute_image_main_with_args(
+                &mut heap,
+                &image,
+                &entry,
+                u64::MAX,
+                HostMode::LiveOs,
+                options.args.clone(),
+            ) {
+                Ok(report) => report,
+                Err(err) => {
+                    let diagnostic = Diagnostic::new(codes::P012, Severity::Error, err.to_string());
+                    report::render(global, sources, &[diagnostic]);
+                    return ExitCode::from(1);
+                }
+            };
+            finish_report(&mut heap, report)
+        }
+        VmTier::Tier1 => {
+            if image.has_initialized_globals() {
+                let diagnostic = Diagnostic::new(
+                    codes::P012,
+                    Severity::Error,
+                    "tier 1 does not support warm VM images with pre-initialized globals; \
+                     run with `--vm-tier 0`",
+                );
+                report::render(global, sources, &[diagnostic]);
+                return ExitCode::from(1);
+            }
+            let report = match tier1::execute_main_program_outcome_with_args(
+                &mut heap,
+                image.program(),
+                &entry,
+                u64::MAX,
+                HostMode::LiveOs,
+                options.args.clone(),
+            ) {
+                Ok(report) => report,
+                Err(err) => {
+                    let diagnostic = Diagnostic::new(codes::P012, Severity::Error, err.to_string());
+                    report::render(global, sources, &[diagnostic]);
+                    return ExitCode::from(1);
+                }
+            };
+            finish_report(&mut heap, report)
+        }
+    }
 }
 
 fn find_entry_module(
@@ -247,30 +376,79 @@ fn find_entry_module(
     }
 }
 
-fn execute_tier0(tier: VmTier, lowered: &lower::LoweredProgram, entry: &MemoryName) -> ExitCode {
-    let VmTier::Tier0 = tier;
+fn execute_tier0(
+    lowered: &lower::LoweredProgram,
+    entry: &MemoryName,
+    program_args: Vec<String>,
+) -> ExitCode {
     let mut heap = Heap::new();
     let report = match &lowered.root {
-        Some(root) => execute_rooted_main_program_outcome_with_host(
+        Some(root) => execute_rooted_main_program_outcome_with_args(
             &mut heap,
             &lowered.program,
             entry,
             root,
             u64::MAX,
             HostMode::LiveOs,
+            program_args,
         ),
-        None => execute_main_program_outcome_with_host(
+        None => execute_main_program_outcome_with_args(
             &mut heap,
             &lowered.program,
             entry,
             u64::MAX,
             HostMode::LiveOs,
+            program_args,
         ),
     };
+    finish_report(&mut heap, report)
+}
+
+fn execute_tier1(
+    lowered: &lower::LoweredProgram,
+    entry: &MemoryName,
+    program_args: Vec<String>,
+    sources: &SourceMap,
+    global: &GlobalArguments,
+) -> ExitCode {
+    let mut heap = Heap::new();
+    let report = match tier1::execute_main_program_outcome_with_args(
+        &mut heap,
+        &lowered.program,
+        entry,
+        u64::MAX,
+        HostMode::LiveOs,
+        program_args,
+    ) {
+        Ok(report) => report,
+        Err(err) => {
+            let diagnostic = match err.span() {
+                Some(mem_span) if (mem_span.file as usize) < sources.files().count() => {
+                    Diagnostic::error(
+                        codes::P012,
+                        err.to_string(),
+                        Span::new(FileId::new(mem_span.file), mem_span.start, mem_span.end),
+                    )
+                }
+                _ => Diagnostic::new(codes::P012, Severity::Error, err.to_string()),
+            };
+            report::render(global, sources, &[diagnostic]);
+            return ExitCode::from(1);
+        }
+    };
+    finish_report(&mut heap, report)
+}
+
+fn finish_report(heap: &mut Heap, report: ExecutionReport) -> ExitCode {
     if !report.stdout.is_empty() {
         let mut stdout = io::stdout().lock();
         let _ = stdout.write_all(report.stdout.as_bytes());
         let _ = stdout.flush();
+    }
+    if !report.stderr.is_empty() {
+        let mut stderr = io::stderr().lock();
+        let _ = stderr.write_all(report.stderr.as_bytes());
+        let _ = stderr.flush();
     }
     match report.outcome {
         ProgramOutcome::Returned(value) => {
@@ -285,27 +463,18 @@ fn execute_tier0(tier: VmTier, lowered: &lower::LoweredProgram, entry: &MemoryNa
             ExitCode::SUCCESS
         }
         ProgramOutcome::Raised(value) => {
-            eprintln!("error: unhandled failure");
+            let formatted = format_uncaught_raised(heap, &value);
             let _ = heap.drop_value(value);
             let _ = heap.finish();
+            eprintln!("{formatted}");
             ExitCode::from(1)
         }
         ProgramOutcome::Failed(cause) => {
-            let interrupted = heap.cause_reasons(&cause).is_ok_and(|mut reasons| {
-                reasons.len() > 0 && reasons.all(|r| matches!(r, Reason::Interrupt { .. }))
-            });
-            let message = match heap.cause_error(&cause) {
-                Ok(err) | Err(err) => err.to_string(),
-            };
+            let formatted = format_uncaught_cause(heap, &cause);
             let _ = heap.drop_cause(cause);
             let _ = heap.finish();
-            if interrupted {
-                eprintln!("interrupted");
-                ExitCode::from(130)
-            } else {
-                eprintln!("error: {message}");
-                ExitCode::from(1)
-            }
+            eprintln!("{formatted}");
+            ExitCode::from(1)
         }
         ProgramOutcome::Fault(err) => {
             let _ = heap.finish();

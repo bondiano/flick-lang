@@ -321,6 +321,7 @@ fn canonical(e: &Export) -> Export {
             kind: d.kind.clone(),
             form,
             variance: d.variance.clone(),
+            native: d.native.clone(),
         }
     });
     Export {

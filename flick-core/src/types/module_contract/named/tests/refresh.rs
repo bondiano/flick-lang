@@ -21,6 +21,7 @@ fn current_actual_form_and_checker_issue_are_required() {
                     }),
                 },
                 variance: Vec::new(),
+                native: None,
             },
         );
         assert!(
@@ -37,6 +38,7 @@ fn current_actual_form_and_checker_issue_are_required() {
                     requirements: Vec::new(),
                 },
                 variance: Vec::new(),
+                native: None,
             },
         );
         assert!(
@@ -60,6 +62,7 @@ fn aliases_remain_live_without_bumping_the_raw_contract_revision() {
                     opaque: false,
                 },
                 variance: Vec::new(),
+                native: None,
             },
         );
         define(checker, vec![member("F", Some(Type::con("Probe", "A")))]);
@@ -80,6 +83,7 @@ fn aliases_remain_live_without_bumping_the_raw_contract_revision() {
                     opaque: false,
                 },
                 variance: Vec::new(),
+                native: None,
             },
         );
         let current = checker
@@ -189,6 +193,7 @@ fn failed_full_preflight_changes_no_owned_slot_marker_or_revision() {
                     derive: false,
                 },
                 variance: Vec::new(),
+                native: None,
             })),
             methods: Vec::new(),
         };
@@ -282,6 +287,7 @@ fn alpha_equal_source_carriers_are_repaired_even_when_the_raw_revision_is_equal(
                     requirements: Vec::new(),
                 },
                 variance: Vec::new(),
+                native: None,
             },
         );
         define(checker, vec![member("F", Some(body()))]);
@@ -320,6 +326,7 @@ fn equal_semantic_owned_definitions_do_not_replace_exact_issued_carriers() {
                     requirements: Vec::new(),
                 },
                 variance: Vec::new(),
+                native: None,
             },
         );
         define(checker, vec![member("F", Some(existential))]);
@@ -377,6 +384,7 @@ fn refresh_never_installs_fixed_foreign_declarations_and_rejects_extra_owned_slo
                     effect: false,
                 },
                 variance: Vec::new(),
+                native: None,
             })),
             methods: Vec::new(),
         };
@@ -405,6 +413,7 @@ fn refresh_never_installs_fixed_foreign_declarations_and_rejects_extra_owned_slo
                 kind: Kind::Type,
                 form: Form::NOMINAL,
                 variance: Vec::new(),
+                native: None,
             },
         );
         checker.env.module = module;

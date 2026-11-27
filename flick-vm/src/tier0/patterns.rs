@@ -6,7 +6,7 @@ use std::mem;
 
 use flick_core::ir::{EnumLit, JsClass, Lit, Pat, Rep};
 
-pub(super) use super::record_update::update;
+pub(crate) use super::record_update::{update, update_labels};
 use super::{Data, Error, Heap, ObjectId, ObjectToken, Value, charge, tagged_boundary};
 use crate::stdlib::{FuelCounter, primitives as std_primitives};
 
@@ -90,7 +90,17 @@ struct Choice<'p> {
 
 type Bindings<'p> = Vec<(&'p str, Place)>;
 
-pub(super) fn execute(
+pub(crate) fn test_only(
+    heap: &Heap,
+    root: &Value,
+    pattern: &Pat,
+    fuel: &mut u64,
+) -> Result<bool, Error> {
+    heap.admit_ordinary(root)?;
+    Ok(select(heap, root, pattern, fuel)?.is_some())
+}
+
+pub(crate) fn execute(
     heap: &mut Heap,
     root: &Value,
     pattern: &Pat,
@@ -528,7 +538,7 @@ fn record<'p>(
 
 #[expect(
     clippy::float_cmp,
-    reason = "literal Float matching uses numeric equality, not SameValueZero"
+    reason = "literal Float matching uses numeric equality"
 )]
 fn literal_matches(
     heap: &Heap,
@@ -538,29 +548,29 @@ fn literal_matches(
 ) -> Result<bool, Error> {
     match (literal, value) {
         (Lit::Unit, Value::Unit) => Ok(true),
-        (Lit::Bool(left), Value::Bool(right)) => Ok(left == right),
-        (Lit::Int(left), Value::Int(right)) => Ok(left == right),
-        (Lit::Int8(left), Value::Int8(right)) => Ok(left == right),
-        (Lit::Int16(left), Value::Int16(right)) => Ok(left == right),
-        (Lit::Int64(left), Value::Int64(right)) => Ok(left == right),
-        (Lit::UInt8(left), Value::UInt8(right)) => Ok(left == right),
-        (Lit::UInt16(left), Value::UInt16(right)) => Ok(left == right),
-        (Lit::UInt32(left), Value::UInt32(right)) => Ok(left == right),
-        (Lit::UInt64(left), Value::UInt64(right)) => Ok(left == right),
-        (Lit::Float(left), Value::Float(right)) => Ok(left == right),
-        (Lit::Float32(left), Value::Float32(right)) => Ok(left == right),
-        (Lit::String(left), _) => {
-            if let Ok(right) = heap.string(value) {
-                charge(fuel, left.len().saturating_add(right.len()))?;
-                Ok(left == right)
+        (Lit::Bool(l), Value::Bool(r)) => Ok(l == r),
+        (Lit::Int(l), Value::Int(r)) => Ok(l == r),
+        (Lit::Int8(l), Value::Int8(r)) => Ok(l == r),
+        (Lit::Int16(l), Value::Int16(r)) => Ok(l == r),
+        (Lit::Int64(l), Value::Int64(r)) => Ok(l == r),
+        (Lit::UInt8(l), Value::UInt8(r)) => Ok(l == r),
+        (Lit::UInt16(l), Value::UInt16(r)) => Ok(l == r),
+        (Lit::UInt32(l), Value::UInt32(r)) => Ok(l == r),
+        (Lit::UInt64(l), Value::UInt64(r)) => Ok(l == r),
+        (Lit::Float(l), Value::Float(r)) => Ok(l == r),
+        (Lit::Float32(l), Value::Float32(r)) => Ok(l == r),
+        (Lit::String(l), _) => {
+            if let Ok(r) = heap.string(value) {
+                charge(fuel, l.len().saturating_add(r.len()))?;
+                Ok(l == r)
             } else {
                 let units = heap.utf16_units(value)?;
-                charge(fuel, left.len().saturating_add(units.len()))?;
+                charge(fuel, l.len().saturating_add(units.len()))?;
                 Ok(false)
             }
         }
-        (Lit::BigInt(left), _) => {
-            std_primitives::bigint_pattern_eq(left, heap.bigint(value)?, &mut FuelCounter(fuel))
+        (Lit::BigInt(l), _) => {
+            std_primitives::bigint_pattern_eq(l, heap.bigint(value)?, &mut FuelCounter(fuel))
         }
         _ => Err(Error::PatternKind("matching literal type")),
     }

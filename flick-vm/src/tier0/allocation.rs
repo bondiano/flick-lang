@@ -12,6 +12,9 @@ impl Heap {
             service_tags: BTreeMap::new(),
             dropped_continuations: Vec::new(),
             released_foreign_handles: Vec::new(),
+            active_module: None,
+            module_names: Vec::new(),
+            module_indices: BTreeMap::new(),
         }
     }
 
@@ -45,7 +48,7 @@ impl Heap {
     }
 
     /// Drains continuation IDs whose last counted reference hit zero in `execution`.
-    pub(super) fn take_dropped_continuations(&mut self, execution: usize) -> Vec<usize> {
+    pub(crate) fn take_dropped_continuations(&mut self, execution: usize) -> Vec<usize> {
         let mut taken = Vec::new();
         let mut kept = Vec::new();
         for (owner, id) in mem::take(&mut self.dropped_continuations) {
@@ -113,7 +116,7 @@ impl Heap {
         }
     }
 
-    pub(super) fn var_contents<'a>(
+    pub(crate) fn var_contents<'a>(
         &'a self,
         execution: usize,
         var: &VarHandle,
@@ -144,7 +147,7 @@ impl Heap {
         contents.as_ref().ok_or(Error::ClosedVar)
     }
 
-    pub(super) fn var_contents_mut<'a>(
+    pub(crate) fn var_contents_mut<'a>(
         &'a mut self,
         execution: usize,
         var: &VarHandle,

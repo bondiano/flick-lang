@@ -7,6 +7,8 @@
 //! keeps the binding it saw. An expression is the value `it`. A phrase that
 //! fails leaves the session as it was.
 
+mod analysis;
+mod commands;
 mod render;
 #[cfg(test)]
 mod tests;
@@ -15,13 +17,18 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 
+pub use analysis::HandlerStyle;
+use analysis::inspect_task;
+pub use commands::{AcceptedBg, AcceptedHandle, AcceptedProvide};
 use render::{Layout, Name, Scope, Space, imported, name_of, starts_declaration};
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::iface::Export;
+use crate::iface::{Export, Namespace};
 use crate::project::config::Config;
-use crate::project::{Compilation, Host, ModuleCache, Project, compile_with};
-use crate::resolve::{declarations, module_syntax};
+use crate::project::{
+    Compilation, Host, ModuleCache, Project, TargetOverride, compile_for, compile_with,
+};
+use crate::resolve::{Import, declarations, module_syntax};
 use crate::source::{FileId, SourceMap, Span};
 use crate::syntax::parse;
 use crate::types::{Type, builtins};
@@ -45,6 +52,26 @@ pub struct Accepted<'s> {
     pub compilation: Compilation,
     /// Its warnings, placed in the input.
     pub diagnostics: Vec<Diagnostic>,
+    /// Whether the phrase was an expression (bound to `it`), rather than declarations.
+    pub expression: bool,
+    /// Checked/inferred type of `it` when `expression` is true.
+    pub value_type: Option<Type>,
+    /// Unresolved user effects on `it`, if any.
+    pub effects: Vec<String>,
+    /// Whether `it` has an `Eff r e a` task type that should be auto-awaited.
+    pub is_task: bool,
+    /// Result type `a` of `Eff r e a` when `is_task` is true.
+    pub ok_type: Option<Type>,
+    /// Error row `e` of `Eff r e a` when `is_task` is true and `e` is non-empty.
+    pub err_type: Option<Type>,
+}
+
+/// Snapshot enabling [`Session::rollback_last`] after a runtime abort/interrupt.
+struct UndoState {
+    path: PathBuf,
+    prev_scope: Scope,
+    prev_handled_len: usize,
+    prev_provided_len: usize,
 }
 
 /// The phrases entered so far and what checking them keeps.
@@ -52,10 +79,14 @@ pub struct Session {
     project: Project,
     sources: SourceMap,
     cache: ModuleCache,
+    target: Option<TargetOverride>,
     /// The text of each phrase module, by path.
     files: BTreeMap<PathBuf, String>,
     phrases: Vec<Phrase>,
     scope: Scope,
+    handled_effects: Vec<String>,
+    provided_services: Vec<String>,
+    last_undo: Option<UndoState>,
 }
 
 impl Default for Session {
@@ -101,10 +132,30 @@ impl Session {
             project,
             sources,
             cache: ModuleCache::default(),
+            target: None,
             files: BTreeMap::new(),
             phrases: Vec::new(),
             scope: Scope::default(),
+            handled_effects: Vec::new(),
+            provided_services: Vec::new(),
+            last_undo: None,
         }
+    }
+
+    /// Creates a session configured to typecheck phrases against `target`
+    /// (for example `"vm"` for `vm/native`).
+    pub fn with_target(target: impl Into<String>) -> Self {
+        let target_name = target.into();
+        let mut session = Self::new();
+        let rt = (target_name != "vm").then_some(true).or(Some(false));
+        session.target = Some(TargetOverride {
+            target: Some(target_name),
+            target_overridden: true,
+            rt,
+            skip_backend_check_target: true,
+            ..TargetOverride::default()
+        });
+        session
     }
 
     /// The inputs and phrase modules, for rendering diagnostics.
@@ -116,6 +167,14 @@ impl Session {
         &self.phrases
     }
 
+    pub fn handled_effects(&self) -> &[String] {
+        &self.handled_effects
+    }
+
+    pub fn provided_services(&self) -> &[String] {
+        &self.provided_services
+    }
+
     /// The type of the newest value `name`.
     pub fn value(&self, name: &str) -> Option<&Type> {
         let (phrase, _) = self.scope.names.get(&(Space::Value, name.to_owned()))?;
@@ -123,6 +182,20 @@ impl Session {
             .find(|e| e.entity.name == name && Space::of(e.entity.namespace) == Space::Value)?
             .scheme
             .as_ref()
+    }
+
+    /// Reverts the most recently accepted phrase or session command, restoring
+    /// `phrases`, `scope`, `files`, and installed effect/service records.
+    pub fn rollback_last(&mut self) -> bool {
+        let Some(undo) = self.last_undo.take() else {
+            return false;
+        };
+        self.files.remove(&undo.path);
+        self.phrases.pop();
+        self.scope = undo.prev_scope;
+        self.handled_effects.truncate(undo.prev_handled_len);
+        self.provided_services.truncate(undo.prev_provided_len);
+        true
     }
 
     /// Checks and lowers `input` against the earlier phrases. On success it
@@ -163,32 +236,74 @@ impl Session {
             "module {module} exposing (..)\n{}",
             self.scope.imports(&earlier, &own, &again)
         );
-        let mut layout = if expression {
-            let previous = self.scope.names.get(&(Space::Value, "it".to_owned()));
-            Layout::expression(&head, input, previous.map(|(_, module)| module.as_str()))
+        let previous_it = self
+            .scope
+            .names
+            .get(&(Space::Value, "it".to_owned()))
+            .map(|(_, module)| module.clone());
+        let initial_layout = if expression {
+            Layout::expression(&head, input, previous_it.as_deref())
         } else {
             Layout::declarations(&head, input)
         };
-        let (mut diagnostics, mut compilation) = self.check(&path, &layout.text);
-        // a function needs a signature: the one the checker inferred is written
-        if let Some(signed) = self.signed(&layout, &path, &diagnostics) {
-            layout = signed;
-            (diagnostics, compilation) = self.check(&path, &layout.text);
+        let (mut layout, mut diagnostics, mut compilation) =
+            self.check_and_sign(&path, initial_layout);
+        // Effectful expressions (such as `Platform.stdout_line "hi"` or `Ask.ask ()`)
+        // fail pure module initialization with E001; retry them wrapped in `task { ... }`.
+        if expression && self.has_pure_init_error(&path, &diagnostics) {
+            let task_layout = Layout::task_expression(&head, input, previous_it.as_deref());
+            (layout, diagnostics, compilation) = self.check_and_sign(&path, task_layout);
         }
         let placed = self.place(diagnostics, &path, &layout, file);
         if placed.iter().any(|d| d.severity == Severity::Error) {
             self.files.remove(&path);
             return Err(placed);
         }
+        let value_type = if expression {
+            Self::binding_scheme(&compilation, &module, "it")
+        } else {
+            None
+        };
+        let task_info = value_type
+            .as_ref()
+            .and_then(|ty| inspect_task(ty, &self.handled_effects, &self.provided_services));
+        let (is_task, ok_type, err_type, effects) = match task_info {
+            Some(info) => (true, Some(info.ok_type), info.err_type, info.effects),
+            None => (false, None, None, Vec::new()),
+        };
+        self.commit_phrase(&path, module, file, &compilation, &imports, brought);
+        Ok(Accepted {
+            phrase: self.phrases.last().expect("the phrase just entered"),
+            compilation,
+            diagnostics: placed,
+            expression,
+            value_type,
+            effects,
+            is_task,
+            ok_type,
+            err_type,
+        })
+    }
+
+    fn commit_phrase(
+        &mut self,
+        path: &Path,
+        module: String,
+        input: FileId,
+        compilation: &Compilation,
+        imports: &[Import],
+        brought: Vec<(Name, String, Option<Export>)>,
+    ) {
         let mut names: Vec<Export> = (compilation.modules.iter())
             .find(|m| m.name == module)
             .map(|m| m.interface.exports.clone())
             .unwrap_or_default();
+        self.save_undo(path);
         let index = self.phrases.len();
         for export in &names {
             (self.scope.names).insert(name_of(export), (index, module.clone()));
         }
-        for import in &imports {
+        for import in imports {
             self.scope
                 .modules
                 .insert(import.module.clone(), import.alias.clone());
@@ -199,14 +314,62 @@ impl Session {
         }
         self.phrases.push(Phrase {
             module,
-            input: file,
+            input,
             names,
         });
-        Ok(Accepted {
-            phrase: self.phrases.last().expect("the phrase just entered"),
-            compilation,
-            diagnostics: placed,
-        })
+    }
+
+    fn save_undo(&mut self, path: &Path) {
+        self.last_undo = Some(UndoState {
+            path: path.to_owned(),
+            prev_scope: self.scope.clone(),
+            prev_handled_len: self.handled_effects.len(),
+            prev_provided_len: self.provided_services.len(),
+        });
+    }
+
+    fn binding_scheme(compilation: &Compilation, module: &str, name: &str) -> Option<Type> {
+        compilation
+            .modules
+            .iter()
+            .find(|m| m.name == module)?
+            .interface
+            .exports
+            .iter()
+            .find(|e| e.entity.name == name && e.entity.namespace == Namespace::Value)
+            .and_then(|e| e.scheme.clone())
+    }
+
+    fn input_error(&self, file: FileId, message: String) -> Diagnostic {
+        let whole = Span::new(
+            file,
+            0,
+            u32::try_from(self.sources.get(file).text.len()).unwrap_or(0),
+        );
+        Diagnostic::error(codes::T002, message, whole)
+    }
+
+    fn has_pure_init_error(&self, path: &Path, diagnostics: &[Diagnostic]) -> bool {
+        let Some(module) = self.file_of(path) else {
+            return false;
+        };
+        diagnostics
+            .iter()
+            .any(|d| d.code == codes::E001 && d.span.is_some_and(|s| s.file == module))
+    }
+
+    fn check_and_sign(
+        &mut self,
+        path: &Path,
+        mut layout: Layout,
+    ) -> (Layout, Vec<Diagnostic>, Compilation) {
+        let (mut diagnostics, mut compilation) = self.check(path, &layout.text);
+        // a function needs a signature: the one the checker inferred is written
+        if let Some(signed) = self.signed(&layout, path, &diagnostics) {
+            layout = signed;
+            (diagnostics, compilation) = self.check(path, &layout.text);
+        }
+        (layout, diagnostics, compilation)
     }
 
     /// Checks and lowers the phrase module at `path` and what it imports.
@@ -214,15 +377,27 @@ impl Session {
         self.files.insert(path.to_owned(), text.to_owned());
         let roots = [path.to_owned()];
         let host = Files(&self.files);
-        let (diagnostics, compilation, _) = compile_with(
-            &host,
-            &mut self.sources,
-            Some(&self.project),
-            &roots,
-            None,
-            None,
-            Some(&mut self.cache),
-        );
+        let (diagnostics, compilation, _) = if let Some(target) = self.target.as_ref() {
+            compile_for(
+                &host,
+                &mut self.sources,
+                Some(&self.project),
+                &roots,
+                None,
+                Some(target),
+                Some(&mut self.cache),
+            )
+        } else {
+            compile_with(
+                &host,
+                &mut self.sources,
+                Some(&self.project),
+                &roots,
+                None,
+                None,
+                Some(&mut self.cache),
+            )
+        };
         (diagnostics, compilation)
     }
 

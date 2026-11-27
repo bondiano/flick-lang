@@ -382,6 +382,7 @@ fn forged_contract(req: types::ModuleRequirement) -> Interface {
                     requirements: vec![req],
                 },
                 variance: Vec::new(),
+                native: None,
             }),
             blocked: None,
             at: None,
@@ -427,6 +428,7 @@ fn rejects_forged_variance_in_nested_module_signatures_and_anonymous_nominals() 
             derive: false,
         },
         variance: vec![Variance::Contravariant, Variance::Covariant],
+        native: None,
     };
     let bad_kind = TypeDef {
         kind: Kind::Named {
@@ -435,6 +437,7 @@ fn rejects_forged_variance_in_nested_module_signatures_and_anonymous_nominals() 
         },
         form: Form::Kind,
         variance: vec![Variance::Covariant],
+        native: None,
     };
     let anon_nominal = ModuleRequirement::Nominal {
         name: "C".into(),

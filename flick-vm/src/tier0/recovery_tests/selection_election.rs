@@ -2,6 +2,7 @@ fn program() -> Program {
     Program {
         globals: vec![],
         functions: BTreeMap::from([(0, function(vec![0, 1], vec![], 1))]),
+        op_spans: BTreeMap::new(),
     }
 }
 

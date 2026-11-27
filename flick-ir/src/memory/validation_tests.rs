@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 fn function(instructions: Vec<Instruction>) -> Function {
     Function {
         params: vec![0],
@@ -102,6 +103,7 @@ fn forwarding_program() -> Program {
                 initializer: 1,
             },
         ],
+        op_spans: BTreeMap::new(),
     }
 }
 
@@ -153,6 +155,7 @@ fn program_validation_rejects_an_intrinsic_with_wrong_consuming_arity() {
     let program = Program {
         functions: BTreeMap::from([(0, function)]),
         globals: vec![],
+        op_spans: BTreeMap::new(),
     };
     assert_eq!(
         validate_program(&program),
@@ -279,6 +282,7 @@ fn selected_owner_helpers_validate_their_consumed_arity() {
             ),
         ]),
         globals: vec![],
+        op_spans: BTreeMap::new(),
     };
     assert_eq!(validate_program(&program), Ok(()));
     program
@@ -376,6 +380,7 @@ fn stage2_control_var_loop_and_generator_operations_validate_arity_and_tokens() 
     let mut program = Program {
         functions: BTreeMap::from([(0, main), (1, helper_one), (2, helper_two)]),
         globals: vec![],
+        op_spans: BTreeMap::new(),
     };
     assert_eq!(validate_program(&program), Ok(()));
     program.functions.get_mut(&2).expect("gen").params.push(2);
@@ -426,6 +431,7 @@ fn validates_foreign_call_arity_and_ownership() {
     let program = Program {
         functions: BTreeMap::from([(0, valid)]),
         globals: vec![],
+        op_spans: BTreeMap::new(),
     };
     assert_eq!(validate_program(&program), Ok(()));
 
@@ -445,6 +451,7 @@ fn validates_foreign_call_arity_and_ownership() {
     let bad_program = Program {
         functions: BTreeMap::from([(0, bad_arity)]),
         globals: vec![],
+        op_spans: BTreeMap::new(),
     };
     assert_eq!(
         validate_program(&bad_program),

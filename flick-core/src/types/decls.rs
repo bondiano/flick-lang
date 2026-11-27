@@ -211,6 +211,7 @@ impl Checker<'_> {
                 kind,
                 form,
                 variance: Vec::new(),
+                native: super::ffi::type_native_condition(decl, self.text),
             },
         );
         if decl.kind == K::ServiceDecl {
@@ -237,6 +238,7 @@ impl Checker<'_> {
                     opaque: false,
                 },
                 variance: Vec::new(),
+                native: None,
             },
         );
     }

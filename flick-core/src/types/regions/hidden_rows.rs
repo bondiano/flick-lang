@@ -8,7 +8,7 @@
 use super::live::merge;
 use crate::iface::{Entity, Namespace};
 use crate::types::Checker;
-use crate::types::env::Form;
+use crate::types::env::{Form, TypeDef};
 use crate::types::kinds::Kind;
 use crate::types::lang::Lang;
 use crate::types::ty::{Binder, Elided, Norm, Type};
@@ -32,7 +32,7 @@ impl Checker<'_> {
         if seen.iter().any(|(m, n)| m == module && n == name) {
             return false;
         }
-        match self.env.type_def(module, name).map(|d| &d.form) {
+        match self.env.type_def(module, name).map(TypeDef::typing) {
             Some(Form::Nominal { hidden, .. }) => *hidden,
             Some(Form::Adt { constructors, .. }) => {
                 seen.push((module.clone(), name.clone()));

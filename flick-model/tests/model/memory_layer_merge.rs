@@ -11,6 +11,7 @@ use flick_core::{
     opt::perceus,
 };
 use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
+use std::collections::BTreeMap;
 
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }
@@ -62,6 +63,7 @@ fn program(instructions: Vec<Instruction>, result: u32, callback: Function) -> P
             name: entry(),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     }
 }
 fn perform(effect: &str, op: &str) -> Operation {
@@ -392,6 +394,7 @@ fn construction_is_inert_and_deep_shared_graph_destruction_is_iterative() {
             name: entry(),
             initializer: 0,
         }],
+        op_spans: BTreeMap::new(),
     };
     let mut heap = Heap::new();
     let value = match execute_program_outcome(&mut heap, &p, &entry(), vec![], 100_000).outcome {

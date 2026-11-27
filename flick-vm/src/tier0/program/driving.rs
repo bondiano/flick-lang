@@ -76,6 +76,7 @@ impl Machine<'_, '_> {
                 self.begin_build_layer(layer, memo_id, sub_owner, false, LayerBuildTarget::Top)?;
                 continue;
             }
+            self.poll_external_interrupt()?;
             if self.failure.is_some() && !self.failure_elected {
                 self.prepare_failure()?;
             }
@@ -156,6 +157,29 @@ impl Machine<'_, '_> {
                 // Current fiber parked inside quantum preempt or has no frame; loop to re-check.
             }
         }
+    }
+
+    fn poll_external_interrupt(&mut self) -> Result<(), Error> {
+        if self
+            .external_interrupt
+            .as_ref()
+            .is_some_and(|flag| flag.load(Ordering::Relaxed))
+        {
+            self.interrupt_active_fiber()?;
+        }
+        Ok(())
+    }
+
+    fn interrupt_active_fiber(&mut self) -> Result<(), Error> {
+        if self.interrupt_requested.is_none() {
+            let target = self.active_fiber;
+            self.request_interrupt(target, 0)?;
+            if target != 1 {
+                self.request_interrupt(1, 0)?;
+            }
+        }
+        self.check_active_interrupt()?;
+        Ok(())
     }
 
     fn step(&mut self) -> Result<(), Error> {

@@ -266,7 +266,9 @@ let remainder divisor self =
       // `5e-324` is the least positive number: a remainder below it is not 0
       // `show` writes a `BigInt` with its suffix `n`
       let digits = show out
-      match String.to_number (String.slice 0 (String.length digits - 1) digits ++ "e" ++ show e) with
+      match
+        String.to_number (String.slice 0 (String.length digits - 1) digits ++ "e" ++ show e)
+      with
       | Some r -> if r == 0.0 then (if self < 0.0 then -5e-324 else 5e-324) else r
       | None -> 0.0 / 0.0
   @native "flick:Number" "remainder" when js || go

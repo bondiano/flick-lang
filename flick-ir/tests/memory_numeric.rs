@@ -34,11 +34,13 @@ fn numeric_arity_and_owned_operand_multiplicity_are_checked() {
         let program = Program {
             functions: BTreeMap::from([(3, function(locals.clone(), kind, locals))]),
             globals: vec![],
+            op_spans: BTreeMap::new(),
         };
         assert_eq!(memory::validate_program(&program), Ok(()));
         let program = Program {
             functions: BTreeMap::from([(3, function(vec![], kind, vec![]))]),
             globals: vec![],
+            op_spans: BTreeMap::new(),
         };
         assert_eq!(
             memory::validate_program(&program),

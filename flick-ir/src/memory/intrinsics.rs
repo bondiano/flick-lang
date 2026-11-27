@@ -6,9 +6,9 @@ use super::{
     ArbitraryIntrinsic, AsyncIntrinsic, BigDecimalIntrinsic, BigIntIntrinsic, BytesIntrinsic,
     ConfigIntrinsic, CronIntrinsic, CryptoIntrinsic, DateTimeIntrinsic, DebugIntrinsic,
     DurationIntrinsic, FixedWidthIntrinsic, FloatIntrinsic, GenIntrinsic, GraphIntrinsic,
-    HashIntrinsic, IntIntrinsic, JsonIntrinsic, JsonSchemaIntrinsic, LayerIntrinsic, ListIntrinsic,
-    OutcomeIntrinsic, PathIntrinsic, RecordIntrinsic, RegExpIntrinsic, SchemaIntrinsic,
-    StringIntrinsic,
+    HashIntrinsic, HostServiceIntrinsic, IntIntrinsic, JsonIntrinsic, JsonSchemaIntrinsic,
+    LayerIntrinsic, ListIntrinsic, OutcomeIntrinsic, PathIntrinsic, RecordIntrinsic,
+    RegExpIntrinsic, SchemaIntrinsic, StringIntrinsic,
 };
 
 /// Platform-independent operations whose host bindings have a known
@@ -166,6 +166,8 @@ pub enum Intrinsic {
     Config(ConfigIntrinsic),
     /// Pure metered `Arbitrary` RNG, shrink, and formatting primitives (Stage 4D).
     Arbitrary(ArbitraryIntrinsic),
+    /// Native Rust VM host service operations (`File`, `FileSystem`, `ChildProcess`).
+    HostService(HostServiceIntrinsic),
 }
 
 /// The host primitives of `Host.live` besides `PrintLine`.

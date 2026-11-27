@@ -19,19 +19,25 @@ use regex_automata::meta::Regex;
 pub(crate) mod causes;
 pub use causes::{CauseToken, DefectClass, DefectCode, DefectSpec, LanguageExit, Reason};
 
-pub use crate::stdlib::{DRAW, HostBridge, HostMode, MILLIS, MONOTONIC_NANOS, NANOS};
+pub use crate::stdlib::{DRAW, HostBridge, HostMode, HostServices, MILLIS, MONOTONIC_NANOS, NANOS};
 use crate::stdlib::{Unmetered, eval_binary, eval_neg, eval_not};
 
-mod patterns;
-mod program;
+pub(crate) mod patterns;
+pub(crate) mod program;
 mod record_update;
 pub use program::{
     Executed, ExecutionReport, ProgramOutcome, TestCaseResult, execute_main_program,
-    execute_main_program_outcome, execute_main_program_outcome_with_bridge,
-    execute_main_program_outcome_with_host, execute_main_with_bridge_and_inits, execute_program,
-    execute_program_outcome, execute_rooted_main_program_outcome,
+    execute_main_program_outcome, execute_main_program_outcome_with_args,
+    execute_main_program_outcome_with_bridge, execute_main_program_outcome_with_host,
+    execute_main_with_bridge_and_inits, execute_program, execute_program_outcome,
+    execute_rooted_main_program_outcome, execute_rooted_main_program_outcome_with_args,
     execute_rooted_main_program_outcome_with_bridge, execute_rooted_main_program_outcome_with_host,
-    execute_tests_program, execute_tests_program_with_bridge,
+    execute_tests_program, execute_tests_program_with_bridge, execute_tests_program_with_host,
+};
+pub(crate) use program::{
+    SessionHandlerKind, SessionPersistentState, SessionRunSpec, SessionSyntheticCodes,
+    allocate_execution_id, build_session_layer_value, execute_main_with_persistent_state,
+    execute_program_with_persistent_state, execute_session_step, shutdown_persistent_state,
 };
 
 /// An allocation's identity includes its heap and generation. Recycled backing
@@ -102,8 +108,8 @@ pub struct ArenaView {
 /// Nonowning handle to a frame-owned mutable local variable (`let mut`).
 #[derive(Debug, PartialEq, Eq)]
 pub struct VarHandle {
-    id: ObjectId,
-    execution: usize,
+    pub(crate) id: ObjectId,
+    pub(crate) execution: usize,
 }
 
 /// Nonowning handle to a root-owned single-flight `Lazy` cell.
@@ -283,6 +289,7 @@ include!("tier0/aggregates.rs");
 include!("tier0/ownership.rs");
 include!("tier0/reuse.rs");
 include!("tier0/standalone.rs");
+include!("tier0/image_support.rs");
 include!("tier0/heap_tests.rs");
 #[cfg(test)]
 include!("tier0/aggregate_tests.rs");
