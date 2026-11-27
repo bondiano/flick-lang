@@ -9,9 +9,11 @@ use flick_core::ir::memory::Name;
 use super::ImageError;
 use super::heap_snap::HeapSnapper;
 use super::heap_types::{
-    SnapCronData, SnapDefectCode, SnapExitData, SnapGraphData, SnapGraphEdge, SnapGraphNode,
-    SnapLayerData, SnapLazyState, SnapObject, SnapStoredReason, SnapTimeZoneData, SnapValue,
+    SnapCliMultiplicity, SnapCliParam, SnapCliSpec, SnapCronData, SnapDefectCode, SnapExitData,
+    SnapGraphData, SnapGraphEdge, SnapGraphNode, SnapLayerData, SnapLazyState, SnapObject,
+    SnapStoredReason, SnapTimeZoneData, SnapValue,
 };
+use crate::stdlib::cli::{CliMultiplicity, CliSpec};
 use crate::tier0::causes::StoredReason;
 use crate::tier0::{
     CronData, Data, DefectCode, ExitData, GraphData, GraphEdge, GraphNode, LayerData, LazyState,
@@ -294,6 +296,60 @@ impl HeapSnapper<'_> {
             indices: out_i,
             values: out_v,
         })
+    }
+
+    pub(super) fn snap_cli_spec(
+        &mut self,
+        global: &Name,
+        path: &mut String,
+        spec: &CliSpec,
+    ) -> Result<SnapCliSpec, ImageError> {
+        let saved_len = path.len();
+        let mut params = Vec::with_capacity(spec.params.len());
+        for (i, param) in spec.params.iter().enumerate() {
+            let _ = write!(path, ".params[{i}].dictionary");
+            let dictionary = self.snap_value(global, path, &param.dictionary)?;
+            path.truncate(saved_len);
+            params.push(SnapCliParam {
+                flag: param.flag,
+                label: param.label.clone(),
+                aliases: param.aliases.clone(),
+                help: param.help.clone(),
+                multi: snap_cli_multi(param.multi),
+                dictionary,
+            });
+        }
+        let mut subcommands = Vec::with_capacity(spec.subcommands.len());
+        for (i, (sub, help)) in spec.subcommands.iter().enumerate() {
+            let _ = write!(path, ".subcommands[{i}]");
+            let snapped = self.snap_cli_spec(global, path, sub)?;
+            path.truncate(saved_len);
+            subcommands.push((snapped, help.clone()));
+        }
+        let handler = match &spec.handler {
+            Some(h) => {
+                path.push_str(".handler");
+                let snapped = self.snap_value(global, path, h)?;
+                path.truncate(saved_len);
+                Some(snapped)
+            }
+            None => None,
+        };
+        Ok(SnapCliSpec {
+            name: spec.name.clone(),
+            description: spec.description.clone(),
+            params,
+            subcommands,
+            handler,
+        })
+    }
+}
+
+pub(super) const fn snap_cli_multi(multi: CliMultiplicity) -> SnapCliMultiplicity {
+    match multi {
+        CliMultiplicity::Required => SnapCliMultiplicity::Required,
+        CliMultiplicity::Optional => SnapCliMultiplicity::Optional,
+        CliMultiplicity::Many => SnapCliMultiplicity::Many,
     }
 }
 

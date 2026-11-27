@@ -20,6 +20,7 @@ pub(crate) mod causes;
 pub use causes::{CauseToken, DefectClass, DefectCode, DefectSpec, LanguageExit, Reason};
 
 pub use crate::sandbox::{Capability, LimitKind};
+use crate::stdlib::cli::{CliMultiplicity, CliSpec};
 pub use crate::stdlib::{DRAW, HostBridge, HostMode, HostServices, MILLIS, MONOTONIC_NANOS, NANOS};
 use crate::stdlib::{Unmetered, eval_binary, eval_neg, eval_not};
 

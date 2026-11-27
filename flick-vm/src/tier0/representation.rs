@@ -332,6 +332,10 @@ pub(crate) enum Data {
         execution: usize,
         host_id: u64,
     },
+    /// Immutable CLI command specification owning parameter dictionaries and handler.
+    CliSpec(Box<CliSpec>),
+    /// CLI parameter multiplicity token (`Cli.required`, `Cli.optional`, `Cli.many`).
+    CliMulti(CliMultiplicity),
 }
 
 #[derive(Debug)]

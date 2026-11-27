@@ -457,7 +457,9 @@ fn release_data_children(data: Data, pending: &mut Vec<Value>) {
             pending.extend(walker.indices);
             pending.extend(walker.values);
         }
+        Data::CliSpec(spec) => spec.drain_values(pending),
         Data::ReuseToken { .. }
+        | Data::CliMulti(_)
         | Data::Defect(_)
         | Data::Duration(_)
         | Data::DateTime(_)

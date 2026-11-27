@@ -11,7 +11,9 @@ use flick_core::ir::memory::CodeId;
 use num_bigint::BigInt;
 
 use super::ImageError;
-use super::heap_restore_extra::{compile_regexp, restore_cron, restore_defect, restore_timezone};
+use super::heap_restore_extra::{
+    compile_regexp, restore_cli_multi, restore_cron, restore_defect, restore_timezone,
+};
 use super::heap_types::{
     HeapSnapshot, SnapDateTimeData, SnapDurationData, SnapId, SnapLazyState, SnapObject,
     SnapSeqData, SnapValue,
@@ -415,6 +417,8 @@ impl Restorer<'_, '_> {
                     }
                 }
             }
+            SnapObject::CliSpec(spec) => Data::CliSpec(Box::new(self.build_cli_spec(spec)?)),
+            SnapObject::CliMulti(multi) => Data::CliMulti(restore_cli_multi(*multi)),
             SnapObject::ServiceTag { .. } | SnapObject::Cell { .. } | SnapObject::Lazy { .. } => {
                 unreachable!("ServiceTag, Cell, and Lazy handled earlier")
             }

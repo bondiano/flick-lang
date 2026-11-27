@@ -23,7 +23,7 @@ pub use foreign::{ForeignCallSpec, WireHint};
 mod handlers;
 pub use handlers::{HandlerEffect, HandlerOperation};
 mod intrinsics;
-pub use intrinsics::{HostPrimitive, Intrinsic};
+pub use intrinsics::{CliIntrinsic, HostPrimitive, Intrinsic};
 
 pub type Local = u32;
 pub type CodeId = u32;
@@ -485,4 +485,5 @@ mod tests {
     include!("memory/validation_tests.rs");
     include!("memory/aggregate_tests.rs");
     include!("memory/serialization_tests.rs");
+    include!("memory/serialization_cli_tests.rs");
 }

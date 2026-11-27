@@ -9,6 +9,8 @@ use crate::common;
 use flick_core::build::{go::executable, runner_path};
 use flick_core::project::config;
 use flick_core::source::FileId;
+#[cfg(unix)]
+use std::os::unix::fs as unix_fs;
 use std::path::Path;
 use std::process::Command;
 use std::{fs, str};
@@ -207,6 +209,78 @@ fn the_mtl_planner_runs_pure_transformers_and_validates_cli_minutes() {
         String::from_utf8(out.stdout).expect("utf-8 stdout"),
         capabilities
     );
+}
+
+#[test]
+#[ignore = "needs Node and the installed runtime"]
+fn the_mtl_planner_matches_js_on_vm_tier0_and_tier1() {
+    let dir = common::example("mtl", "examples/mtl-vm-js-parity");
+    #[cfg(unix)]
+    {
+        let repo_nm = Path::new(env!("CARGO_MANIFEST_DIR")).join("../node_modules");
+        let dst_nm = dir.join("node_modules");
+        if repo_nm.is_dir() && !dst_nm.exists() {
+            let _ = unix_fs::symlink(&repo_nm, &dst_nm);
+        }
+    }
+    success(&dir, &["build", "--target", "vm", "--out-dir", "dist-vm"]);
+
+    let vm_image = dir.join("dist-vm/main.fvm");
+    let vm_image_str = vm_image.to_string_lossy().into_owned();
+
+    let cases: &[&[&str]] = &[
+        &["catalog"],
+        &["plan", "--budget", "60", "docs", "lint"],
+        &["plan", "--budget", "36", "--overhead", "3", "docs", "lint"],
+        &["plan", "--budget", "25", "docs", "lint", "tests"],
+        &["--help"],
+        &["plan", "--help"],
+        &["--version"],
+        &["plan", "--budget", "abc", "docs"],
+        &["plan", "--budget", "-1", "docs"],
+        &["--completions", "bash"],
+        &["--completions", "zsh"],
+        &["--completions", "fish"],
+        &["--completions", "powershell"],
+    ];
+
+    for args in cases {
+        let mut js_args = vec!["run", "--target", "js", "--"];
+        js_args.extend_from_slice(args);
+        let js = flick_in(&dir, &js_args);
+        for tier in ["0", "1"] {
+            let mut vm_args = vec![
+                "run",
+                "--target",
+                "vm",
+                "--vm-tier",
+                tier,
+                &vm_image_str,
+                "--",
+            ];
+            vm_args.extend_from_slice(args);
+            let vm = flick_in(&dir, &vm_args);
+            assert_eq!(
+                vm.status.code(),
+                js.status.code(),
+                "exit code mismatch for {args:?} (tier {tier}): vm={:?} js={:?}\nvm_err={}\njs_err={}",
+                vm.status,
+                js.status,
+                String::from_utf8_lossy(&vm.stderr),
+                String::from_utf8_lossy(&js.stderr),
+            );
+            assert_eq!(
+                String::from_utf8_lossy(&vm.stdout),
+                String::from_utf8_lossy(&js.stdout),
+                "stdout mismatch for {args:?} (tier {tier})"
+            );
+            assert_eq!(
+                String::from_utf8_lossy(&vm.stderr),
+                String::from_utf8_lossy(&js.stderr),
+                "stderr mismatch for {args:?} (tier {tier})"
+            );
+        }
+    }
 }
 
 #[test]

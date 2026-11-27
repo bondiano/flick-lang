@@ -64,6 +64,7 @@ impl Machine<'_, '_> {
             | End::Store(_)
             | End::Global { .. }
             | End::Modify { .. }
+            | End::CliStep { .. }
             | End::FunctionBoundary { .. }
             | End::Loop(_)
             | End::GenerateStrict { .. }

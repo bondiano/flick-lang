@@ -177,6 +177,7 @@ impl<'p> Machine<'p, '_> {
             Destination::Loop { args: items, .. } | Destination::GenerateStrict { items, .. } => {
                 roots.extend(items);
             }
+            Destination::CliStep { state, .. } => state.drain_roots(&mut roots),
             Destination::GeneratorStep { gen_id, .. } => {
                 if let Some(slot) = self.generators.get_mut(&gen_id) {
                     slot.run = GeneratorRun::Done;

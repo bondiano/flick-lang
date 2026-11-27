@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use flick_core::ir::BinOp;
-use flick_core::ir::memory::{HostServiceIntrinsic, Intrinsic, Name, ValueRep};
+use flick_core::ir::memory::{CliIntrinsic, HostServiceIntrinsic, Intrinsic, Name, ValueRep};
 use flick_core::numeric::{Arith, Num};
 use flick_core::types::OpClass;
 
@@ -247,6 +247,14 @@ fn push_handler_and_record_corpus(cases: &mut Vec<(&'static str, Prepared)>) {
         }),
     ));
     cases.push((
+        "cli_arity_mismatch",
+        with_first_instr(Instr::Cli {
+            dst: 0,
+            op: CliIntrinsic::RunVersion,
+            args: vec![0],
+        }),
+    ));
+    cases.push((
         "closure_bad_param_count",
         with_first_instr(Instr::Closure {
             dst: 0,
@@ -291,7 +299,7 @@ pub fn fuzz_mutate_and_verify_bytecode(
     let mut mutated = clone_prepared(base);
     let mutations = 1 + usize::try_from(next() % 4).unwrap_or(0);
     for _ in 0..mutations {
-        let pick = next() % 18;
+        let pick = next() % 19;
         let wild = usize::try_from(next() % 512).unwrap_or(0);
         apply_bytecode_mutation(&mut mutated, pick, wild);
     }
@@ -324,7 +332,7 @@ fn apply_bytecode_mutation(mutated: &mut Prepared, pick: u64, wild: usize) {
             f.instructions.pop();
             f.spans.pop();
         }
-        8..=16 if fn_len > 0 => {
+        8..=17 if fn_len > 0 => {
             let f = &mut mutated.functions[wild % fn_len];
             let ilen = f.instructions.len();
             if ilen > 0 {
@@ -392,6 +400,11 @@ fn mutated_instr(pick: u64, wild: usize) -> Instr {
             id: wild % 16,
             code: wild % 8,
             args: vec![wild % 4],
+        },
+        16 => Instr::Cli {
+            dst: wild % 4,
+            op: CliIntrinsic::RunVersion,
+            args: vec![wild % 8; wild % 5],
         },
         _ => Instr::UpdateCell {
             var: wild % 32,

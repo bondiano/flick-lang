@@ -228,6 +228,11 @@ impl Machine<'_, '_> {
                 let _ = cell;
                 Ok(())
             }
+            End::CliStep { state, .. } => {
+                let mut roots = Vec::new();
+                state.drain_roots(&mut roots);
+                self.heap.drop_values(roots)
+            }
             End::Loop(state) => {
                 let mut arg_roots = Vec::new();
                 for arg in state.args {

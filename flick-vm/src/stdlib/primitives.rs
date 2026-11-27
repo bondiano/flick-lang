@@ -97,6 +97,7 @@ pub(crate) use cause_ops::{
     concat_causes, first_defect_message, join_causes, strip_fail_and_add_interrupt,
 };
 pub(crate) use decimal_ops::format_decimal;
+pub use float_ops::{parse_float, parse_number};
 pub(crate) use isaac_ops::{
     IsaacRng, describe_cause_report, duration_sleep_nanos, fails_to_dies_cause,
     without_interrupts_cause,

@@ -201,6 +201,16 @@ lean`, 363 jobs) remain valid for their token projection; the Rust VM, Node
 worker, wire marshalling, host libraries, and cross-heap refcount symmetry are
 validated by tests rather than proved in Lean.
 
+Audited `flick:cli` bindings (`CliIntrinsic` — 11 variants: `Command`,
+`Description`, `Flag`, `Arg`, `Subcommand`, `Handle`, `Group`, `Required`,
+`Optional`, `Many`, `RunVersion`) lower directly to `Intrinsic::Cli` in
+`flick-core/src/opt/perceus/source/cli.rs` and execute through the shared
+`flick-vm/src/stdlib/cli/` state machine on both tier 0 and tier 1 (`Instr::Cli`)
+with leak-free `OutOfFuel`/error unwinding. Like Stage 3 and Stage 4 intrinsics,
+`Intrinsic::Cli` only adds consuming operand variants under `Operation::Intrinsic`
+with no changes to typing, effects, regions, `Operation`, or `Exit`, so the Lean
+proofs in `formal/Formal/Memory*.lean` remain unaffected.
+
 ### Tier-neutral shared primitive library (`flick-vm/src/stdlib/`)
 
 All pure stdlib primitives, Stage 4 pure context/layer/cooperative helpers,

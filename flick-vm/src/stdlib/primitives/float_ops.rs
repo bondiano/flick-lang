@@ -61,18 +61,12 @@ pub(super) fn run(
         FloatIntrinsic::Parse => {
             let text = heap.string(&args[0])?;
             charge(fuel, text.len())?;
-            let parsed = match text {
-                "NaN" => Some(f64::NAN),
-                "Infinity" => Some(f64::INFINITY),
-                "-Infinity" => Some(f64::NEG_INFINITY),
-                _ => parse_js_number(text, false),
-            };
-            option_float(heap, parsed)
+            option_float(heap, parse_float(text))
         }
         FloatIntrinsic::StringToNumber => {
             let text = heap.string(&args[0])?;
             charge(fuel, text.len())?;
-            option_float(heap, parse_js_number(text, true))
+            option_float(heap, parse_number(text))
         }
         FloatIntrinsic::Remainder => {
             // Curried subject-last: args = [divisor, self]
@@ -118,6 +112,23 @@ pub(super) fn js_math_round(x: f64) -> f64 {
         return -0.0;
     }
     (x + 0.5).floor()
+}
+
+/// Parses a string with the standard library's `Float.parse` semantics.
+#[must_use]
+pub fn parse_float(text: &str) -> Option<f64> {
+    match text {
+        "NaN" => Some(f64::NAN),
+        "Infinity" => Some(f64::INFINITY),
+        "-Infinity" => Some(f64::NEG_INFINITY),
+        _ => parse_js_number(text, false),
+    }
+}
+
+/// Parses the standard library's `String.to_number` representation.
+#[must_use]
+pub fn parse_number(text: &str) -> Option<f64> {
+    parse_js_number(text, true)
 }
 
 /// Parses JS `Number(s)` for non-empty trimmed text.

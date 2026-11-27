@@ -157,6 +157,7 @@ impl<'p> Machine<'p, '_> {
             | Destination::RecoveryHelper { .. }
             | Destination::RecoveryBody { .. }
             | Destination::RaiseFromCatch
+            | Destination::CliStep { .. }
             | Destination::HostApplyChain { .. }
             | Destination::DiscardFinalizer => false,
         }

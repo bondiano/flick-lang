@@ -392,6 +392,8 @@ fn unsupported_object_error(other: &Data) -> Error {
         Data::Arena { .. } => "Arena",
         Data::Defect(_) => "Defect",
         Data::Seq(_) => "Seq",
+        Data::CliSpec(_) => "CliSpec",
+        Data::CliMulti(_) => "CliMulti",
         _ => "other",
     };
     Error::HostBridge(format!(

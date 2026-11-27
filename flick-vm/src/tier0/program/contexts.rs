@@ -104,6 +104,7 @@ impl Machine<'_, '_> {
                 let value = self.host_service(op)?;
                 self.primitive_result(binding, value)?;
             }
+            Intrinsic::Cli(op) => self.cli_intrinsic(op, binding)?,
             _ => unreachable!("control and metered intrinsics dispatched above"),
         }
         Ok(())
@@ -244,6 +245,55 @@ impl Machine<'_, '_> {
             hooks = hooks.with_seeded_rng(rng);
         }
         stdlib::eval_host_service(self.heap, op, &self.scratch, &mut hooks)
+    }
+
+    fn cli_intrinsic(&mut self, op: CliIntrinsic, binding: Local) -> Result<(), Error> {
+        if op == CliIntrinsic::RunVersion {
+            let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout)
+                .with_stderr(&mut self.stderr)
+                .with_program_args(&self.program_args)
+                .with_host_services(&mut self.host_services)
+                .with_capabilities(self.sandbox.capabilities);
+            let step = stdlib::cli::eval_run_version(self.heap, &self.scratch, &mut hooks)?;
+            self.release_operands()?;
+            return self.drive_cli_step(step, binding);
+        }
+        let value = stdlib::cli::eval_builder(
+            self.heap,
+            op,
+            &self.scratch,
+            &mut FuelCounter(&mut self.fuel),
+        )?;
+        self.primitive_result(binding, value)
+    }
+
+    fn complete_cli_step(&mut self, state: CliRunState, binding: Local) -> Result<(), Error> {
+        let returned = self.pending.take().expect("cli callback return");
+        let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout)
+            .with_stderr(&mut self.stderr)
+            .with_program_args(&self.program_args)
+            .with_host_services(&mut self.host_services)
+            .with_capabilities(self.sandbox.capabilities);
+        let step = stdlib::cli::resume_run(state, self.heap, returned, &mut hooks)?;
+        self.drive_cli_step(step, binding)
+    }
+
+    fn drive_cli_step(&mut self, step: CliStep, binding: Local) -> Result<(), Error> {
+        match step {
+            CliStep::Return(value) => self.store(binding, value),
+            CliStep::Raise(payload) => {
+                self.scratch.push(payload);
+                self.raise_ordinary()
+            }
+            CliStep::Call { callee, arg, state } => {
+                self.scratch.extend([callee, arg]);
+                self.apply_fresh(Destination::CliStep { state, binding })
+            }
+            CliStep::InvokeHandler { handler, options } => {
+                self.scratch.extend([handler, options]);
+                self.apply(Destination::Bind(binding))
+            }
+        }
     }
 
     fn unwrap_result(&mut self, binding: Local) -> Result<(), Error> {

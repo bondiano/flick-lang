@@ -72,7 +72,9 @@ pub fn show_value(heap: &Heap, value: &Value) -> Result<String, Error> {
             | Data::ExitTask(_)
             | Data::CapturedEnv { .. }
             | Data::ForeignHandle { .. }
-            | Data::ForeignCycle { .. } => Err(unsupported(
+            | Data::ForeignCycle { .. }
+            | Data::CliSpec(_)
+            | Data::CliMulti(_) => Err(unsupported(
                 "primitive show of record or executable/opaque storage",
             )),
             Data::ReuseToken { .. } => Err(Error::ReuseTokenEscape),

@@ -12,7 +12,8 @@ reference-counted tier-0 executor (`tier0`) specified in
 - `src/stdlib.rs`, `src/stdlib/` — tier-neutral shared primitive library,
   caller-supplied fuel/allocation/host hooks (`hooks.rs`: `Accounting`,
   `HostEnv`, `VmHooks`, `FuelCounter`, `CountingHooks`, `HostContext`,
-  `Unmetered`), pure primitives (`primitives/`), Stage 4 cooperative runtime
+  `Unmetered`), pure primitives (`primitives/`), shared CLI command/parser/help/
+  completion/runner engine (`cli.rs`, `cli/`), Stage 4 cooperative runtime
   helpers (`runtime/{context,coop,layers}.rs`), Stage 5 host modes (`host.rs`),
   and the persistent Node `HostBridge` (`host_bridge.rs`, `host_bridge/`).
 - `src/tier0.rs`, `src/tier0/` — reference counted heap, pattern matcher, and
@@ -20,9 +21,9 @@ reference-counted tier-0 executor (`tier0`) specified in
   deterministic host constants from `stdlib` for API compatibility.
 - `src/tier1/` — register bytecode compiler (`prepare.rs`, `prepare_ops.rs`,
   `prepare_ops_data.rs`, `prepare_fuse.rs`), opcode/error types (`opcode.rs`),
-  and register machine (`machine.rs`, `machine_ops.rs`, `machine_dict.rs`,
-  `machine_call.rs`, `machine_recovery.rs`) running over `tier0::Heap` and
-  `crate::stdlib`.
+  and register machine (`machine.rs`, `machine_ops.rs`, `machine_cli.rs`,
+  `machine_dict.rs`, `machine_call.rs`, `machine_recovery.rs`) running over
+  `tier0::Heap` and `crate::stdlib`.
 - `tests/kernel_primitives.rs` — direct primitive-kernel boundary tests against
   `flick_vm::stdlib` and its accounting/host hooks.
 - `tests/tier1_numeric.rs` — numeric-policy boundary tests, unsupported-operation

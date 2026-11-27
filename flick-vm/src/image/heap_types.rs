@@ -184,6 +184,32 @@ pub(crate) enum SnapDefectCode {
     RangeError(String),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum SnapCliMultiplicity {
+    Required,
+    Optional,
+    Many,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct SnapCliParam {
+    pub(crate) flag: bool,
+    pub(crate) label: String,
+    pub(crate) aliases: Vec<String>,
+    pub(crate) help: String,
+    pub(crate) multi: SnapCliMultiplicity,
+    pub(crate) dictionary: SnapValue,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct SnapCliSpec {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) params: Vec<SnapCliParam>,
+    pub(crate) subcommands: Vec<(Self, String)>,
+    pub(crate) handler: Option<SnapValue>,
+}
+
 /// Serialized representation of serializable [`crate::tier0::Data`] heap objects.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum SnapObject {
@@ -269,6 +295,8 @@ pub(crate) enum SnapObject {
         indices: Vec<SnapValue>,
         values: Vec<SnapValue>,
     },
+    CliSpec(Box<SnapCliSpec>),
+    CliMulti(SnapCliMultiplicity),
 }
 
 /// Identifies VM-internal constructor tags that back live OS/host resources

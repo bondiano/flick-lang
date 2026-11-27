@@ -74,6 +74,9 @@ impl<'p> Machine<'p, '_> {
             Destination::Modify { cell, binding } => {
                 self.complete_modify(&cell, binding)?;
             }
+            Destination::CliStep { state, binding } => {
+                self.complete_cli_step(*state, binding)?;
+            }
             Destination::CloseScope {
                 owner,
                 previous,

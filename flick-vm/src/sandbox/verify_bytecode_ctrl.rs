@@ -159,6 +159,9 @@ pub(super) fn verify_control_and_call_instr(
         Instr::LayerOp { dst, op, args } => {
             check_fixed_arity_op(loc, *dst, op.arity(), args, &format!("layer op {op:?}"))
         }
+        Instr::Cli { dst, op, args } => {
+            check_fixed_arity_op(loc, *dst, op.arity(), args, &format!("cli op {op:?}"))
+        }
         Instr::Closure {
             dst,
             code,

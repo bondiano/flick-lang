@@ -403,7 +403,23 @@ fn object_child_values(obj: &SnapObject) -> Vec<&SnapValue> {
             out.extend(indices.iter());
             out.extend(values.iter());
         }
+        SnapObject::CliSpec(spec) => push_cli_spec_values(spec, &mut out),
         _ => {}
     }
     out
+}
+
+fn push_cli_spec_values<'a>(
+    spec: &'a super::heap_types::SnapCliSpec,
+    out: &mut Vec<&'a SnapValue>,
+) {
+    for p in &spec.params {
+        out.push(&p.dictionary);
+    }
+    if let Some(h) = &spec.handler {
+        out.push(h);
+    }
+    for (sub, _) in &spec.subcommands {
+        push_cli_spec_values(sub, out);
+    }
 }

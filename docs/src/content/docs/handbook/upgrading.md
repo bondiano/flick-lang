@@ -69,6 +69,7 @@ change needs.
 | [The kernel's defects](#the-kernels-defects) | no | — |
 | [`Math.log` in the kernel, and an exact `Float.next_pow2`](#mathlog-in-the-kernel-and-an-exact-floatnext_pow2) | no | — |
 | [Hot-swap compatibility and declared state-cell migrations (formal model)](#hot-swap-compatibility-and-declared-state-cell-migrations-formal-model) | no | — |
+| [VM Tier 1 runs std and CLI intrinsics](#vm-tier-1-runs-std-and-cli-intrinsics) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -924,3 +925,15 @@ Existing Flick sources require no changes. Differential `.fvm` image save/load
 and migrations outside declared state cells are out of scope for this model
 milestone; runtime VM hot swap builds on the exported compatibility checker and
 session oracle.
+
+## VM Tier 1 runs std and CLI intrinsics
+
+The ownership IR (`flick-ir`) gains `Intrinsic::Cli(CliIntrinsic)` for audited
+`flick:cli` builders (`command`, `description`, `flag`, `arg`, `subcommand`,
+`handle`, `group`, `required`, `optional`, `many`, `run_version`), and both
+in-process VM tiers (`--target vm --vm-tier 0` and `--vm-tier 1`) execute
+schemas, codecs, JSON, temporal (`DateTime`, `Duration`, `TimeZone`), `Decimal`,
+`BigInt`, `Arbitrary`, and `Cli` commands (argument parsing, typed `Cli.Value`
+errors, help, version, and Bash/Zsh/Fish/PowerShell completions) through the
+shared `flick-vm` standard library. JS and Go outputs are unchanged, and
+existing Flick sources require no edits.

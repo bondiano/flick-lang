@@ -8,7 +8,7 @@ use flick_core::ir::memory::{CodeId, Name};
 
 use super::ImageError;
 use super::heap_snap_extra::{
-    snap_cron, snap_defect_code, snap_timezone, unserializable_data_kind,
+    snap_cli_multi, snap_cron, snap_defect_code, snap_timezone, unserializable_data_kind,
 };
 use super::heap_types::{
     HeapSnapshot, SnapDateTimeData, SnapDictValue, SnapDurationData, SnapId, SnapNode, SnapObject,
@@ -367,6 +367,10 @@ impl<'h> HeapSnapper<'h> {
             Data::GraphWalker(GraphWalkerData { indices, values }) => {
                 self.snap_walker(global, path, indices, values)?
             }
+            Data::CliSpec(spec) => {
+                SnapObject::CliSpec(Box::new(self.snap_cli_spec(global, path, spec)?))
+            }
+            Data::CliMulti(multi) => SnapObject::CliMulti(snap_cli_multi(*multi)),
             other => return Err(Self::reject(global, path, unserializable_data_kind(other))),
         })
     }

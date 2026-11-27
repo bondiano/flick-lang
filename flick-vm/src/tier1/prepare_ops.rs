@@ -403,6 +403,11 @@ impl Lowering<'_> {
                 op,
                 args: tokens.take_all(args),
             }),
+            (Intrinsic::Cli(op), _) => Ok(Instr::Cli {
+                dst,
+                op,
+                args: tokens.take_all(args),
+            }),
             (Intrinsic::MatchFail, []) => Ok(Instr::MatchFail),
             (Intrinsic::FromResult, [src]) => Ok(Instr::FromResult {
                 dst,

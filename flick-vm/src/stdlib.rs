@@ -13,6 +13,7 @@ use flick_core::numeric::Num;
 
 use crate::tier0::{Error, Heap, Value};
 
+pub(crate) mod cli;
 mod hooks;
 mod host;
 pub(crate) mod host_bridge;
@@ -26,7 +27,7 @@ pub use host::{
     format_uncaught_raised,
 };
 pub use host_bridge::HostBridge;
-pub use primitives::{is_metered_primitive, show_value};
+pub use primitives::{is_metered_primitive, parse_float, parse_number, show_value};
 pub use runtime::{DEFAULT_VIRTUAL_NOW_NS, FIBER_QUANTUM, QUANTUM_VIRTUAL_NS};
 
 /// Evaluates a binary IR operation (`+`, `-`, `*`, `/`, `%`, `**`, `==`, `!=`,

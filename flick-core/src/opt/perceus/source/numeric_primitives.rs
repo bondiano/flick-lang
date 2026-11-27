@@ -63,6 +63,7 @@ impl Lower<'_> {
         }
         if let Some(kind) = strings::intrinsic(value)
             .or_else(|| layers::intrinsic(value))
+            .or_else(|| super::cli::intrinsic(value, name))
             .or_else(|| intrinsic(value))
         {
             return Some(self.intrinsic(kind, false, vec![], block, span));

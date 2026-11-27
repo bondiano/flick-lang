@@ -308,35 +308,63 @@ fn run_image(
             };
             finish_report(&mut heap, report)
         }
-        VmTier::Tier1 => {
-            if image.has_initialized_globals() {
-                let diagnostic = Diagnostic::new(
-                    codes::P012,
-                    Severity::Error,
-                    "tier 1 does not support warm VM images with pre-initialized globals; \
-                     run with `--vm-tier 0`",
-                );
-                report::render(global, sources, &[diagnostic]);
-                return ExitCode::from(1);
-            }
-            let report = match tier1::execute_main_program_outcome_with_args(
-                &mut heap,
-                image.program(),
-                &entry,
-                u64::MAX,
-                HostMode::LiveOs,
-                options.args.clone(),
-            ) {
-                Ok(report) => report,
-                Err(err) => {
-                    let diagnostic = Diagnostic::new(codes::P012, Severity::Error, err.to_string());
-                    report::render(global, sources, &[diagnostic]);
-                    return ExitCode::from(1);
-                }
-            };
-            finish_report(&mut heap, report)
-        }
+        VmTier::Tier1 => execute_image_tier1(
+            &mut heap,
+            &image,
+            &entry,
+            options.args.clone(),
+            sources,
+            global,
+        ),
     }
+}
+
+fn execute_image_tier1(
+    heap: &mut Heap,
+    image: &VmImage,
+    entry: &MemoryName,
+    program_args: Vec<String>,
+    sources: &SourceMap,
+    global: &GlobalArguments,
+) -> ExitCode {
+    if image.has_initialized_globals() {
+        let diagnostic = Diagnostic::new(
+            codes::P012,
+            Severity::Error,
+            "tier 1 does not support warm VM images with pre-initialized globals; \
+             run with `--vm-tier 0`",
+        );
+        report::render(global, sources, &[diagnostic]);
+        return ExitCode::from(1);
+    }
+    let result = match image.root_layer() {
+        Some(root) => tier1::execute_rooted_main_program_outcome_with_args(
+            heap,
+            image.program(),
+            entry,
+            root,
+            u64::MAX,
+            HostMode::LiveOs,
+            program_args,
+        ),
+        None => tier1::execute_main_program_outcome_with_args(
+            heap,
+            image.program(),
+            entry,
+            u64::MAX,
+            HostMode::LiveOs,
+            program_args,
+        ),
+    };
+    let report = match result {
+        Ok(report) => report,
+        Err(err) => {
+            let diagnostic = Diagnostic::new(codes::P012, Severity::Error, err.to_string());
+            report::render(global, sources, &[diagnostic]);
+            return ExitCode::from(1);
+        }
+    };
+    finish_report(heap, report)
 }
 
 fn find_entry_module(

@@ -66,6 +66,7 @@ impl<'p> Machine<'p, '_> {
                 roots.push(handler);
             }
             Destination::Loop { args, .. } => roots.extend(args),
+            Destination::CliStep { state, .. } => state.drain_roots(roots),
             Destination::GenerateStrict { items, .. } => roots.extend(items),
             Destination::AcquireRegister { release, .. } => roots.push(release),
             Destination::BracketUse {

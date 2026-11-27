@@ -152,6 +152,7 @@ impl Machine<'_, '_> {
                 let res = stdlib::eval_host_service(self.heap, *op, &self.scratch, &mut hooks)?;
                 self.finish_primitive(*dst, res)?;
             }
+            Instr::Cli { dst, op, args } => self.exec_cli(*dst, *op, args)?,
             Instr::Construct {
                 dst,
                 tag,

@@ -85,6 +85,7 @@ impl Intrinsic {
             Self::Config(op) => op.arity(),
             Self::Arbitrary(op) => op.arity(),
             Self::HostService(op) => op.arity(),
+            Self::Cli(op) => op.arity(),
         }
     }
 }

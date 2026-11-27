@@ -8,14 +8,23 @@ use regex_automata::meta::Regex;
 use super::ImageError;
 use super::heap_restore::Restorer;
 use super::heap_types::{
-    SnapCronData, SnapDefectCode, SnapDictValue, SnapExitData, SnapGraphData, SnapLayerData,
-    SnapStoredReason, SnapTimeZoneData, SnapValue,
+    SnapCliMultiplicity, SnapCliSpec, SnapCronData, SnapDefectCode, SnapDictValue, SnapExitData,
+    SnapGraphData, SnapLayerData, SnapStoredReason, SnapTimeZoneData, SnapValue,
 };
+use crate::stdlib::cli::{CliMultiplicity, CliParam, CliSpec};
 use crate::tier0::causes::{CauseData, StoredReason};
 use crate::tier0::{
     CronData, Data, DefectCode, DictionaryValue, ExitData, GraphData, GraphEdge, GraphNode,
     LayerData, TimeZoneData, Value,
 };
+
+pub(super) const fn restore_cli_multi(multi: SnapCliMultiplicity) -> CliMultiplicity {
+    match multi {
+        SnapCliMultiplicity::Required => CliMultiplicity::Required,
+        SnapCliMultiplicity::Optional => CliMultiplicity::Optional,
+        SnapCliMultiplicity::Many => CliMultiplicity::Many,
+    }
+}
 
 impl Restorer<'_, '_> {
     pub(super) fn build_list_slice(
@@ -114,6 +123,68 @@ impl Restorer<'_, '_> {
             }
         }
         Ok(out)
+    }
+
+    pub(super) fn build_cli_spec(&mut self, spec: &SnapCliSpec) -> Result<CliSpec, ImageError> {
+        let mut params = Vec::with_capacity(spec.params.len());
+        for p in &spec.params {
+            match self.materialize_value(&p.dictionary) {
+                Ok(dictionary) => params.push(CliParam {
+                    flag: p.flag,
+                    label: p.label.clone(),
+                    aliases: p.aliases.clone(),
+                    help: p.help.clone(),
+                    multi: restore_cli_multi(p.multi),
+                    dictionary,
+                }),
+                Err(err) => {
+                    let roots: Vec<Value> = params.into_iter().map(|b| b.dictionary).collect();
+                    let _ = self.heap.drop_values(roots);
+                    return Err(err);
+                }
+            }
+        }
+        let mut subcommands = Vec::with_capacity(spec.subcommands.len());
+        for (sub, help) in &spec.subcommands {
+            match self.build_cli_spec(sub) {
+                Ok(built) => subcommands.push((built, help.clone())),
+                Err(err) => {
+                    let mut roots = Vec::new();
+                    for b in params {
+                        roots.push(b.dictionary);
+                    }
+                    for (s, _) in subcommands {
+                        s.drain_values(&mut roots);
+                    }
+                    let _ = self.heap.drop_values(roots);
+                    return Err(err);
+                }
+            }
+        }
+        let handler = match &spec.handler {
+            Some(sv) => match self.materialize_value(sv) {
+                Ok(h) => Some(h),
+                Err(err) => {
+                    let mut roots = Vec::new();
+                    for b in params {
+                        roots.push(b.dictionary);
+                    }
+                    for (s, _) in subcommands {
+                        s.drain_values(&mut roots);
+                    }
+                    let _ = self.heap.drop_values(roots);
+                    return Err(err);
+                }
+            },
+            None => None,
+        };
+        Ok(CliSpec {
+            name: spec.name.clone(),
+            description: spec.description.clone(),
+            params,
+            subcommands,
+            handler,
+        })
     }
 
     pub(super) fn build_cause(

@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 use std::{error, fmt};
 
 use flick_core::ir::memory::{
-    self, AsyncIntrinsic, CellLayout, CodeId, HostServiceIntrinsic, Intrinsic, LayerIntrinsic,
-    MemorySpan, Name, ValueRep,
+    self, AsyncIntrinsic, CellLayout, CliIntrinsic, CodeId, HostServiceIntrinsic, Intrinsic,
+    LayerIntrinsic, MemorySpan, Name, ValueRep,
 };
 use flick_core::ir::{BinOp, Pat};
 use flick_core::numeric::Num;
@@ -224,6 +224,11 @@ pub(crate) enum Instr {
     HostService {
         dst: usize,
         op: HostServiceIntrinsic,
+        args: Vec<usize>,
+    },
+    Cli {
+        dst: usize,
+        op: CliIntrinsic,
         args: Vec<usize>,
     },
     Construct {

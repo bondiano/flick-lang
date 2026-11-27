@@ -61,6 +61,7 @@ impl Machine<'_, '_> {
                     Self::reg_into_roots(arg, &mut roots);
                 }
             }
+            End::CliStep { state, .. } => state.drain_roots(&mut roots),
             End::GenerateStrict { items, .. } => roots.extend(items),
             End::GeneratorStep { gen_id, .. } => {
                 if let Some(slot) = self.generators.get_mut(&gen_id) {
@@ -348,6 +349,7 @@ impl Machine<'_, '_> {
                     Self::reg_into_roots(arg, roots);
                 }
             }
+            End::CliStep { state, .. } => state.drain_roots(roots),
             End::GenerateStrict { items, .. } => roots.extend(items),
             End::Try { selector, .. }
             | End::CatchDefect {

@@ -285,6 +285,7 @@ impl Machine<'_, '_> {
                 }
             }
             End::Modify { cell, dst } => self.complete_modify(&cell, dst)?,
+            End::CliStep { state, dst } => self.complete_cli_step(*state, dst)?,
             End::Loop(state) => {
                 let ignored = self.pending.take().expect("loop iteration value");
                 self.drop_reg(ignored)?;

@@ -168,6 +168,40 @@ pub enum Intrinsic {
     Arbitrary(ArbitraryIntrinsic),
     /// Native Rust VM host service operations (`File`, `FileSystem`, `ChildProcess`).
     HostService(HostServiceIntrinsic),
+    /// Immutable command construction and host execution for the audited CLI ABI.
+    Cli(CliIntrinsic),
+}
+
+/// The owned operand order is the original binding order, including class
+/// dictionaries preceding the source parameters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CliIntrinsic {
+    Command,
+    Description,
+    /// `Cli.Value`, `Record.Lacks`, `Record.UnionDisjoint`, label, aliases, help, multi, spec.
+    Flag,
+    /// `Cli.Value`, `Record.Lacks`, `Record.UnionDisjoint`, label, help, multi, spec.
+    Arg,
+    Subcommand,
+    Handle,
+    Group,
+    Required,
+    Optional,
+    Many,
+    RunVersion,
+}
+
+impl CliIntrinsic {
+    pub const fn arity(self) -> usize {
+        match self {
+            Self::Command | Self::Group => 1,
+            Self::Description | Self::Handle => 2,
+            Self::Subcommand | Self::RunVersion => 3,
+            Self::Flag => 8,
+            Self::Arg => 7,
+            Self::Required | Self::Optional | Self::Many => 0,
+        }
+    }
 }
 
 /// The host primitives of `Host.live` besides `PrintLine`.

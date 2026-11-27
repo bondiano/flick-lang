@@ -9,8 +9,8 @@ use flick_core::ir::{BinOp, Lit, Pat};
 use flick_core::types::OpClass;
 
 use flick_core::ir::memory::{
-    self, Block, CodeId, Exit, HostPrimitive, HostServiceIntrinsic, Instruction, Intrinsic, Local,
-    Name, Operation, Program,
+    self, Block, CliIntrinsic, CodeId, Exit, HostPrimitive, HostServiceIntrinsic, Instruction,
+    Intrinsic, Local, Name, Operation, Program,
 };
 
 use super::{
@@ -19,6 +19,7 @@ use super::{
     ObjectId, ObjectToken, OwnerHandle, SeqData, Value, VarHandle, patterns, peek, tagged_boundary,
     take,
 };
+use crate::stdlib::cli::{CliRunState, CliStep};
 use crate::stdlib::runtime::coop::{HOST_CTX_KEY, MEMO_REF_KEY};
 use crate::stdlib::{
     self, DEFAULT_VIRTUAL_NOW_NS, FIBER_QUANTUM, FuelCounter, HostContext, QUANTUM_VIRTUAL_NS,
@@ -416,6 +417,10 @@ enum Destination<'p> {
         target: LayerBuildTarget,
     },
     RaiseFromCatch,
+    CliStep {
+        state: Box<CliRunState>,
+        binding: Local,
+    },
     HostSyncCallback {
         req_id: u64,
         remaining_args: VecDeque<Value>,

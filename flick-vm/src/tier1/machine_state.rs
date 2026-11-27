@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::stdlib::cli::CliRunState;
 use crate::tier0::{CauseToken, CellHandle, LazyHandle, ObjectId, OwnerHandle, Value};
 
 use super::machine_layers::LayerBuildTarget;
@@ -71,6 +72,10 @@ pub(super) enum End {
     },
     Modify {
         cell: CellHandle,
+        dst: usize,
+    },
+    CliStep {
+        state: Box<CliRunState>,
         dst: usize,
     },
     Loop(LoopState),

@@ -76,6 +76,7 @@ fn data_byte_size(data: &Data) -> usize {
         Data::Layer(LayerData::MergeAll(layers)) => {
             layers.iter().map(value_inline_bytes).sum()
         }
+        Data::CliSpec(spec) => spec.byte_size(),
         _ => 0,
     };
     OBJECT_HEADER_BYTES.saturating_add(payload)

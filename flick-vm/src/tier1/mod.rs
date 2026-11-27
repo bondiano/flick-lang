@@ -17,6 +17,7 @@ mod machine_arenas;
 mod machine_async_ends;
 mod machine_call;
 mod machine_cleanup;
+mod machine_cli;
 mod machine_concurrency;
 mod machine_continuations;
 mod machine_coords;

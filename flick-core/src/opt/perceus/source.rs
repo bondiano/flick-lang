@@ -7,6 +7,7 @@
 
 mod aggregates;
 mod app_fail;
+mod cli;
 pub use aggregates::{AggregatePolicy, FallbackTarget};
 mod core_lists;
 mod core_lists_array;

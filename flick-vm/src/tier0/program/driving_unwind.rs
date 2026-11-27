@@ -123,6 +123,11 @@ impl<'p> Machine<'p, '_> {
             Destination::ClosingScope { state } => self.finalizer_failed(state)?,
             Destination::RestoreOwner { previous, .. } => self.current_owner = previous,
             Destination::Loop { args, .. } => self.heap.drop_values(args)?,
+            Destination::CliStep { state, .. } => {
+                let mut roots = Vec::new();
+                state.drain_roots(&mut roots);
+                self.heap.drop_values(roots)?;
+            }
             Destination::GenerateStrict { items, .. } => self.heap.drop_values(items)?,
             Destination::GeneratorStep { gen_id, .. } => {
                 if let Some(slot) = self.generators.get_mut(&gen_id) {
