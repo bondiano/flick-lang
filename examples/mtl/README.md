@@ -302,15 +302,17 @@ also requires `Monoid w`. Capability operations require their `Monad`
 superclass. These shared contracts intentionally replace the formerly weaker
 module-specific operations, without compatibility aliases.
 
-The [law tests](test/Mtl/TransformersTest.fl) check the custom instances, and
+The [law tests](test/Mtl/TransformerLawsTest.fl) check the custom instances, and
 [`LawsTest`](test/Mtl/LawsTest.fl) connects the same Prelude laws and notation to
 built-in instances. Start a new wrapper with its representation and decide how
 its context flows through these four operations before copying an instance.
 
 `LawsTest` covers Option, List, Result, Seq, Validation and the monoidal wrappers;
-`TransformersTest` covers Identity and the existing three transformers;
-[`WriterExceptTest`](test/Mtl/WriterExceptTest.fl) covers the new two.
-[`CapabilitiesTest`](test/Mtl/CapabilitiesTest.fl) exercises inherited/native
+`TransformerLawsTest` and `TransformersTest` cover Identity and the existing three
+transformers; [`WriterExceptLawsTest`](test/Mtl/WriterExceptLawsTest.fl) and
+[`WriterExceptTest`](test/Mtl/WriterExceptTest.fl) cover the new two.
+[`CapabilitiesTest`](test/Mtl/CapabilitiesTest.fl) and
+[`CapabilityLawsTest`](test/Mtl/CapabilityLawsTest.fl) exercise inherited/native
 operations, defaults and ordering. [`EffLawsTest`](test/Mtl/EffLawsTest.fl)
 uses effectful `Arbitrary.check` properties with seed 7 and 100 runs, comparing
 complete outcomes and ordered traces rather than executing effects synchronously.

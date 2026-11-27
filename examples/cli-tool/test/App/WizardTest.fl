@@ -1,8 +1,9 @@
 /// The wizard's question on a terminal that types a script of keys.
-module App.WizardTest exposing (tests)
+module App.WizardTest
 
 import App.Main exposing (first_note)
 import Cli.Prompt exposing (Tty)
+import Test exposing (expect, to)
 
 press : String -> Option String -> Terminal.UserInput
 let press name input = {
@@ -35,15 +36,12 @@ let answer keys =
   let script = Ref.make keys
   provide (terminal script) { Cli.Prompt.run first_note }
 
-tests : List Test.Test
-let tests = [
-  Test.effect_test
-    "the wizard takes the typed note"
-    (task { Test.check (Test.equal "buy milk" (answer (typing "buy milk"))) }),
-  Test.effect_test
-    "a blank note is refused until there are words"
-    (task {
-      let keys = typing "  " ++ List.repeat 2 (press "backspace" None) ++ typing "tea"
-      Test.check (Test.equal "tea" (answer keys))
-    }),
-]
+suite "wizard" {
+  test "the wizard takes the typed note" { expect (answer (typing "buy milk"))
+    |> to.equal "buy milk" }
+
+  test "a blank note is refused until there are words" {
+    let keys = typing "  " ++ List.repeat 2 (press "backspace" None) ++ typing "tea"
+    expect (answer keys) |> to.equal "tea"
+  }
+}

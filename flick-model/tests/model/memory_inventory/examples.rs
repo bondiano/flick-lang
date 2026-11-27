@@ -300,6 +300,17 @@ fn check_conduit_examples(
             "Conduit.Server.CoreTest",
         ),
         (
+            "examples/conduit/server/Conduit.Server.CorePropertyTest",
+            conduit.join("server"),
+            {
+                let mut r = contract_src.clone();
+                r.push(conduit.join("server/src/Conduit/Server/Slug.fl"));
+                r.push(conduit.join("server/test/Conduit/Server/CorePropertyTest.fl"));
+                r
+            },
+            "Conduit.Server.CorePropertyTest",
+        ),
+        (
             "examples/conduit/client/Conduit.Client.PagesTest",
             conduit.join("client"),
             {

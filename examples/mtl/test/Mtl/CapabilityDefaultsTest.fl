@@ -1,8 +1,9 @@
-module Mtl.CapabilityDefaultsTest exposing (tests)
+module Mtl.CapabilityDefaultsTest
 
-import Mtl.Classes exposing (MonadState(..), MonadReader(..), MonadWriter(..))
-import Mtl.Identity as Identity exposing (Identity)
 import App.Capabilities as Capabilities exposing (Stack)
+import Mtl.Classes exposing (MonadReader(..), MonadState(..), MonadWriter(..))
+import Mtl.Identity as Identity exposing (Identity)
+import Test exposing (expect, to)
 
 type Defaults a = Defaults (Stack Identity a)
 
@@ -33,9 +34,8 @@ instance MonadWriter Defaults (List String) =
   let listen (Defaults action) = Defaults (listen action)
   let pass (Defaults action) = Defaults (pass action)
 
-tests : List Test.Test
-let tests = [
-  Test.test "state, reader and writer execute their class default bodies" (fun () ->
+suite "capability defaults" {
+  test "state, reader and writer execute their class default bodies" {
     action : Defaults (Float, Float)
     let action = do {
       old_state <- state (fun old -> (old, old + 2))
@@ -43,8 +43,7 @@ let tests = [
       writer_value <- writer (environment_value, ["default"])
       pure (old_state, writer_value)
     }
-    Test.equal
-      ((Ok (10, 4), ["default"]), 12)
-      (Identity.run (Capabilities.run 3 10 (unwrap action)))
-  ),
-]
+    expect (Identity.run (Capabilities.run 3 10 (unwrap action)))
+    |> to.equal ((Ok (10, 4), ["default"]), 12)
+  }
+}

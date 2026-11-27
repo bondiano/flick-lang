@@ -1,12 +1,13 @@
-module Mtl.CapabilityOrdersTest exposing (tests)
+module Mtl.CapabilityOrdersTest
 
 import Mtl.Classes exposing (..)
+import Mtl.ExceptT as ExceptT exposing (ExceptT)
 import Mtl.Identity as Identity exposing (Identity)
 import Mtl.MaybeT as MaybeT exposing (MaybeT)
-import Mtl.StateT as StateT exposing (StateT)
 import Mtl.ReaderT as ReaderT exposing (ReaderT)
+import Mtl.StateT as StateT exposing (StateT)
 import Mtl.WriterT as WriterT exposing (WriterT)
-import Mtl.ExceptT as ExceptT exposing (ExceptT)
+import Test exposing (expect, to)
 
 reader_catch_probe :
   (MonadReader m Float, MonadError m String) => m (Float, (String, Float), (String, Float), Float)
@@ -38,9 +39,8 @@ let reader_catch_probe =
     pure (before, local_outside, catch_outside, after)
   }
 
-order : List Test.Test
-let order = [
-  Test.test "StateT catch restarts the handler at entry state" (fun () ->
+suite "capability handler ordering" {
+  test "StateT catch restarts the handler at entry state" {
     action : StateT Float (ExceptT String Identity) Float
     let action =
       catch_error
@@ -49,9 +49,10 @@ let order = [
           put 1
           throw_error "bad"
         })
-    Test.equal (Ok (0, 0)) (Identity.run (ExceptT.run (StateT.run action 0)))
-  ),
-  Test.test "ExceptT catch observes state retained below the error" (fun () ->
+    expect (Identity.run (ExceptT.run (StateT.run action 0))) |> to.equal (Ok (0, 0))
+  }
+
+  test "ExceptT catch observes state retained below the error" {
     action : ExceptT String (StateT Float Identity) Float
     let action =
       catch_error
@@ -60,9 +61,10 @@ let order = [
           put 1
           throw_error "bad"
         })
-    Test.equal (Ok 1, 1) (Identity.run (StateT.run (ExceptT.run action) 0))
-  ),
-  Test.test "WriterT catch has no failed output pair to retain" (fun () ->
+    expect (Identity.run (StateT.run (ExceptT.run action) 0)) |> to.equal (Ok 1, 1)
+  }
+
+  test "WriterT catch has no failed output pair to retain" {
     action : WriterT (List String) (ExceptT String Identity) Float
     let action =
       catch_error
@@ -74,9 +76,10 @@ let order = [
           tell ["before"]
           throw_error "bad"
         })
-    Test.equal (Ok (9, ["recovered"])) (Identity.run (ExceptT.run (WriterT.run action)))
-  ),
-  Test.test "ExceptT catch retains output emitted below the error" (fun () ->
+    expect (Identity.run (ExceptT.run (WriterT.run action))) |> to.equal (Ok (9, ["recovered"]))
+  }
+
+  test "ExceptT catch retains output emitted below the error" {
     action : ExceptT String (WriterT (List String) Identity) Float
     let action =
       catch_error
@@ -88,27 +91,27 @@ let order = [
           tell ["before"]
           throw_error "bad"
         })
-    Test.equal (Ok 9, ["before", "recovered"]) (Identity.run (WriterT.run (ExceptT.run action)))
-  ),
-  Test.test
-    "ReaderT catch shares the environment and local placement controls the handler"
-    (fun () ->
-      action :
-        ReaderT
-          Float
-          (ExceptT String Identity)
-          (
-            Float,
-            (String, Float),
-            (String, Float),
-            Float,
-          )
-      let action = reader_catch_probe
-      Test.equal
-        (Ok (5, ("15", 15), ("15", 5), 5))
-        (Identity.run (ExceptT.run (ReaderT.run action 5)))
-    ),
-  Test.test "ExceptT local changes the handler only when outside catch" (fun () ->
+    expect (Identity.run (WriterT.run (ExceptT.run action)))
+    |> to.equal (Ok 9, ["before", "recovered"])
+  }
+
+  test "ReaderT catch shares the environment and local placement controls the handler" {
+    action :
+      ReaderT
+        Float
+        (ExceptT String Identity)
+        (
+          Float,
+          (String, Float),
+          (String, Float),
+          Float,
+        )
+    let action = reader_catch_probe
+    expect (Identity.run (ExceptT.run (ReaderT.run action 5)))
+    |> to.equal (Ok (5, ("15", 15), ("15", 5), 5))
+  }
+
+  test "ExceptT local changes the handler only when outside catch" {
     action :
       ExceptT
         String
@@ -120,21 +123,23 @@ let order = [
           Float,
         )
     let action = reader_catch_probe
-    Test.equal
-      (Ok (5, ("15", 15), ("15", 5), 5))
-      (Identity.run (ReaderT.run (ExceptT.run action) 5))
-  ),
-  Test.test "MaybeT None is not an inherited error" (fun () ->
+    expect (Identity.run (ReaderT.run (ExceptT.run action) 5))
+    |> to.equal (Ok (5, ("15", 15), ("15", 5), 5))
+  }
+
+  test "MaybeT None is not an inherited error" {
     action : MaybeT (ExceptT String Identity) Float
     let action = catch_error (fun _ -> throw_error "handler invoked") (MaybeT.from_option None)
-    Test.equal (Ok None) (Identity.run (ExceptT.run (MaybeT.run action)))
-  ),
-  Test.test "a catch does not catch its handler's rethrow" (fun () ->
+    expect (Identity.run (ExceptT.run (MaybeT.run action))) |> to.equal (Ok None)
+  }
+
+  test "a catch does not catch its handler's rethrow" {
     action : ExceptT String Identity Float
     let action = catch_error (fun problem -> throw_error "\{problem}:handler") (throw_error "bad")
-    Test.equal (Err "bad:handler") (Identity.run (ExceptT.run action))
-  ),
-  Test.test "throw skips the continuation and retains only preceding state" (fun () ->
+    expect (Identity.run (ExceptT.run action)) |> to.equal (Err "bad:handler")
+  }
+
+  test "throw skips the continuation and retains only preceding state" {
     action : ExceptT String (StateT Float Identity) Float
     let action = do {
       put 1
@@ -142,13 +147,12 @@ let order = [
       put 99
       pure 0
     }
-    Test.equal (Err "bad", 1) (Identity.run (StateT.run (ExceptT.run action) 0))
-  ),
-]
+    expect (Identity.run (StateT.run (ExceptT.run action) 0)) |> to.equal (Err "bad", 1)
+  }
+}
 
-failure_output : List Test.Test
-let failure_output = [
-  Test.test "MaybeT failure and listen retain the underlying ordered output" (fun () ->
+suite "failure preserves only observable output" {
+  test "MaybeT failure and listen retain the underlying ordered output" {
     action : MaybeT (WriterT (List String) Identity) Float
     let action = do {
       tell ["a"]
@@ -157,12 +161,11 @@ let failure_output = [
       tell ["unreachable"]
       pure 9
     }
-    Test.all [
-      Test.equal (None, ["a", "b"]) (Identity.run (WriterT.run (MaybeT.run action))),
-      Test.equal (None, ["a", "b"]) (Identity.run (WriterT.run (MaybeT.run (listen action)))),
-    ]
-  ),
-  Test.test "MaybeT pass uses identity on None rather than dropping its output" (fun () ->
+    expect (Identity.run (WriterT.run (MaybeT.run action))) |> to.equal (None, ["a", "b"])
+    expect (Identity.run (WriterT.run (MaybeT.run (listen action)))) |> to.equal (None, ["a", "b"])
+  }
+
+  test "MaybeT pass uses identity on None rather than dropping its output" {
     action : MaybeT (WriterT (List String) Identity) (Float, List String -> List String)
     let action = do {
       tell ["a"]
@@ -170,9 +173,10 @@ let failure_output = [
       _ <- MaybeT.from_option (None : Option Unit)
       pure (9, List.reverse)
     }
-    Test.equal (None, ["a", "b"]) (Identity.run (WriterT.run (MaybeT.run (pass action))))
-  ),
-  Test.test "ExceptT failure and listen retain the underlying ordered output" (fun () ->
+    expect (Identity.run (WriterT.run (MaybeT.run (pass action)))) |> to.equal (None, ["a", "b"])
+  }
+
+  test "ExceptT failure and listen retain the underlying ordered output" {
     action : ExceptT String (WriterT (List String) Identity) Float
     let action = do {
       tell ["a"]
@@ -181,12 +185,12 @@ let failure_output = [
       tell ["unreachable"]
       pure 9
     }
-    Test.all [
-      Test.equal (Err "bad", ["a", "b"]) (Identity.run (WriterT.run (ExceptT.run action))),
-      Test.equal (Err "bad", ["a", "b"]) (Identity.run (WriterT.run (ExceptT.run (listen action)))),
-    ]
-  ),
-  Test.test "ExceptT pass uses identity on Err rather than dropping its output" (fun () ->
+    expect (Identity.run (WriterT.run (ExceptT.run action))) |> to.equal (Err "bad", ["a", "b"])
+    expect (Identity.run (WriterT.run (ExceptT.run (listen action))))
+    |> to.equal (Err "bad", ["a", "b"])
+  }
+
+  test "ExceptT pass uses identity on Err rather than dropping its output" {
     action : ExceptT String (WriterT (List String) Identity) (Float, List String -> List String)
     let action = do {
       tell ["a"]
@@ -194,9 +198,11 @@ let failure_output = [
       _ <- throw_error "bad"
       pure (9, List.reverse)
     }
-    Test.equal (Err "bad", ["a", "b"]) (Identity.run (WriterT.run (ExceptT.run (pass action))))
-  ),
-  Test.test "WriterT outside a failed MaybeT has no output pair" (fun () ->
+    expect (Identity.run (WriterT.run (ExceptT.run (pass action))))
+    |> to.equal (Err "bad", ["a", "b"])
+  }
+
+  test "WriterT outside a failed MaybeT has no output pair" {
     absent : MaybeT Identity Unit
     let absent = MaybeT.from_option None
     action : WriterT (List String) (MaybeT Identity) Float
@@ -205,9 +211,10 @@ let failure_output = [
       lift absent
       writer (9, ["unreachable"])
     }
-    Test.equal None (Identity.run (MaybeT.run (WriterT.run action)))
-  ),
-  Test.test "WriterT outside a failed ExceptT has no output pair" (fun () ->
+    expect (Identity.run (MaybeT.run (WriterT.run action))) |> to.equal None
+  }
+
+  test "WriterT outside a failed ExceptT has no output pair" {
     failed : ExceptT String Identity Unit
     let failed = throw_error "bad"
     action : WriterT (List String) (ExceptT String Identity) Float
@@ -216,13 +223,12 @@ let failure_output = [
       lift failed
       writer (9, ["unreachable"])
     }
-    Test.equal (Err "bad") (Identity.run (ExceptT.run (WriterT.run action)))
-  ),
-]
+    expect (Identity.run (ExceptT.run (WriterT.run action))) |> to.equal (Err "bad")
+  }
+}
 
-repeated : List Test.Test
-let repeated = [
-  Test.test "native outer State wins and typed lift reaches inner State" (fun () ->
+suite "repeated capability selection" {
+  test "native outer State wins and typed lift reaches inner State" {
     inner_get : StateT Float Identity Float
     let inner_get = get
     inner_put : Float -> StateT Float Identity Unit
@@ -237,9 +243,11 @@ let repeated = [
       inner_after <- lift inner_get
       pure (outer_before, outer_after, inner_before, inner_after)
     }
-    Test.equal (((3, 4, 100, 110), 4), 110) (Identity.run (StateT.run (StateT.run action 3) 100))
-  ),
-  Test.test "native outer Reader wins and typed lift reaches inner Reader" (fun () ->
+    expect (Identity.run (StateT.run (StateT.run action 3) 100))
+    |> to.equal (((3, 4, 100, 110), 4), 110)
+  }
+
+  test "native outer Reader wins and typed lift reaches inner Reader" {
     inner_ask : ReaderT Float Identity Float
     let inner_ask = ask
     action : ReaderT Float (ReaderT Float Identity) (Float, Float, Float, Float)
@@ -250,9 +258,10 @@ let repeated = [
       unchanged_inner <- local (fun n -> n + 10) (lift inner_ask)
       pure (outer, inner, changed_outer, unchanged_inner)
     }
-    Test.equal (5, 20, 15, 20) (Identity.run (ReaderT.run (ReaderT.run action 5) 20))
-  ),
-  Test.test "native outer Writer wins and typed lift reaches inner Writer" (fun () ->
+    expect (Identity.run (ReaderT.run (ReaderT.run action 5) 20)) |> to.equal (5, 20, 15, 20)
+  }
+
+  test "native outer Writer wins and typed lift reaches inner Writer" {
     inner_tell : WriterT (List String) Identity Unit
     let inner_tell = tell ["inner"]
     action : WriterT (List String) (WriterT (List String) Identity) Float
@@ -261,9 +270,10 @@ let repeated = [
       lift inner_tell
       pure 9
     }
-    Test.equal ((9, ["outer"]), ["inner"]) (Identity.run (WriterT.run (WriterT.run action)))
-  ),
-  Test.test "native outer Error wins and typed lift bypasses its catch" (fun () ->
+    expect (Identity.run (WriterT.run (WriterT.run action))) |> to.equal ((9, ["outer"]), ["inner"])
+  }
+
+  test "native outer Error wins and typed lift bypasses its catch" {
     outer : ExceptT String (ExceptT String Identity) Float
     let outer = throw_error "outer"
     recovered : ExceptT String (ExceptT String Identity) Float
@@ -272,17 +282,8 @@ let repeated = [
     let inner = throw_error "inner"
     lifted : ExceptT String (ExceptT String Identity) Float
     let lifted = catch_error (fun _ -> pure 99) (lift inner)
-    Test.all [
-      Test.equal (Ok (Err "outer")) (Identity.run (ExceptT.run (ExceptT.run outer))),
-      Test.equal (Ok (Ok 7)) (Identity.run (ExceptT.run (ExceptT.run recovered))),
-      Test.equal (Err "inner") (Identity.run (ExceptT.run (ExceptT.run lifted))),
-    ]
-  ),
-]
-
-tests : List Test.Test
-let tests = [
-  Test.group "capability handler ordering" order,
-  Test.group "failure preserves only observable output" failure_output,
-  Test.group "repeated capability selection" repeated,
-]
+    expect (Identity.run (ExceptT.run (ExceptT.run outer))) |> to.equal (Ok (Err "outer"))
+    expect (Identity.run (ExceptT.run (ExceptT.run recovered))) |> to.equal (Ok (Ok 7))
+    expect (Identity.run (ExceptT.run (ExceptT.run lifted))) |> to.equal (Err "inner")
+  }
+}

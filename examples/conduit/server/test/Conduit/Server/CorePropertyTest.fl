@@ -1,0 +1,24 @@
+/// Generator-driven properties of article slugs and pagination bounds.
+module Conduit.Server.CorePropertyTest exposing (tests)
+
+import Conduit.Server.Slug as Slug
+
+/// Whether `text` is a slug's base: words of `a`–`z` and `0`–`9` joined by `-`.
+is_slug : String -> Bool
+let is_slug text =
+  let words = String.split "-" text
+  List.all (fun w -> w != "" && List.all Slug.is_word (String.chars w)) words
+
+tests : List Test.Test
+let tests = [
+  Test.property "every title has a slug of words" (Gen.string 40) (fun title ->
+    Test.is_true "the base is words" (is_slug (Slug.base title))
+  ),
+  Test.property
+    "a page holds 1 to 100 articles from an offset of 0 or more"
+    (Gen.pair (Gen.number (-50) 500) (Gen.number (-50) 500))
+    (fun (limit, offset) ->
+      let page = Slug.page (Some limit) (Some offset)
+      Test.is_true "in bounds" (page.limit >= 1 && page.limit <= 100 && page.offset >= 0)
+    ),
+]

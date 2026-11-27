@@ -281,8 +281,10 @@ fn stage5_examples_bridged_tests_and_conduit_zero_leaks() {
     server_roots.push(conduit.join("server/src/Conduit/Server/Slug.fl"));
     server_roots.push(conduit.join("server/src/Conduit/Server/Validate.fl"));
     server_roots.push(conduit.join("server/test/Conduit/Server/CoreTest.fl"));
+    server_roots.push(conduit.join("server/test/Conduit/Server/CorePropertyTest.fl"));
     let server_mods = compile_project_roots(&conduit.join("server"), server_roots);
     assert_bridged_suite(&mut bridge, &server_mods, "Conduit.Server.CoreTest");
+    assert_bridged_suite(&mut bridge, &server_mods, "Conduit.Server.CorePropertyTest");
 
     let mut client_roots = contract_src;
     client_roots.extend(fixture_files(&conduit.join("client/src"), "fl"));
