@@ -29,7 +29,10 @@ pub(super) const CORE: &[(&str, &str)] = &[
     ("Ref", builtin_source!("core", "Ref.fl")),
     ("FuncRef", builtin_source!("core", "FuncRef.fl")),
     ("String.Text", builtin_source!("core", "String/Text.fl")),
-    ("String.CaseData", builtin_source!("core", "String/CaseData.fl")),
+    (
+        "String.CaseData",
+        builtin_source!("core", "String/CaseData.fl"),
+    ),
     ("String.Case", builtin_source!("core", "String/Case.fl")),
     ("String", builtin_source!("core", "String.fl")),
     ("Float", builtin_source!("core", "Float.fl")),
