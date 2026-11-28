@@ -415,7 +415,7 @@ impl Store {
         let atom = match label {
             Elem::Provided(inner) => return Elem::Provided(Box::new(self.zonk_label(inner))),
             Elem::Capture(atom) | Elem::Error(atom) | Elem::Service(atom) => atom,
-            Elem::Named(_) | Elem::Live => return label.clone(),
+            Elem::Named(_) | Elem::Live | Elem::ProvidedAny => return label.clone(),
         };
         let ty = match atom {
             Atom::Meta(meta) => Type::Meta(meta.clone()),
@@ -465,7 +465,8 @@ impl Store {
             Type::Without { row, gone } => {
                 let mut inner = Norm::default();
                 Self::collect_row_with(&row, &mut inner, resolve, semantic);
-                let kept = (inner.entries.into_iter()).filter(|(label, _)| !gone.contains(label));
+                let kept = (inner.entries.into_iter())
+                    .filter(|(label, _)| !super::elem::gone_excludes(&gone, label));
                 out.entries.extend(kept);
                 for tail in inner.tails {
                     let tail = super::ty::without(tail, &gone);
@@ -544,7 +545,7 @@ fn relabel(label: &Elem, t: &Type) -> Elem {
         Elem::Error(_) => super::ty::error_label(t),
         Elem::Service(_) => super::ty::service_label(t),
         Elem::Provided(inner) => Some(Elem::Provided(Box::new(relabel(inner, t)))),
-        Elem::Named(_) | Elem::Live => None,
+        Elem::Named(_) | Elem::Live | Elem::ProvidedAny => None,
     };
     current.unwrap_or_else(|| label.clone())
 }

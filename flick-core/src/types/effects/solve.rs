@@ -4,6 +4,7 @@
 //! constraint either holds or names what its bound lacks.
 
 use crate::types::Elem;
+use crate::types::elem::gone_excludes;
 use std::collections::HashMap;
 use std::mem;
 
@@ -143,7 +144,8 @@ impl Checker<'_> {
                     let _ = self.unify(ty, &bound);
                 }
                 None => {
-                    if let Some(variable) = open.as_ref().filter(|_| !never.contains(label)) {
+                    if let Some(variable) = open.as_ref().filter(|_| !gone_excludes(&never, label))
+                    {
                         let Some(rest) = self.store.fresh_beside_occurrence(variable) else {
                             return false;
                         };
@@ -414,10 +416,14 @@ impl Checker<'_> {
                     // the element names one service (`regions::provided`
                     // `obligation`), never a row variable: only its owner can be unsigned
                     if let [service, owner] = ty.spine().1[..] {
-                        let (service, named) = (self.show(service), self.signed(owner));
-                        let owner = self.show(owner);
-                        let service = service.trim_matches(['{', '}', ' ']);
-                        self.unprovided(service, &owner, named, c.span);
+                        if self.row_excludes_provided(&c.declared, label) {
+                            self.outlived_layer_run(service, owner, c.span);
+                        } else {
+                            let (service, named) = (self.show(service), self.signed(owner));
+                            let owner = self.show(owner);
+                            let service = service.trim_matches(['{', '}', ' ']);
+                            self.unprovided(service, &owner, named, c.span);
+                        }
                     }
                 }
                 None => {
@@ -471,6 +477,28 @@ impl Checker<'_> {
             earlier.merge(next);
         } else {
             excess.push(next);
+        }
+    }
+
+    /// Whether `ty` carries a `Type::Without` excluding `label` (checked before
+    /// `normalize` discards `gone` once its underlying row meta closes to empty).
+    fn row_excludes_provided(&self, ty: &Type, label: &Elem) -> bool {
+        match ty {
+            Type::Without { row, gone } => {
+                gone_excludes(gone, label) || self.row_excludes_provided(row, label)
+            }
+            Type::Row(row) => row
+                .tail
+                .as_deref()
+                .is_some_and(|tail| self.row_excludes_provided(tail, label)),
+            Type::Union(left, right) => {
+                self.row_excludes_provided(left, label) || self.row_excludes_provided(right, label)
+            }
+            Type::Meta(_) => {
+                let resolved = self.store.resolve(ty);
+                resolved != *ty && self.row_excludes_provided(&resolved, label)
+            }
+            _ => false,
         }
     }
 }

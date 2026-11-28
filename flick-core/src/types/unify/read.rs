@@ -136,7 +136,7 @@ impl<'s, 'e> Read<'s, 'e> {
                     .map(|label| Elem::Provided(Box::new(label)));
             }
             Elem::Capture(atom) | Elem::Error(atom) | Elem::Service(atom) => atom,
-            Elem::Named(_) | Elem::Live => return Ok(label.clone()),
+            Elem::Named(_) | Elem::Live | Elem::ProvidedAny => return Ok(label.clone()),
         };
         let ty = match atom {
             Atom::Meta(meta) => Type::Meta(meta.clone()),

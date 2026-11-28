@@ -24,6 +24,7 @@ mod live;
 mod live_rows;
 mod outlives;
 mod provided;
+mod provided_diag;
 mod qualifiers;
 mod reader;
 mod scopes;

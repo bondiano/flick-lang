@@ -33,7 +33,10 @@ impl Checker<'_> {
         if a.1.is_some() || e.1.is_some() {
             return self.subsume_captured((actual, a), (expected, e), span);
         }
-        let (a, e) = (a.0, e.0);
+        let (mut a, e) = (a.0, e.0);
+        if matches!(a, Type::Fun { .. }) {
+            self.attach_discharged_provides(&mut a);
+        }
         if matches!(e, Type::Meta(_))
             && let Some(result) = self.bind_subsumed_meta(&a, &e, false)
         {

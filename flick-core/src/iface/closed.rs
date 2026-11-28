@@ -84,9 +84,11 @@ fn type_is_closed(ty: &Type) -> bool {
             result,
         } => {
             type_is_closed(param)
-                && effects
-                    .as_deref()
-                    .is_none_or(|e| type_is_closed(&e.services) && type_is_closed(&e.errors))
+                && effects.as_deref().is_none_or(|e| {
+                    type_is_closed(&e.services)
+                        && type_is_closed(&e.errors)
+                        && e.provides.as_ref().is_none_or(type_is_closed)
+                })
                 && type_is_closed(result)
         }
         Type::Tuple(items) => items.iter().all(type_is_closed),
@@ -339,6 +341,14 @@ mod tests {
                 effects: Some(Box::new(Effects::new(Type::empty_row(), Type::empty_row()))),
                 result: Box::new(Type::con("Core", "Bool")),
             },
+            Type::Fun {
+                param: Box::new(Type::con("Core", "Int")),
+                effects: Some(Box::new(Effects {
+                    provides: Some(Type::con("App", "Greeter")),
+                    ..Effects::new(Type::empty_row(), Type::empty_row())
+                })),
+                result: Box::new(Type::con("Core", "Bool")),
+            },
             Type::Exists {
                 scope: Scope::default(),
                 binder: "K".into(),
@@ -361,6 +371,30 @@ mod tests {
             Type::meta(1),
             Type::Skolem(2),
             Type::Error,
+            Type::Fun {
+                param: Box::new(Type::con("Core", "Unit")),
+                effects: Some(Box::new(Effects {
+                    provides: Some(Type::meta(4)),
+                    ..Effects::new(Type::empty_row(), Type::empty_row())
+                })),
+                result: Box::new(Type::con("Core", "Unit")),
+            },
+            Type::Fun {
+                param: Box::new(Type::con("Core", "Unit")),
+                effects: Some(Box::new(Effects {
+                    provides: Some(Type::Skolem(5)),
+                    ..Effects::new(Type::empty_row(), Type::empty_row())
+                })),
+                result: Box::new(Type::con("Core", "Unit")),
+            },
+            Type::Fun {
+                param: Box::new(Type::con("Core", "Unit")),
+                effects: Some(Box::new(Effects {
+                    provides: Some(Type::Error),
+                    ..Effects::new(Type::empty_row(), Type::empty_row())
+                })),
+                result: Box::new(Type::con("Core", "Unit")),
+            },
             Type::Forall {
                 vars: vec![Binder {
                     name: "a".into(),
@@ -429,5 +463,29 @@ mod tests {
         };
         assert!(!instance_is_closed(&open_ctx));
         assert!(serde_json::to_value(&open_ctx).is_err());
+    }
+
+    #[test]
+    fn support_dependencies_include_effects_provides_constructors() {
+        let mut export = base_export();
+        export.scheme = Some(Type::Fun {
+            param: Box::new(Type::con("Core", "Unit")),
+            effects: Some(Box::new(Effects {
+                provides: Some(Type::con("App", "Greeter")),
+                ..Effects::new(Type::empty_row(), Type::empty_row())
+            })),
+            result: Box::new(Type::con("Core", "Unit")),
+        });
+        let interface = Interface {
+            module: "M".into(),
+            exports: vec![export],
+            ..Interface::default()
+        };
+        let deps = super::super::support::dependencies(&interface);
+        assert!(deps.contains(&Entity {
+            module: "App".into(),
+            namespace: Namespace::Type,
+            name: "Greeter".into(),
+        }));
     }
 }

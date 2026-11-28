@@ -111,9 +111,15 @@ impl Checker<'_> {
         self.regions.renamed.pop();
         self.regions.nest.pop();
         self.regions.open.pop();
+        let grew = if checked.is_ok() {
+            self.grow_pending()
+        } else {
+            Ok(())
+        };
         self.level -= 1;
         let s = &s;
         let (t, inner) = checked?;
+        grew?;
         let own = inner.clone();
         self.grow_holds()?;
         let (mut r, e) = match inner {

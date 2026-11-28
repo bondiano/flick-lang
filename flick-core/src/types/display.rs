@@ -170,7 +170,7 @@ impl Printer<'_, '_> {
             Type::Row(row)
                 if row.entries.iter().all(|(l, _)| {
                     l.name().is_none_or(|name| name.contains('.'))
-                        && !matches!(l, Elem::Live | Elem::Provided(_))
+                        && !matches!(l, Elem::Live | Elem::Provided(_) | Elem::ProvidedAny)
                 }) =>
             {
                 if row.entries.is_empty() && row.tail.is_none() {
@@ -187,10 +187,14 @@ impl Printer<'_, '_> {
                 out.push_str(" + ");
                 self.print(b, Prec::App, out);
             }),
-            Type::Without { .. } => {
-                out.push('{');
-                self.print_row_items(t, out);
-                out.push('}');
+            Type::Without { row, gone } => {
+                if gone.iter().all(Elem::is_provided_exclusion) {
+                    self.print(row, prec, out);
+                } else {
+                    out.push('{');
+                    self.print_row_items(t, out);
+                    out.push('}');
+                }
             }
             Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } => {
                 self.print_captured(ty, captures, prec, out);
@@ -354,8 +358,15 @@ impl Printer<'_, '_> {
             Type::Row(row) => row,
             // `-S` before the `|`, as it is written
             Type::Without { row, gone } => {
-                printer.print_gone(gone, true, out);
-                out.push_str(" | ");
+                let visible: Vec<Elem> = gone
+                    .iter()
+                    .filter(|l| !l.is_provided_exclusion())
+                    .cloned()
+                    .collect();
+                if !visible.is_empty() {
+                    printer.print_gone(&visible, true, out);
+                    out.push_str(" | ");
+                }
                 printer.print(row, Prec::App, out);
                 return;
             }
@@ -380,8 +391,17 @@ impl Printer<'_, '_> {
         let services = items.clone().any(|item| !is_fail(item));
         let tail = match row.tail.as_deref() {
             Some(Type::Without { row, gone }) => {
-                printer.print_gone(gone, !services, out);
-                out.push_str(" | ");
+                let visible: Vec<Elem> = gone
+                    .iter()
+                    .filter(|l| !l.is_provided_exclusion())
+                    .cloned()
+                    .collect();
+                if visible.is_empty() {
+                    out.push_str(if services { " | " } else { "" });
+                } else {
+                    printer.print_gone(&visible, !services, out);
+                    out.push_str(" | ");
+                }
                 Some(&**row)
             }
             Some(tail) => {

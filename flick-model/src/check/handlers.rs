@@ -287,6 +287,7 @@ impl Checker<'_> {
         self.leave_provide();
         self.stage_bound = outer_bound;
         let (t, inner) = checked?;
+        self.grow_pending()?;
         let own = inner.clone();
         let (mut needed, raised) = match inner {
             Stage::Pure => (Row::none(), Row::none()),

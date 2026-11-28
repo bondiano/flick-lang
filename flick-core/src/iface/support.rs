@@ -375,6 +375,9 @@ fn type_children<'a>(ty: &'a Type, pending: &mut Vec<Part<'a>>) {
             pending.extend([Part::Type(param), Part::Type(result)]);
             if let Some(effects) = effects {
                 pending.extend([Part::Type(&effects.services), Part::Type(&effects.errors)]);
+                if let Some(provides) = &effects.provides {
+                    pending.push(Part::Type(provides));
+                }
             }
         }
         Type::Tuple(items) => pending.extend(items.iter().map(Part::Type)),

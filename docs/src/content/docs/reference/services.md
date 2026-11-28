@@ -219,7 +219,8 @@ source typing equivalence. A `Layer.run` closure boundary cannot preserve outer
 (`FLICK-T071`), or lexical `defer`/`errdefer` binding (`FLICK-G004`), cannot
 discharge a service out of an abstract row variable (`{-Log | s}`,
 `FLICK-E002`), and `provide S impl` installs a record implementation directly
-without building a layer. Direct `Layer.run` calls enforce the same safety
+without building a layer. `Layer.run` calls—whether invoked directly or through a partially applied
+alias, pipe, hole, composition, or higher-order wrapper—enforce the same safety
 checks as `provide`: provider lifetime (`Fiber.Provided`, `FLICK-G003`),
 parameterized-instance exclusion (`FLICK-E019`), and live-region checks when
 installing region-indexed services (`FLICK-G002`).

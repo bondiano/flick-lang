@@ -31,7 +31,8 @@ impl Checker<'_> {
 
     /// The type of a value or constructor reference, instantiated.
     pub fn name(&mut self, node: &Node) -> Type {
-        let ty = self.name_type(node);
+        let mut ty = self.name_type(node);
+        self.attach_provides(node, &mut ty);
         let declared = self.gadt.declared.take();
         let ty = self.value_bound(ty);
         let ty = if matches!(self.typing.names.get(&node.range()), Some(Ref::Local)) {
@@ -277,20 +278,22 @@ impl Checker<'_> {
             }
             match self.ui_callable(&ty, (span.start, span.end), self.span(head)) {
                 Type::Fun {
-                    param,
-                    effects,
+                    mut param,
+                    mut effects,
                     result,
                 } => {
-                    let entered_layer_run = i == 1
-                        && layer_run_ro.is_some()
-                        && super::handlers::is_immediate_thunk(arg);
-                    let body_provided = self.cx.regions.provided.len();
-                    let body_provided_late = self.cx.regions.provided_late.len();
-                    if entered_layer_run && let Some(ro) = layer_run_ro.as_ref() {
-                        self.enter_layer_run_provide(head, span, ro);
-                        self.cx.regions.immediate_provide =
-                            Some(self.cx.regions.provides.len() - 1);
-                    }
+                    self.attach_discharged_arrow(&mut param, &mut effects, &result);
+                    let provides_ro = effects
+                        .as_deref()
+                        .and_then(|e| e.provides.clone())
+                        .or_else(|| (i == 1).then(|| layer_run_ro.clone()).flatten());
+                    let marks = (
+                        self.cx.regions.provided.len(),
+                        self.cx.regions.provided_late.len(),
+                        self.cx.subrows.len(),
+                    );
+                    let entered_layer_run =
+                        self.begin_layer_run_arg(head, arg, provides_ro.as_ref(), span);
                     let argument = match checked {
                         Some(argument) => argument,
                         None if watched.is_none() && self.late_accessor(arg, &param) => {
@@ -309,30 +312,26 @@ impl Checker<'_> {
                     if entered_layer_run {
                         self.cx.regions.immediate_provide = None;
                     }
-                    if let Some(ro) = layer_run_ro.as_ref().filter(|_| i == 1) {
-                        if !defaults.is_empty() {
-                            self.grow();
-                            let pending = mem::take(defaults);
-                            self.settle_defaults(pending);
-                        }
-                        self.settle_provided_since(body_provided, body_provided_late);
-                        if let Some(e) = effects {
-                            let live = self.live_call(&ty, &e);
-                            self.layer_run_call_effects(head, ro, &live, span, entered_layer_run);
-                        } else if entered_layer_run {
-                            self.leave_provide();
-                        }
+                    if let Some(ro) = provides_ro.as_ref() {
+                        self.finish_layer_run_arg(
+                            head,
+                            &ty,
+                            &param,
+                            effects.as_deref(),
+                            ro,
+                            span,
+                            entered_layer_run,
+                            marks,
+                            defaults,
+                        );
                     } else if let Some(e) = effects {
                         self.call_effects(&self.live_call(&ty, &e), span);
                     }
+                    let is_layer_arg = self.layer_parts(&param).is_some();
                     params.push(*param);
                     let result = self.instantiate(&result, span);
                     ty = self.application_result(result, &ty, &argument, parametric && i == 0);
-                    if i == 0
-                        && let Some(ro) = layer_run_ro.as_ref()
-                    {
-                        self.refine_layer_run_after_layer(ro, &mut ty);
-                    }
+                    self.refine_after_arg(i == 0, is_layer_arg, layer_run_ro.as_ref(), &mut ty);
                 }
                 Type::Error => {
                     let inferred = checked.unwrap_or_else(|| self.infer(arg));

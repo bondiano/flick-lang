@@ -327,7 +327,12 @@ impl Checker<'_> {
                 result,
             } => {
                 let effect_free = !effects.as_ref().is_some_and(|errors| {
-                    occurs(parameter, &errors.services) || occurs(parameter, &errors.errors)
+                    occurs(parameter, &errors.services)
+                        || occurs(parameter, &errors.errors)
+                        || errors
+                            .provides
+                            .as_ref()
+                            .is_some_and(|p| occurs(parameter, p))
                 });
                 effect_free
                     && self.pol_ok(current, parameter, sign, !positive, true, param)

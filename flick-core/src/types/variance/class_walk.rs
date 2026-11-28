@@ -22,6 +22,12 @@ fn label_names(label: &Elem, a: &str) -> bool {
     }
 }
 
+fn effects_occur_free(a: &str, effects: &super::super::ty::Effects) -> bool {
+    occurs_free(a, &effects.services)
+        || occurs_free(a, &effects.errors)
+        || effects.provides.as_ref().is_some_and(|p| occurs_free(a, p))
+}
+
 /// Whether `a` occurs free in `ty`, respecting inner `Forall` binders.
 pub(super) fn occurs_free(a: &str, ty: &Type) -> bool {
     match ty {
@@ -34,9 +40,7 @@ pub(super) fn occurs_free(a: &str, ty: &Type) -> bool {
             result,
         } => {
             occurs_free(a, param)
-                || effects
-                    .as_ref()
-                    .is_some_and(|e| occurs_free(a, &e.services) || occurs_free(a, &e.errors))
+                || effects.as_ref().is_some_and(|e| effects_occur_free(a, e))
                 || occurs_free(a, result)
         }
         Type::Tuple(items) => items.iter().any(|t| occurs_free(a, t)),
@@ -131,10 +135,7 @@ impl Checker<'_> {
                 result,
             } => {
                 if let Some(effects) = effects {
-                    out.fixed(
-                        occurs_free(param, &effects.services)
-                            || occurs_free(param, &effects.errors),
-                    );
+                    out.fixed(effects_occur_free(param, effects));
                 }
                 self.walk_class_ty(
                     current,

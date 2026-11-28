@@ -9,16 +9,14 @@
 //! stage's row as `Provided {S} s` and goes to whatever runs the stage.
 
 use crate::types::Elem;
+use crate::types::elem::gone_excludes;
 use std::mem;
 
 use super::{Scope, scope};
-use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
-use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Checker;
 use crate::types::classes::args_of;
-use crate::types::convert::is_type;
 use crate::types::gadt::branch::type_eqs;
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Row, Type};
@@ -316,7 +314,30 @@ impl Checker<'_> {
             }
             return true;
         }
-        self.scope_or_given(at, &owner, Some(service), None)
+        if self
+            .scope_index(&owner)
+            .is_some_and(|i| at.scopes.contains(&i))
+        {
+            return true;
+        }
+        // A callback stage whose row explicitly excludes `Provided(service)`
+        // (from a `Layer.run` wrapper) shadows any outer `Fiber.Provided` given
+        // for that service.
+        if self.stage_excludes_provided(&at.services, service) {
+            return false;
+        }
+        self.given_provided(at, &owner, Some(service), None)
+    }
+
+    /// Whether `services` carries a `Type::Without` tail excluding `Provided(service)`.
+    fn stage_excludes_provided(&self, services: &Type, service: &Elem) -> bool {
+        let target = Elem::Provided(Box::new(service.clone()));
+        self.store.normalize(services).tails.iter().any(|tail| {
+            let Type::Without { gone, .. } = tail else {
+                return false;
+            };
+            gone_excludes(gone, &target)
+        })
     }
 
     /// Whether `owner` is a `scope` of `at`, or a given `Provided R owner`
@@ -330,20 +351,41 @@ impl Checker<'_> {
     ) -> bool {
         self.scope_index(owner)
             .is_some_and(|i| at.scopes.contains(&i))
-            || at.givens.iter().any(|g| {
-                let Some(args) = args_of(g, Lang::Provided) else {
-                    return false;
-                };
-                let [row, region] = &args[..] else {
-                    return false;
-                };
-                if self.store.resolve(region) != *owner {
-                    return false;
-                }
-                let norm = self.store.normalize(row);
-                service.is_some_and(|s| norm.get(s).is_some())
-                    || tail.is_some_and(|t| norm.tails.contains(t))
-            })
+            || (!self.stage_excludes_any_provided(&at.services)
+                && self.given_provided(at, owner, service, tail))
+    }
+
+    fn stage_excludes_any_provided(&self, services: &Type) -> bool {
+        self.store.normalize(services).tails.iter().any(|tail| {
+            let Type::Without { gone, .. } = tail else {
+                return false;
+            };
+            gone.contains(&Elem::ProvidedAny)
+        })
+    }
+
+    /// Whether a given `Provided R owner` in `at` names `service` or `tail`.
+    fn given_provided(
+        &self,
+        at: &Lexical,
+        owner: &Type,
+        service: Option<&Elem>,
+        tail: Option<&Type>,
+    ) -> bool {
+        at.givens.iter().any(|g| {
+            let Some(args) = args_of(g, Lang::Provided) else {
+                return false;
+            };
+            let [row, region] = &args[..] else {
+                return false;
+            };
+            if self.store.resolve(region) != *owner {
+                return false;
+            }
+            let norm = self.store.normalize(row);
+            service.is_some_and(|s| norm.get(s).is_some())
+                || tail.is_some_and(|t| norm.tails.contains(t))
+        })
     }
 
     /// Obligations the stage cannot settle go to its row.
@@ -378,110 +420,6 @@ impl Checker<'_> {
                 };
                 self.unprovided(service.trim_matches(['{', '}', ' ']), &region, named, span);
             }
-        }
-    }
-
-    fn outlived_provide(
-        &mut self,
-        service: &Elem,
-        provide: usize,
-        owner: &Type,
-        span: Span,
-        owner_related: Option<Span>,
-    ) {
-        let Scope { span: at, .. } = self.cx.regions.scopes[provide];
-        let (region, _) = self.describe(owner);
-        let service = service.to_string();
-        let name = service.rsplit('.').next().unwrap_or(&service);
-        let mut diagnostic = Diagnostic::error(
-            codes::G003,
-            format!(
-                "this keeps work that uses `{name}` until {region} closes, but the `provide` that builds `{name}` releases it earlier"
-            ),
-            span,
-        )
-        .with_related(at, "the service is released when this `provide` ends");
-        if let Some(owner_span) = owner_related {
-            diagnostic =
-                diagnostic.with_related(owner_span, "cleanup is registered on this `scope`");
-        }
-        self.diagnostics.push(diagnostic.with_fix(|| {
-            (
-                "give the work an owner inside the `provide`, or provide the service outside the owner's `scope`",
-                Vec::new(),
-            )
-        }));
-    }
-
-    /// Whether `ty` is a variable of a top-level signature being checked,
-    /// which a constraint added to it can name; the region of a `forall`
-    /// in an argument's type, as that of `Layer.from_build`, is not.
-    pub fn signed(&self, ty: &Type) -> bool {
-        matches!(self.store.resolve(ty), Type::Skolem(s) if self.cx.regions.signed.contains(&s))
-    }
-
-    /// An obligation that reached a signature, or a row variable none
-    /// settles. Only when the signature `named` the region and the row is
-    /// there a constraint to add to it.
-    pub fn unprovided(&mut self, service: &str, region: &str, named: bool, span: Span) {
-        // a row variable is the row itself; a service is an element of one
-        let row = if service.starts_with(char::is_lowercase) {
-            service.to_owned()
-        } else {
-            format!("{{{service}}}")
-        };
-        let diagnostic = Diagnostic::error(
-            codes::G003,
-            format!(
-                "this keeps work that uses `{service}` until `{region}` closes, but the service comes from the caller, which may release it earlier"
-            ),
-            span,
-        );
-        let diagnostic = if named {
-            let constraint = format!("Fiber.Provided {row} {region}");
-            let edits = self.constraint_edits(&constraint, span);
-            diagnostic.with_fix(|| (format!("add `{constraint}` to the signature"), edits))
-        } else {
-            diagnostic
-        };
-        self.diagnostics.push(diagnostic);
-    }
-
-    /// The edits that add `constraint` to the signature of the top-level
-    /// function around `span`; none when it has no signature to edit.
-    fn constraint_edits(&self, constraint: &str, span: Span) -> Vec<Edit> {
-        let Some(mut ty) = self
-            .signature_around(span)
-            .and_then(|sig| sig.nodes().find(|n| is_type(n.kind)))
-        else {
-            return Vec::new();
-        };
-        if ty.kind == K::ForallType {
-            let Some(body) = ty.nodes().next() else {
-                return Vec::new();
-            };
-            ty = body;
-        }
-        let insert = |at: u32, replacement: String| Edit {
-            span: Span::new(self.file, at, at),
-            replacement,
-        };
-        match (ty.kind == K::ConstrainedType)
-            .then(|| ty.nodes().next())
-            .flatten()
-        {
-            Some(context) => {
-                let (start, end) = context.range();
-                if context.kind == K::TupleType {
-                    vec![insert(end - 1, format!(", {constraint}"))]
-                } else {
-                    vec![
-                        insert(start, "(".to_owned()),
-                        insert(end, format!(", {constraint})")),
-                    ]
-                }
-            }
-            None => vec![insert(ty.range().0, format!("{constraint} => "))],
         }
     }
 }

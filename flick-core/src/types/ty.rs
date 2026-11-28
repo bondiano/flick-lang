@@ -114,6 +114,12 @@ pub struct Effects {
     /// `sync` still says what unifies, and runtime calls adapt either stage.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub direct: bool,
+    /// Output service row of a `Layer.run` provider scope carried by this
+    /// runtime arrow, so invoking it through an alias, pipe, or binding
+    /// enforces `FLICK-G003` provider-lifetime soundness. No part of type
+    /// equality; omitted from interfaces unless present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provides: Option<Type>,
     /// Where the row is written, for a fix that adds to it.
     #[serde(skip)]
     pub written: Written,
@@ -199,6 +205,7 @@ impl Effects {
             errors,
             sync,
             direct: false,
+            provides: None,
             written: Written::default(),
         }
     }

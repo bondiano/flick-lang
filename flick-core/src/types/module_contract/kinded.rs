@@ -133,6 +133,11 @@ impl<K: Kinding, I: Identities> Walk<'_, '_, K, I> {
                         Ok(Box::new(Effects {
                             services: self.ty(&effects.services, &Kind::ServiceRow)?,
                             errors: self.ty(&effects.errors, &Kind::ErrorRow)?,
+                            provides: effects
+                                .provides
+                                .as_ref()
+                                .map(|provides| self.ty(provides, &Kind::ServiceRow))
+                                .transpose()?,
                             ..(**effects).clone()
                         }))
                     })
