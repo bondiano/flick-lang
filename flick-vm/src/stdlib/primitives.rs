@@ -83,6 +83,8 @@ mod record_ops;
 mod regexp_ops;
 mod scalar;
 mod schema_data;
+mod schema_fln_encode;
+mod schema_fln_leaves;
 mod schema_leaves;
 mod schema_leaves_encode;
 mod schema_ops;

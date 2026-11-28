@@ -24,6 +24,7 @@ use super::{
     BUILTIN_DIR, Context, Server, Snapshot, analyze, builtin_index, features, lsp_diagnostic,
     protocol,
 };
+use crate::fln_files;
 
 #[path = "ffi.rs"]
 mod ffi;
@@ -53,6 +54,18 @@ impl Server {
             }
             "textDocument/formatting" => {
                 let (path, text) = self.document(params)?;
+                if fln_files::is_fln_path(&path) {
+                    let name = path.to_string_lossy();
+                    let Ok(formatted) =
+                        fln_files::format_fln(FileId::default(), name.as_ref(), &text)
+                    else {
+                        return Ok(Value::Null);
+                    };
+                    let end = u32::try_from(text.len()).unwrap_or(u32::MAX);
+                    return Ok(
+                        json!([{ "range": protocol::range(&text, 0, end), "newText": formatted }]),
+                    );
+                }
                 // the plugins of the module's blocks, as the analysis loaded them
                 let snapshot = self.snapshot_for(&path);
                 let plugins: HashMap<String, Arc<dyn Expander>> = (snapshot.file(&path))
@@ -107,6 +120,23 @@ impl Server {
 
     fn at_position(&mut self, method: &str, params: &Value) -> Reply {
         let (path, text) = self.document(params)?;
+        if fln_files::is_fln_path(&path) {
+            return match method {
+                "textDocument/semanticTokens/full" => Ok(json!({ "data": [] })),
+                "textDocument/documentSymbol"
+                | "textDocument/foldingRange"
+                | "textDocument/inlayHint"
+                | "textDocument/documentHighlight"
+                | "textDocument/references" => Ok(json!([])),
+                "textDocument/hover"
+                | "textDocument/signatureHelp"
+                | "textDocument/typeDefinition"
+                | "textDocument/definition"
+                | "textDocument/prepareRename"
+                | "textDocument/rename" => Ok(Value::Null),
+                _ => Err((-32601, format!("`{method}` is not supported"))),
+            };
+        }
         if matches!(method, "textDocument/prepareRename" | "textDocument/rename")
             && builtin_index(&path).is_some()
         {
@@ -176,6 +206,9 @@ impl Server {
     /// imported module.
     fn code_actions(&mut self, params: &Value) -> Reply {
         let (path, text) = self.document(params)?;
+        if fln_files::is_fln_path(&path) {
+            return Ok(json!([]));
+        }
         let start = protocol::offset(&text, &params["range"]["start"]);
         let end = protocol::offset(&text, &params["range"]["end"]);
         let snapshot = self.snapshot_for(&path);
@@ -216,6 +249,9 @@ impl Server {
     /// offset points at the `.` so qualifier and receiver completions are found.
     fn completion(&mut self, params: &Value) -> Reply {
         let (path, text) = self.document(params)?;
+        if fln_files::is_fln_path(&path) {
+            return Ok(json!([]));
+        }
         let cursor = protocol::offset(&text, &params["position"]) as usize;
         if in_comment_or_string(&text, cursor) {
             return Ok(json!([]));

@@ -1,0 +1,577 @@
+/// Lexing, string-escaping, and formatting primitives for `Fln`.
+module Fln.Lex exposing (..)
+
+import Bytes
+
+/// A source span in UTF-16 code-unit offsets and 1-based line/column positions.
+type alias Span = {
+  start : Int
+  end : Int
+  line : Int
+  column : Int
+  end_line : Int
+  end_column : Int
+}
+
+type alias Cursor = { src : String; len : Int; pos : Int; line : Int; col : Int }
+
+type alias LexError = {
+  message : String
+  line : Int
+  column : Int
+  offset : Int
+  span : Span
+}
+
+// Pure list helpers using only kernel primitives so `Fln` runs on every target including Lua.
+map_list : (a -> b) -> List a -> List b
+let map_list f xs =
+  go : List a -> List b -> List b
+  let rec go rem acc =
+    match rem with
+    | [] -> List.reverse acc
+    | [h, ...t] -> go t ([f h] ++ acc)
+  go xs []
+
+any_list : (a -> Bool) -> List a -> Bool
+let rec any_list p xs =
+  match xs with
+  | [] -> false
+  | [h, ...t] -> if p h then true else any_list p t
+
+find_list : (a -> Bool) -> List a -> Option a
+let rec find_list p xs =
+  match xs with
+  | [] -> None
+  | [h, ...t] -> if p h then Some h else find_list p t
+
+map_result : (a -> Result e b) -> List a -> Result e (List b)
+let map_result f xs =
+  go : List a -> List b -> Result e (List b)
+  let rec go rem acc =
+    match rem with
+    | [] -> Ok (List.reverse acc)
+    | [h, ...t] ->
+      match f h with
+      | Ok y -> go t ([y] ++ acc)
+      | Err e -> Err e
+  go xs []
+
+make_span : Cursor -> Cursor -> Span
+let make_span a b = {
+  start = a.pos
+  end = b.pos
+  line = a.line
+  column = a.col
+  end_line = b.line
+  end_column = b.col
+}
+
+err_span : Cursor -> Cursor -> String -> Result LexError a
+let err_span a b msg =
+  Err {
+    message = msg
+    line = a.line
+    column = a.col
+    offset = a.pos
+    span = make_span a b
+  }
+
+err_at : Cursor -> String -> Result LexError a
+let err_at c msg = err_span c c msg
+
+peek : Cursor -> Int
+let peek c =
+  if c.pos >= c.len then -1 else Option.with_default (-1) (String.char_code_at c.pos c.src)
+
+peek_at : Int -> Cursor -> Int
+let peek_at delta c =
+  let i = c.pos + delta
+  if i < 0 || i >= c.len then -1 else Option.with_default (-1) (String.char_code_at i c.src)
+
+bump : Cursor -> Cursor
+let bump c =
+  let ch = peek c
+  if ch < 0 then
+    c
+  else if ch == 10 then
+    ({ src = c.src; len = c.len; pos = c.pos + 1; line = c.line + 1; col = 1 })
+  else
+    ({ src = c.src; len = c.len; pos = c.pos + 1; line = c.line; col = c.col + 1 })
+
+bump_n : Int -> Cursor -> Cursor
+let rec bump_n n c = if n <= 0 then c else bump_n (n - 1) (bump c)
+
+is_upper : Int -> Bool
+let is_upper ch = ch >= 65 && ch <= 90
+
+is_lower : Int -> Bool
+let is_lower ch = ch >= 97 && ch <= 122
+
+is_digit : Int -> Bool
+let is_digit ch = ch >= 48 && ch <= 57
+
+is_ident_start : Int -> Bool
+let is_ident_start ch = is_upper ch || is_lower ch || ch == 95
+
+is_ident_cont : Int -> Bool
+let is_ident_cont ch = is_ident_start ch || is_digit ch
+
+hex_val : Int -> Int
+let hex_val ch =
+  if ch >= 48 && ch <= 57 then
+    ch - 48
+  else if ch >= 65 && ch <= 70 then
+    ch - 55
+  else if ch >= 97 && ch <= 102 then
+    ch - 87
+  else
+    -1
+
+reserved_keywords : List String
+let reserved_keywords = [
+  "_",
+  "as",
+  "assert",
+  "await",
+  "break",
+  "class",
+  "continue",
+  "deriving",
+  "do",
+  "else",
+  "error",
+  "exposing",
+  "false",
+  "for",
+  "forall",
+  "foreign",
+  "from",
+  "fun",
+  "if",
+  "ignore",
+  "import",
+  "in",
+  "instance",
+  "kind",
+  "lazy",
+  "let",
+  "match",
+  "module",
+  "mut",
+  "none",
+  "not",
+  "opaque",
+  "provide",
+  "rec",
+  "scope",
+  "service",
+  "task",
+  "then",
+  "true",
+  "try",
+  "type",
+  "when",
+  "where",
+  "with",
+  "yield",
+]
+
+is_reserved_keyword : String -> Bool
+let is_reserved_keyword w = any_list (fun k -> k == w) reserved_keywords
+
+skip_line_comment : Cursor -> Cursor
+let rec skip_line_comment c =
+  let ch = peek c
+  if ch < 0 || ch == 10 then c else skip_line_comment (bump c)
+
+skip_block_comment : Cursor -> Int -> Cursor -> Result LexError Cursor
+let rec skip_block_comment opened depth c =
+  let ch = peek c
+  if ch < 0 then
+    err_span opened c "unterminated block comment"
+  else if ch == 47 && peek_at 1 c == 42 then
+    skip_block_comment opened (depth + 1) (bump_n 2 c)
+  else if ch == 42 && peek_at 1 c == 47 then
+    let next = bump_n 2 c
+    if depth == 1 then Ok next else skip_block_comment opened (depth - 1) next
+  else
+    skip_block_comment opened depth (bump c)
+
+skip_trivia : Cursor -> Result LexError (Cursor, Bool)
+let skip_trivia start =
+  go : Cursor -> Bool -> Result LexError (Cursor, Bool)
+  let rec go c saw_nl =
+    let ch = peek c
+    if ch == 32 then
+      go (bump c) saw_nl
+    else if ch == 10 then
+      go (bump c) true
+    else if ch == 13 && peek_at 1 c == 10 then
+      go (bump (bump c)) true
+    else if ch == 9 then
+      err_span c (bump c) "tabs are not allowed outside strings and comments; use spaces"
+    else if ch == 47 && peek_at 1 c == 47 then
+      go (skip_line_comment (bump_n 2 c)) saw_nl
+    else if ch == 47 && peek_at 1 c == 42 then
+      match skip_block_comment c 1 (bump_n 2 c) with
+      | Ok next -> go next (saw_nl || next.line > c.line)
+      | Err e -> Err e
+    else
+      Ok (c, saw_nl)
+  go start false
+
+encode_codepoint : Int -> Option String
+let encode_codepoint cp =
+  if cp < 0 || cp > 1114111 || (cp >= 55296 && cp <= 57343) then
+    None
+  else
+    let bytes =
+      if cp < 128 then
+        [cp]
+      else if cp < 2048 then
+        [192 + cp / 64, 128 + cp % 64]
+      else if cp < 65536 then
+        [224 + cp / 4096, 128 + (cp / 64) % 64, 128 + cp % 64]
+      else
+        [240 + cp / 262144, 128 + (cp / 4096) % 64, 128 + (cp / 64) % 64, 128 + cp % 64]
+    match Bytes.from_list bytes with
+    | Ok packed -> Bytes.decode_utf8 packed
+    | Err _ -> None
+
+parse_unicode_escape : Cursor -> Cursor -> Result LexError (String, Cursor)
+let parse_unicode_escape esc_start c =
+  if peek c != 123 then
+    err_span esc_start c "expected `{` after `\\u`"
+  else
+    let c1 = bump c
+    read_hex : Cursor -> Int -> Int -> Result LexError (String, Cursor)
+    let rec read_hex cur count acc =
+      let ch = peek cur
+      if ch == 125 then
+        if count == 0 then
+          err_span esc_start (bump cur) "empty unicode escape `\\u{}`"
+        else
+          match encode_codepoint acc with
+          | Some s -> Ok (s, bump cur)
+          | None -> err_span esc_start (bump cur) "invalid unicode scalar value in escape"
+      else
+        let d = hex_val ch
+        if d < 0 then
+          err_span esc_start cur "expected hexadecimal digit in unicode escape"
+        else if count >= 6 then
+          err_span esc_start cur "unicode escape has too many digits"
+        else
+          read_hex (bump cur) (count + 1) (acc * 16 + d)
+    read_hex c1 0 0
+
+parse_escape : Cursor -> Result LexError (String, Cursor)
+let parse_escape slash =
+  let c1 = bump slash
+  let ch = peek c1
+  if ch == 110 then
+    Ok ("\n", bump c1)
+  else if ch == 116 then
+    Ok ("\t", bump c1)
+  else if ch == 114 then
+    Ok ("\r", bump c1)
+  else if ch == 92 then
+    Ok ("\\", bump c1)
+  else if ch == 34 then
+    Ok ("\"", bump c1)
+  else if ch == 48 then
+    Ok ("\0", bump c1)
+  else if ch == 117 then
+    parse_unicode_escape slash (bump c1)
+  else if ch < 0 then
+    err_span slash c1 "unterminated escape sequence"
+  else
+    err_span
+      slash
+      (bump c1)
+      ("invalid escape sequence `\\" ++ String.slice c1.pos (c1.pos + 1) c1.src ++ "`")
+
+parse_quoted_string : Cursor -> Result LexError (Span, String, Cursor)
+let parse_quoted_string opened =
+  let c0 = bump opened
+  go : Cursor -> Int -> List String -> Result LexError (Span, String, Cursor)
+  let rec go c seg_start parts =
+    let ch = peek c
+    if ch < 0 || ch == 10 || ch == 13 then
+      err_span opened c "unterminated string literal"
+    else if ch == 34 then
+      let seg = String.slice seg_start c.pos c.src
+      let closed = bump c
+      let text = String.join "" (List.reverse ([seg] ++ parts))
+      Ok (make_span opened closed, text, closed)
+    else if ch == 92 then
+      let seg = String.slice seg_start c.pos c.src
+      match parse_escape c with
+      | Ok (decoded, next) -> go next next.pos ([decoded, seg] ++ parts)
+      | Err e -> Err e
+    else
+      go (bump c) seg_start parts
+  go c0 c0.pos []
+
+decode_escapes_in : Cursor -> String -> Result LexError String
+let decode_escapes_in origin text =
+  let n = String.length text
+  let sub = { src = text; len = n; pos = 0; line = origin.line; col = origin.col }
+  go : Cursor -> Int -> List String -> Result LexError String
+  let rec go c seg_start parts =
+    let ch = peek c
+    if ch < 0 then
+      let seg = String.slice seg_start c.pos c.src
+      Ok (String.join "" (List.reverse ([seg] ++ parts)))
+    else if ch == 92 then
+      let seg = String.slice seg_start c.pos c.src
+      match parse_escape c with
+      | Ok (decoded, next) -> go next next.pos ([decoded, seg] ++ parts)
+      | Err e -> Err e
+    else
+      go (bump c) seg_start parts
+  go sub 0 []
+
+split_lines_lf : String -> List String
+let split_lines_lf text =
+  let n = String.length text
+  go : Int -> Int -> List String -> List String
+  let rec go i start acc =
+    if i >= n then
+      List.reverse ([String.slice start n text] ++ acc)
+    else
+      let ch = Option.with_default (-1) (String.char_code_at i text)
+      if ch == 13 && i + 1 < n && String.char_code_at (i + 1) text == Some 10 then
+        go (i + 2) (i + 2) ([String.slice start i text] ++ acc)
+      else if ch == 10 then
+        go (i + 1) (i + 1) ([String.slice start i text] ++ acc)
+      else
+        go (i + 1) start acc
+  go 0 0 []
+
+count_leading_spaces : String -> Int
+let count_leading_spaces s =
+  let n = String.length s
+  go : Int -> Int
+  let rec go i = if i < n && String.char_code_at i s == Some 32 then go (i + 1) else i
+  go 0
+
+dedent_multiline : String -> String
+let dedent_multiline raw =
+  let n = String.length raw
+  let trimmed_lead =
+    if n >= 2 && String.char_code_at 0 raw == Some 13 && String.char_code_at 1 raw == Some 10 then
+      String.slice 2 n raw
+    else if n >= 1 && String.char_code_at 0 raw == Some 10 then
+      String.slice 1 n raw
+    else
+      raw
+  let lines = split_lines_lf trimmed_lead
+  let count = List.length lines
+  let last_line = Option.with_default "" (List.get (count - 1) lines)
+  let last_spaces = count_leading_spaces last_line
+  let closing_only_spaces = count > 1 && last_spaces == String.length last_line
+  let body_lines = if closing_only_spaces then List.take (count - 1) lines else lines
+  min_of : Int -> List String -> Int
+  let rec min_of cur xs =
+    match xs with
+    | [] -> cur
+    | [line, ...rest] ->
+      let ln = String.length line
+      let sp = count_leading_spaces line
+      if ln == 0 || sp == ln then
+        min_of cur rest
+      else
+        min_of (if cur < 0 || sp < cur then sp else cur) rest
+  let base_min = if closing_only_spaces then last_spaces else -1
+  let indent =
+    let m = min_of base_min body_lines
+    if m < 0 then 0 else m
+  let stripped =
+    map_list
+      (fun line ->
+        let ln = String.length line
+        if ln <= indent then "" else String.slice indent ln line
+      )
+      body_lines
+  String.join "\n" stripped
+
+parse_multiline_string : Cursor -> Result LexError (Span, String, Cursor)
+let parse_multiline_string opened =
+  let c0 = bump_n 3 opened
+  scan : Cursor -> Result LexError (Span, String, Cursor)
+  let rec scan c =
+    let ch = peek c
+    if ch < 0 then
+      err_span opened c "unterminated multiline string literal"
+    else if ch == 92 then
+      let c1 = bump c
+      if peek c1 < 0 then
+        err_span opened c1 "unterminated multiline string literal"
+      else
+        scan (bump c1)
+    else if ch == 34 && peek_at 1 c == 34 && peek_at 2 c == 34 then
+      let raw = String.slice c0.pos c.pos c.src
+      let closed = bump_n 3 c
+      let dedented = dedent_multiline raw
+      match decode_escapes_in c0 dedented with
+      | Ok decoded -> Ok (make_span opened closed, decoded, closed)
+      | Err e -> Err e
+    else
+      scan (bump c)
+  scan c0
+
+parse_raw_string : Cursor -> Int -> Result LexError (Span, String, Cursor)
+let parse_raw_string opened hashes =
+  let c0 = bump_n (hashes + 2) opened
+  check_hashes : Int -> Cursor -> Bool
+  let rec check_hashes k c = if k <= 0 then true else peek_at k c == 35 && check_hashes (k - 1) c
+  scan : Cursor -> Result LexError (Span, String, Cursor)
+  let rec scan c =
+    let ch = peek c
+    if ch < 0 then
+      err_span opened c "unterminated raw string literal"
+    else if ch == 34 && check_hashes hashes c then
+      let text = String.slice c0.pos c.pos c.src
+      let closed = bump_n (hashes + 1) c
+      Ok (make_span opened closed, text, closed)
+    else
+      scan (bump c)
+  scan c0
+
+raw_string_hashes : Cursor -> Option Int
+let raw_string_hashes c =
+  if peek c != 114 then
+    None
+  else
+    go : Int -> Option Int
+    let rec go k =
+      let ch = peek_at (1 + k) c
+      if ch == 35 then go (k + 1) else if ch == 34 then Some k else None
+    go 0
+
+strip_underscores : String -> String
+let strip_underscores s =
+  let n = String.length s
+  go : Int -> Int -> List String -> String
+  let rec go i seg parts =
+    if i >= n then
+      String.join "" (List.reverse ([String.slice seg n s] ++ parts))
+    else if String.char_code_at i s == Some 95 then
+      go (i + 1) (i + 1) ([String.slice seg i s] ++ parts)
+    else
+      go (i + 1) seg parts
+  go 0 0 []
+
+scan_ident : Cursor -> (String, Cursor)
+let scan_ident start =
+  go : Cursor -> Cursor
+  let rec go c = if is_ident_cont (peek c) then go (bump c) else c
+  let end_c = go start
+  (String.slice start.pos end_c.pos start.src, end_c)
+
+scan_con_path : Cursor -> Result LexError (List String, String, Cursor)
+let scan_con_path start =
+  go : Cursor -> List String -> Result LexError (List String, String, Cursor)
+  let rec go c rev_segs =
+    if not (is_upper (peek c)) then
+      err_at c "expected uppercase constructor or module name"
+    else
+      let (seg, c1) = scan_ident c
+      if peek c1 == 46 then
+        go (bump c1) ([seg] ++ rev_segs)
+      else
+        Ok (List.reverse rev_segs, seg, c1)
+  go start []
+
+is_field_assign_ahead : Cursor -> Bool
+let is_field_assign_ahead c =
+  if not (is_ident_start (peek c)) then
+    false
+  else
+    let (_, c1) = scan_ident c
+    match skip_trivia c1 with
+    | Ok (c2, _) -> peek c2 == 61 && peek_at 1 c2 != 61
+    | Err _ -> false
+
+can_start_con_arg : Cursor -> Bool
+let can_start_con_arg c =
+  let ch = peek c
+  if ch == 40 || ch == 91 || ch == 123 || ch == 34 || is_digit ch then
+    true
+  else if raw_string_hashes c != None then
+    true
+  else if is_upper ch then
+    not (is_field_assign_ahead c)
+  else if is_lower ch then
+    let (w, _) = scan_ident c
+    (w == "true" || w == "false") && not (is_field_assign_ahead c)
+  else
+    false
+
+hex_digit : Int -> String
+let hex_digit d = String.slice d (d + 1) "0123456789abcdef"
+
+hex_escape : Int -> String
+let hex_escape cp =
+  if cp < 16 then
+    "\\u{" ++ hex_digit cp ++ "}"
+  else
+    "\\u{" ++ hex_digit (cp / 16) ++ hex_digit (cp % 16) ++ "}"
+
+escape_string : String -> String
+let escape_string s =
+  let n = String.length s
+  go : Int -> Int -> List String -> String
+  let rec go i seg parts =
+    if i >= n then
+      "\"" ++ String.join "" (List.reverse ([String.slice seg n s] ++ parts)) ++ "\""
+    else
+      let ch = Option.with_default 0 (String.char_code_at i s)
+      let esc =
+        if ch == 92 then
+          Some "\\\\"
+        else if ch == 34 then
+          Some "\\\""
+        else if ch == 10 then
+          Some "\\n"
+        else if ch == 13 then
+          Some "\\r"
+        else if ch == 9 then
+          Some "\\t"
+        else if ch == 0 then
+          let next_ch =
+            if i + 1 < n then Option.with_default (-1) (String.char_code_at (i + 1) s) else -1
+          if is_digit next_ch then Some "\\u{0}" else Some "\\0"
+        else if ch < 32 || ch == 127 then
+          Some (hex_escape ch)
+        else
+          None
+      match esc with
+      | Some rep -> go (i + 1) (i + 1) ([rep, String.slice seg i s] ++ parts)
+      | None -> go (i + 1) seg parts
+  go 0 0 []
+
+has_dot_or_exp : String -> Bool
+let has_dot_or_exp s =
+  let n = String.length s
+  go : Int -> Bool
+  let rec go i =
+    if i >= n then
+      false
+    else
+      let ch = Option.with_default 0 (String.char_code_at i s)
+      if ch == 46 || ch == 101 || ch == 69 then true else go (i + 1)
+  go 0
+
+spaces : Int -> String
+let spaces n =
+  go : Int -> List String -> String
+  let rec go k acc = if k <= 0 then String.join "" acc else go (k - 1) ([" "] ++ acc)
+  go n []
+
+format_con_name : List String -> String -> String
+let format_con_name path name =
+  match path with
+  | [] -> name
+  | _ -> String.join "." path ++ "." ++ name

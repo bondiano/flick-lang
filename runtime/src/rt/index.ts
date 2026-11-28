@@ -68,11 +68,14 @@ export { loop, trampolineDone, trampolineRun, trampolineSuspend } from "./loop.t
 export { snapshot, snapshotDefault } from "./snapshot.ts";
 export {
   checkEmail, checkNonEmpty, checkPositive, codecDecodeResult, codecEncodeResult, codecTransformPure,
-  schemaAdtOf, schemaBigint, schemaBool, schemaCase, schemaField, schemaInt, schemaItem,
+  schemaAdtOf, schemaBigint, schemaBool, schemaCase, schemaField, schemaFloat32, schemaInt,
+  schemaInt8, schemaInt16, schemaInt64, schemaItem,
   schemaJsonCodec, schemaLazyOf, schemaList, schemaLiterals, schemaNever, schemaNumber, schemaOpaque,
   schemaOption, schemaRecordOf, schemaRecursive, schemaRedacted, schemaRefinedOf, schemaResult,
-  schemaString, schemaTupleOf, schemaUnboxed, schemaUnit, schemaUnknown, schemaValidate, schemaEnumTags,
+  schemaString, schemaTupleOf, schemaUInt8, schemaUInt16, schemaUInt32, schemaUInt64,
+  schemaUnboxed, schemaUnit, schemaUnknown, schemaValidate, schemaEnumTags,
 } from "./schema.ts";
+export { schemaFlnCodec } from "./schema_fln.ts";
 export { schemaGenerator, schemaWithGenerator } from "./schema_gen.ts";
 export { schemaArbitrary } from "./effect/Arbitrary.ts";
 export { lazyDone, lazyForce, lazyMake, lazyMakeLocal } from "./effect/Lazy.ts";

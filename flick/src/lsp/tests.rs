@@ -461,3 +461,6 @@ let greet () = load \"Гость 🎉\" catch | Missing _ -> \"ok\"
         "expected diagnostics to clear after fixing recovery arm: {out}"
     );
 }
+
+#[path = "tests_fln.rs"]
+mod fln;

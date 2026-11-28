@@ -424,12 +424,14 @@ test("activate registers commands, watchers, output channel, and status bar read
   assert.deepEqual(client.clientOptions.documentSelector, [
     { scheme: "file", language: "flick" },
     { scheme: "untitled", language: "flick" },
+    { scheme: "file", language: "fln" },
+    { scheme: "untitled", language: "fln" },
   ]);
   assert.equal(client.clientOptions.outputChannel, h.createdChannels[0]);
   assert.equal(client.clientOptions.traceOutputChannel, h.createdChannels[0]);
   assert.deepEqual(
     h.createdWatchers.map((w) => w.globPattern),
-    ["**/*.fl", "**/flick.toml", "**/flick.lock"],
+    ["**/*.fl", "**/*.fln", "**/flick.toml", "**/flick.lock"],
   );
 
   // `flick.showOutput` opens the output channel.
@@ -545,7 +547,7 @@ test("deactivate race ignores restartServer and configuration changes without le
 
   assert.equal(h.createdClients.length, 1, "no new client may be spawned after deactivate() starts");
   assert.ok(h.createdWatchers.every((w) => w.disposed), "all watchers must remain disposed after deactivate()");
-  assert.equal(h.createdWatchers.length, 3);
+  assert.equal(h.createdWatchers.length, 4);
   assert.equal(h.registeredCommands.size, 0, "commands should be disposed on deactivate()");
 });
 
@@ -937,4 +939,24 @@ test("Find Proof distinguishes exhaustion from no checked candidate", async (t) 
   }
   assert.deepEqual(h.previews, []);
   assert.deepEqual(h.information, ["No checked proof term was found.", "Proof search reached its limit."]);
+});
+
+test("manifest and language client register .fln language, grammar, document selector, and watcher", async (t) => {
+  const flnLang = manifest.contributes.languages.find((l) => l.id === "fln");
+  assert.ok(flnLang, "fln language registered");
+  assert.deepEqual(flnLang.extensions, [".fln"]);
+  const flnGrammar = manifest.contributes.grammars.find((g) => g.language === "fln");
+  assert.ok(flnGrammar, "fln grammar registered");
+  assert.equal(flnGrammar.scopeName, "source.fln");
+  assert.equal(flnGrammar.path, "./syntaxes/fln.tmLanguage.json");
+  assert.ok(manifest.activationEvents.includes("onLanguage:fln"));
+  assert.ok(manifest.contributes.configurationDefaults["[fln]"]);
+
+  const h = createHarness();
+  await h.extension.activate({ subscriptions: [] });
+  t.after(() => h.extension.deactivate());
+  const [client] = h.createdClients;
+  assert.ok(client.clientOptions.documentSelector.some((s) => s.language === "fln" && s.scheme === "file"));
+  assert.ok(client.clientOptions.documentSelector.some((s) => s.language === "fln" && s.scheme === "untitled"));
+  assert.ok(h.createdWatchers.some((w) => w.globPattern === "**/*.fln"));
 });

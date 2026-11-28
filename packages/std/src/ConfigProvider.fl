@@ -2,7 +2,9 @@
 /// `layer` makes a provider the one of the body of a `provide`.
 module ConfigProvider exposing (..)
 
+import BigInt
 import FileSystem
+import Fln
 import Host
 import PlatformError
 
@@ -106,6 +108,58 @@ let from_dot_env options =
       preserveEmptyStrings = options.preserveEmptyStrings
     }
     text
+
+fln_node_at : Options -> Path -> Fln.Value -> Option Node
+let rec fln_node_at options path value =
+  match path with
+  | [] ->
+    match value with
+    | Fln.Record fields -> Some (RecordNode (List.map (fun (k, _) -> k) fields) None)
+    | Fln.List items | Fln.Tuple items -> Some (ArrayNode (List.length items) None)
+    | Fln.String s ->
+      if s == "" && not options.preserveEmptyStrings then None else Some (ValueNode s)
+    | Fln.Bool b -> Some (ValueNode (if b then "true" else "false"))
+    | Fln.Int n _ | Fln.BigInt n -> Some (ValueNode (BigInt.to_string n))
+    | Fln.Float x _ -> Some (ValueNode (Float.to_string x))
+    | Fln.Unit -> None
+    | Fln.Constructor _ "None" [] -> None
+    | Fln.Constructor _ "Some" [inner] -> fln_node_at options [] inner
+    | Fln.Constructor _ name [] -> Some (ValueNode name)
+    | Fln.Constructor _ _ _ -> None
+  | [Key key, ...rest] ->
+    match value with
+    | Fln.Record fields ->
+      match List.find (fun (k, _) -> k == key) fields with
+      | Some (_, next) -> fln_node_at options rest next
+      | None -> None
+    | Fln.Constructor _ "Some" [inner] -> fln_node_at options path inner
+    | _ -> None
+  | [Index idx, ...rest] ->
+    match value with
+    | Fln.List items | Fln.Tuple items ->
+      match List.get idx items with
+      | Some next -> fln_node_at options rest next
+      | None -> None
+    | Fln.Constructor _ "Some" [inner] -> fln_node_at options path inner
+    | _ -> None
+
+/// Values from the text of a `.fln` file.
+from_fln_contents : Options -> String -> ConfigProvider
+let from_fln_contents options text =
+  let parsed = Fln.parse text
+  make (fun path ->
+    match parsed with
+    | Ok root -> fln_node_at options path root
+    | Err err -> Fail.fail (SourceError ("invalid FLN at " ++ Fln.format_parse_error err))
+  )
+
+/// Values from a `.fln` file, by default `config.fln`.
+from_fln :
+  { path : Option String; preserveEmptyStrings : Bool } ->{Async, FileSystem.FileSystem; PlatformError.PlatformError}
+  ConfigProvider
+let from_fln options =
+  let text = FileSystem.read_file_string (Option.with_default "config.fln" options.path)
+  from_fln_contents { preserveEmptyStrings = options.preserveEmptyStrings } text
 
 /// Values from a directory tree, by default `/`: a file is a value, its
 /// trimmed text; a directory is a record of its entries.

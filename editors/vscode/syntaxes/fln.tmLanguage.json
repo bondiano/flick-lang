@@ -1,0 +1,91 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "FLN",
+  "scopeName": "source.fln",
+  "fileTypes": ["fln"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#booleans" },
+    { "include": "#unit" },
+    { "include": "#record-field" },
+    { "include": "#constructors" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.documentation.fln", "match": "///(?!/).*$" },
+        { "name": "comment.line.double-slash.fln", "match": "//.*$" },
+        { "include": "#block-comment" }
+      ]
+    },
+    "block-comment": {
+      "name": "comment.block.fln",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "patterns": [{ "include": "#block-comment" }]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.triple.fln",
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "patterns": [{ "include": "#escapes" }]
+        },
+        {
+          "name": "string.quoted.other.raw.fln",
+          "begin": "\\br(#*)\"",
+          "end": "\"\\1"
+        },
+        {
+          "name": "string.quoted.double.fln",
+          "begin": "\"",
+          "end": "\"|$",
+          "patterns": [{ "include": "#escapes" }]
+        }
+      ]
+    },
+    "escapes": {
+      "patterns": [
+        { "name": "constant.character.escape.fln", "match": "\\\\(?:[ntr\\\\\"0]|u\\{[0-9a-fA-F]{1,6}\\})" },
+        { "name": "invalid.illegal.escape.fln", "match": "\\\\." }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.fln",
+      "match": "\\b(?:(?:0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+)(?:n|[iu](?:8|16|32|64))?|[0-9][0-9_]*(?:\\.[0-9][0-9_]*(?:[eE][+-]?[0-9_]+)?|[eE][+-]?[0-9_]+)(?:f32)?|[0-9][0-9_]*(?:n|[iu](?:8|16|32|64)|f32)?)\\b"
+    },
+    "booleans": {
+      "name": "constant.language.boolean.fln",
+      "match": "(?<![.\\w])(?:true|false)\\b"
+    },
+    "unit": {
+      "name": "constant.language.unit.fln",
+      "match": "\\(\\)"
+    },
+    "record-field": {
+      "match": "(?<![.\\w])([A-Za-z_][A-Za-z0-9_]*)(?=\\s*=(?!=))",
+      "captures": {
+        "1": { "name": "variable.other.member.fln" }
+      }
+    },
+    "constructors": {
+      "name": "entity.name.type.fln",
+      "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+    },
+    "punctuation": {
+      "patterns": [
+        { "name": "keyword.operator.assignment.fln", "match": "=" },
+        { "name": "keyword.operator.arithmetic.fln", "match": "-" },
+        { "name": "punctuation.accessor.fln", "match": "\\." },
+        { "name": "punctuation.separator.fln", "match": "[,;]" },
+        { "name": "punctuation.brackets.round.fln", "match": "[()]" },
+        { "name": "punctuation.brackets.square.fln", "match": "[\\[\\]]" },
+        { "name": "punctuation.brackets.curly.fln", "match": "[{}]" }
+      ]
+    }
+  }
+}

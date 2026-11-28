@@ -9,6 +9,7 @@ import { flickDark, flickLight } from "../src/styles/code-themes.mjs";
 import { highlight, loadHighlighting } from "../src/playground/highlight.ts";
 
 const grammar = JSON.parse(readFileSync(new URL("../../editors/vscode/syntaxes/flick.tmLanguage.json", import.meta.url), "utf8")) as LanguageRegistration;
+const flnGrammar = JSON.parse(readFileSync(new URL("../../editors/vscode/syntaxes/fln.tmLanguage.json", import.meta.url), "utf8")) as LanguageRegistration;
 
 test("interpolated expressions use code colours in both site themes and the playground", async () => {
   const highlighter = await createHighlighterCore({
@@ -332,4 +333,45 @@ test("effect, sql, and contextual keywords obey word boundaries in Shiki", async
       assert.ok(!scopes(line, word).some((s) => s.startsWith("keyword.")), `${word} in ${line}`);
     }
   } finally { highlighter.dispose(); }
+});
+
+test("fln blocks highlight comments, strings without interpolation, suffixes, records, and constructors", async () => {
+  const highlighter = await createHighlighterCore({
+    engine: createJavaScriptRegexEngine(),
+    themes: [flickLight, flickDark],
+    langs: [{ ...flnGrammar, name: "fln" }],
+  });
+  try {
+    const language = highlighter.getLanguage("fln");
+    const sample = 'App.Config { host = "no \\{interp}"; port = 8080u16; ratio = 1.5f32; big = 10n; raw = r#"hi"#; ok = true; unit = () } // note';
+    const { tokens } = language.tokenizeLine(sample, null);
+    const scopes = (word: string): readonly string[] => {
+      const at = sample.indexOf(word);
+      assert.ok(at >= 0, word);
+      return tokens.find((t) => t.startIndex <= at && at < t.endIndex)?.scopes ?? [];
+    };
+    assert.ok(scopes("App").includes("entity.name.type.fln"));
+    assert.ok(scopes("Config").includes("entity.name.type.fln"));
+    assert.ok(scopes("host").includes("variable.other.member.fln"));
+    assert.ok(scopes("\\{").includes("invalid.illegal.escape.fln"));
+    assert.ok(!scopes("interp").includes("meta.interpolation.flick"));
+    assert.ok(scopes("8080u16").includes("constant.numeric.fln"));
+    assert.ok(scopes("1.5f32").includes("constant.numeric.fln"));
+    assert.ok(scopes("10n").includes("constant.numeric.fln"));
+    assert.ok(scopes("hi").includes("string.quoted.other.raw.fln"));
+    assert.ok(scopes("true").includes("constant.language.boolean.fln"));
+    assert.ok(scopes("()").includes("constant.language.unit.fln"));
+    assert.ok(scopes("// note").includes("comment.line.double-slash.fln"));
+  } finally {
+    highlighter.dispose();
+  }
+
+  await loadHighlighting();
+  const text = '// header\nApp.Config { host = "localhost"; port = 8080u16 }\n';
+  const tokens = highlight(text, "fln");
+  assert.equal(tokens.map((t) => t.text).join(""), text);
+  assert.ok(tokens.some((t) => t.text.includes("// header") && t.class_name === "fp-token-comment"));
+  assert.ok(tokens.some((t) => t.text === "App" && t.class_name === "fp-token-keyword"));
+  assert.ok(tokens.some((t) => t.text.includes("localhost") && t.class_name === "fp-token-string"));
+  assert.ok(tokens.some((t) => t.text === "8080u16" && t.class_name === "fp-token-string"));
 });

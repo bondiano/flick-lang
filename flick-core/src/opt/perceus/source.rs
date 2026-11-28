@@ -108,6 +108,7 @@ mod std_schema_route;
 mod std_schema_rt;
 mod std_schema_rt_adt;
 mod std_schema_rt_block;
+mod std_schema_rt_fln;
 mod std_schema_rt_gen;
 mod std_schema_rt_gen_kind;
 mod std_schema_rt_more;

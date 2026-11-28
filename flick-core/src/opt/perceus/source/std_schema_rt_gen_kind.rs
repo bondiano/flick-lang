@@ -312,6 +312,24 @@ pub(super) fn draw_kind_expr(b: &ExprBuilder) -> Expr {
         ),
         b.float(1000.0),
     );
+    let draw_fw = |span_f: f64, off_f: f64, conv: &str| {
+        let raw = b.app(
+            b.global("Float", "floor"),
+            mul_f(b.loc("r"), b.float(span_f)),
+        );
+        let shifted = if off_f == 0.0 {
+            raw
+        } else {
+            sub_f(raw, b.float(off_f))
+        };
+        b.match_(
+            step(b.loc("s1")),
+            vec![arm(
+                pair_pat(b, "s2", "r"),
+                b.tuple(vec![b.loc("s2"), b.app(rt(b, conv), shifted)]),
+            )],
+        )
+    };
 
     b.match_(
         b.loc("kind"),
@@ -325,6 +343,38 @@ pub(super) fn draw_kind_expr(b: &ExprBuilder) -> Expr {
                         b.tuple(vec![b.loc("s2"), num_val.clone()]),
                     )],
                 ),
+            ),
+            arm(
+                Pat::Con(kc("$Float32", 0), vec![]),
+                draw_fw(2000.0, 1000.0, "FixedWidth.ToFloat32"),
+            ),
+            arm(
+                Pat::Con(kc("$Int8", 0), vec![]),
+                draw_fw(256.0, 128.0, "FixedWidth.ToInt8"),
+            ),
+            arm(
+                Pat::Con(kc("$Int16", 0), vec![]),
+                draw_fw(65_536.0, 32_768.0, "FixedWidth.ToInt16"),
+            ),
+            arm(
+                Pat::Con(kc("$Int64", 0), vec![]),
+                draw_fw(2000.0, 1000.0, "FixedWidth.ToInt64"),
+            ),
+            arm(
+                Pat::Con(kc("$UInt8", 0), vec![]),
+                draw_fw(256.0, 0.0, "FixedWidth.ToUInt8"),
+            ),
+            arm(
+                Pat::Con(kc("$UInt16", 0), vec![]),
+                draw_fw(65_536.0, 0.0, "FixedWidth.ToUInt16"),
+            ),
+            arm(
+                Pat::Con(kc("$UInt32", 0), vec![]),
+                draw_fw(2000.0, 0.0, "FixedWidth.ToUInt32"),
+            ),
+            arm(
+                Pat::Con(kc("$UInt64", 0), vec![]),
+                draw_fw(2000.0, 0.0, "FixedWidth.ToUInt64"),
             ),
             arm(Pat::Con(kc("$String", 0), vec![]), str_arm),
             arm(

@@ -291,7 +291,7 @@ pub(super) fn schema_enum_tags(b: &ExprBuilder) -> Expr {
                     b.app(rt(b, "Helper.codec_meta"), b.loc("adt_c")),
                     extra_con(b, "$None", vec![]),
                 ),
-                kind_con(b, "$Enum", vec![b.loc("vals")]),
+                kind_con(b, "$EnumTags", vec![b.loc("pairs")]),
                 b.none(),
             ),
         ),

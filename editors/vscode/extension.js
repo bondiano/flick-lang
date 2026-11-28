@@ -155,6 +155,7 @@ function createWatchers() {
   if (typeof vscode.workspace.createFileSystemWatcher === "function") {
     fileWatchers = [
       vscode.workspace.createFileSystemWatcher("**/*.fl"),
+      vscode.workspace.createFileSystemWatcher("**/*.fln"),
       vscode.workspace.createFileSystemWatcher("**/flick.toml"),
       vscode.workspace.createFileSystemWatcher("**/flick.lock"),
     ];
@@ -220,6 +221,8 @@ async function startNewClient(expectedGeneration) {
       documentSelector: [
         { scheme: "file", language: "flick" },
         { scheme: "untitled", language: "flick" },
+        { scheme: "file", language: "fln" },
+        { scheme: "untitled", language: "fln" },
       ],
       outputChannel,
       traceOutputChannel: outputChannel,

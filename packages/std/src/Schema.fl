@@ -87,6 +87,38 @@ foreign pure chunk from "flick:Schema" "flickChunk"
 int : Schema Int
 foreign pure int from "flick:rt" "schemaInt"
 
+/// Signed 8-bit integers (`-128..=127`).
+int8 : Schema Int8
+foreign pure int8 from "flick:rt" "schemaInt8"
+
+/// Signed 16-bit integers (`-32768..=32767`).
+int16 : Schema Int16
+foreign pure int16 from "flick:rt" "schemaInt16"
+
+/// Signed 64-bit integers.
+int64 : Schema Int64
+foreign pure int64 from "flick:rt" "schemaInt64"
+
+/// Unsigned 8-bit integers (`0..=255`).
+uint8 : Schema UInt8
+foreign pure uint8 from "flick:rt" "schemaUInt8"
+
+/// Unsigned 16-bit integers (`0..=65535`).
+uint16 : Schema UInt16
+foreign pure uint16 from "flick:rt" "schemaUInt16"
+
+/// Unsigned 32-bit integers (`0..=4294967295`).
+uint32 : Schema UInt32
+foreign pure uint32 from "flick:rt" "schemaUInt32"
+
+/// Unsigned 64-bit integers.
+uint64 : Schema UInt64
+foreign pure uint64 from "flick:rt" "schemaUInt64"
+
+/// Binary32 floating-point numbers, `NaN` and the infinities included.
+float32 : Schema Float32
+foreign pure float32 from "flick:rt" "schemaFloat32"
+
 /// A field of a record's schema: its label and the schema of its values.
 type Field
 

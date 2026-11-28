@@ -1,6 +1,8 @@
 //! Synthetic `$rt` global lowering for `Schema`, `Codec`, `Check`, `Route`, and `JsonSchema`.
 
-use flick_ir::memory::{GenIntrinsic, JsonIntrinsic, JsonSchemaIntrinsic, SchemaIntrinsic};
+use flick_ir::memory::{
+    FixedWidthIntrinsic, GenIntrinsic, JsonIntrinsic, JsonSchemaIntrinsic, SchemaIntrinsic,
+};
 use flick_ir::{BinOp, Handler};
 
 use super::expr_builder::{ExprBuilder, arm};
@@ -64,6 +66,14 @@ impl Lower<'_> {
             )?
         } else if name.name == "Int.ToBigInt" {
             self.intrinsic(Intrinsic::ToBigInt, false, vec![], &mut block, span)?
+        } else if let Some(fw_name) = name.name.strip_prefix("FixedWidth.") {
+            let op = fixed_width_intrinsic_by_name(fw_name).ok_or_else(|| {
+                LowerError::UnknownGlobal {
+                    name: name.clone(),
+                    span: Some(span),
+                }
+            })?;
+            self.intrinsic(Intrinsic::FixedWidth(op), false, vec![], &mut block, span)?
         } else if name.name == "Metric.Registry" {
             let b = ExprBuilder::new(span, "$mr");
             let init = b.rmake(b.list(vec![]));
@@ -108,6 +118,21 @@ impl Lower<'_> {
         };
         self.finish(code, &block.finish(value))
     }
+}
+
+fn fixed_width_intrinsic_by_name(name: &str) -> Option<FixedWidthIntrinsic> {
+    use FixedWidthIntrinsic as F;
+    Some(match name {
+        "ToInt8" => F::ToInt8,
+        "ToInt16" => F::ToInt16,
+        "ToInt64" => F::ToInt64,
+        "ToUInt8" => F::ToUInt8,
+        "ToUInt16" => F::ToUInt16,
+        "ToUInt32" => F::ToUInt32,
+        "ToUInt64" => F::ToUInt64,
+        "ToFloat32" => F::ToFloat32,
+        _ => return None,
+    })
 }
 
 fn schema_intrinsic_by_name(name: &str) -> Option<SchemaIntrinsic> {

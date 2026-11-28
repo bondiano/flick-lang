@@ -2,6 +2,8 @@
 /// a `PureCodec` decodes without the runtime.
 module Codec exposing (..)
 
+import Fln
+
 /// A codec contract that strict JSON Schema export cannot state, with the
 /// path of the node: `Profile.session -> JSON Schema: …`.
 type error ExportError = ExportError String
@@ -40,6 +42,53 @@ foreign pure general from "flick:rt" "identity"
 /// `Redacted` value has none without an explicit policy.
 json : Schema a -> PureCodec Json a
 foreign pure json from "flick:rt" "schemaJsonCodec"
+
+/// The canonical FLN form of a schema: preserves records, lists, tuples,
+/// tagged variants, fixed-width numeric suffixes, `BigInt`, booleans, strings,
+/// and `()`. A `Redacted` value has none without an explicit policy.
+fln : Schema a -> PureCodec Fln.Value a
+foreign pure fln from "flick:rt" "schemaFlnCodec"
+
+fln_to_unknown : Fln.Value -> Unknown
+foreign pure fln_to_unknown from "flick:rt" "identity"
+
+/// Decodes a parsed `Fln.Value` using the schema's canonical FLN codec.
+decode_fln_value : Schema a -> Fln.Value -> Result SchemaError a
+let decode_fln_value schema value = decode_result (fln schema) (fln_to_unknown value)
+
+/// Parses FLN text and decodes it using the schema's canonical FLN codec.
+decode_fln : Schema a -> String -> Result SchemaError a
+let decode_fln schema text =
+  match Fln.parse text with
+  | Ok value -> decode_fln_value schema value
+  | Err (Fln.ParseError err) ->
+    Err
+      (SchemaError [
+        {
+          path = "(root)"
+          message = "not FLN at " ++ show err.line ++ ":" ++ show err.column ++ ": " ++ err.message
+        },
+      ])
+
+/// Encodes a value into compact single-line FLN text using its schema.
+encode_fln : Schema a -> a -> Result SchemaError String
+let encode_fln schema value =
+  match encode_result (fln schema) value with
+  | Ok fln_val ->
+    match Fln.try_stringify fln_val with
+    | Ok text -> Ok text
+    | Err msg -> Err (SchemaError [{ path = "(root)"; message = msg }])
+  | Err err -> Err err
+
+/// Encodes a value into pretty-printed FLN text using its schema.
+encode_fln_pretty : Schema a -> a -> Result SchemaError String
+let encode_fln_pretty schema value =
+  match encode_result (fln schema) value with
+  | Ok fln_val ->
+    match Fln.try_pretty fln_val with
+    | Ok text -> Ok text
+    | Err msg -> Err (SchemaError [{ path = "(root)"; message = msg }])
+  | Err err -> Err err
 
 /// A JSON array of the item's values.
 list : PureCodec Json a -> PureCodec Json (List a)

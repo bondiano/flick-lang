@@ -29,10 +29,11 @@ use std::time::{Duration, Instant};
 
 use flick_core::diagnostics::Diagnostic;
 use flick_core::project;
+use flick_core::source::SourceMap;
 use serde_json::Value;
 use tracing::{debug, error, info, info_span};
 
-use crate::builtins;
+use crate::{builtins, fln_files};
 use deferred::Deferred;
 use diagnostics::{lsp_diagnostic, publish};
 use proof_search::Search;
@@ -252,6 +253,11 @@ impl Server {
             return;
         }
 
+        if fln_files::is_fln_path(&path) {
+            self.notify_fln(method, params, &path);
+            return;
+        }
+
         match method {
             "textDocument/didOpen" => {
                 let text = params["textDocument"]["text"]
@@ -294,6 +300,57 @@ impl Server {
         }
         self.input_changed(&path);
         self.refresh(&path);
+    }
+
+    /// Handles LSP document lifecycle notifications for `.fln` files directly
+    /// without running the Flick compiler worker thread.
+    fn notify_fln(&mut self, method: &str, params: &Value, path: &Path) {
+        match method {
+            "textDocument/didOpen" => {
+                let text = params["textDocument"]["text"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_owned();
+                self.docs.insert(path.to_path_buf(), text);
+            }
+            "textDocument/didChange" => {
+                let changes = params["contentChanges"].as_array();
+                let text = self.docs.entry(path.to_path_buf()).or_default();
+                if let Some(changes) = changes {
+                    apply_changes(text, changes);
+                }
+            }
+            "textDocument/didClose" => {
+                self.docs.remove(path);
+                self.versions.remove(path);
+                self.send(&publish(path, &[]));
+                if self.snapshots.values().any(|s| s.reads(path)) {
+                    self.input_changed(path);
+                }
+                return;
+            }
+            "textDocument/didSave" => {}
+            _ => return,
+        }
+        if let Some(version) = params["textDocument"]["version"].as_i64() {
+            self.versions.insert(path.to_path_buf(), version);
+        }
+        self.publish_fln(path);
+        if self.snapshots.values().any(|s| s.reads(path)) {
+            self.input_changed(path);
+        }
+    }
+
+    fn publish_fln(&mut self, path: &Path) {
+        let Some(text) = self.docs.get(path) else {
+            return;
+        };
+        let mut sources = SourceMap::default();
+        let name = path.to_string_lossy();
+        let file = sources.add(name.as_ref(), text.clone());
+        let diags = fln_files::parse_diagnostics(file, name.as_ref(), text);
+        let lsp: Vec<Value> = diags.iter().map(|d| lsp_diagnostic(&sources, d)).collect();
+        self.send(&publish(path, &lsp));
     }
 
     fn open_in(&self, context: &Context) -> Option<PathBuf> {

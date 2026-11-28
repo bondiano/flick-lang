@@ -174,7 +174,24 @@ pub(super) fn draw_schema_helper(b: &ExprBuilder) -> Expr {
             ),
             arm(
                 Pat::Con(kc("$Enum", 1), vec![Pat::Bind(b.name("vals"))]),
-                enum_expr,
+                enum_expr.clone(),
+            ),
+            arm(
+                Pat::Con(kc("$EnumTags", 1), vec![Pat::Bind(b.name("pairs"))]),
+                b.block(
+                    vec![b.let_(
+                        "vals",
+                        b.gen_strict(b.each(
+                            "p",
+                            b.loc("pairs"),
+                            b.match_(
+                                b.loc("p"),
+                                vec![arm(pair_pat(b, "_n", "v"), b.yield_(b.loc("v")))],
+                            ),
+                        )),
+                    )],
+                    enum_expr,
+                ),
             ),
             arm(
                 Pat::Wild,

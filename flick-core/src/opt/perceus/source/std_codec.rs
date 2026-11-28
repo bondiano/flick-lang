@@ -150,6 +150,23 @@ fn codec_rt_template(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr>
             b.app(b.app(rt(b, "Helper.codec_enc"), b.loc("c")), b.loc("v")),
         )),
         ("schemaJsonCodec", 1) => Some(rt(b, "Helper.schema_codec")),
+        ("schemaFlnCodec", 1) => Some(b.lam(
+            &["sch"],
+            make_codec(
+                b,
+                b.lam(
+                    &["in"],
+                    b.app2(rt(b, "Helper.decode_fln"), b.loc("sch"), b.loc("in")),
+                ),
+                b.lam(
+                    &["v"],
+                    b.app2(rt(b, "Helper.encode_fln"), b.loc("sch"), b.loc("v")),
+                ),
+                b.lam(&["_in"], b.bool_(true)),
+                meta_con(b, "$Unknown", vec![]),
+                extra_con(b, "$None", vec![]),
+            ),
+        )),
         ("codecBool", 0) => Some(leaf_codec(b, "bool", meta_con(b, "$Bool", vec![]))),
         ("codecInt", 0) => Some(leaf_codec(b, "int", meta_con(b, "$Int", vec![]))),
         ("codecString", 0) => Some(leaf_codec(b, "string", meta_con(b, "$String", vec![]))),

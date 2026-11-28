@@ -4,7 +4,11 @@ import type { Witness } from "./schema.ts";
 export interface Case { readonly tag: string; readonly fields: ReadonlyArray<Witness> }
 
 export type SchemaNode =
-  | { readonly kind: "number" | "string" | "bool" | "int" | "bigint" | "unit" | "never" | "unknown" }
+  | {
+    readonly kind:
+      | "number" | "string" | "bool" | "int" | "bigint" | "unit" | "never" | "unknown"
+      | "int8" | "int16" | "int64" | "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+  }
   | { readonly kind: "list" | "option" | "chunk"; readonly item: Witness }
   | { readonly kind: "result"; readonly error: Witness; readonly value: Witness }
   | { readonly kind: "tuple"; readonly items: ReadonlyArray<Witness> }

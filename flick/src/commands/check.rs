@@ -10,6 +10,7 @@ use flick_core::source::{FileId, SourceMap};
 
 use crate::args::CheckArguments;
 use crate::command::{Command, Outcome};
+use crate::fln_files;
 use crate::sources::{self, FsHost};
 use crate::{builtins, package_cache, timings};
 
@@ -48,14 +49,27 @@ impl CheckCommand {
 
 impl Command for CheckCommand {
     fn run(&self) -> Outcome {
-        let (pages, paths): (Vec<String>, Vec<String>) =
+        let (pages, rest): (Vec<String>, Vec<String>) =
             (self.options.paths.iter().cloned()).partition(|p| pages::is_page(p));
-        // Markdown pages alone check no Flick sources, not the whole project
-        let mut outcome = if paths.is_empty() && !pages.is_empty() {
+        let (fln_paths, paths): (Vec<String>, Vec<String>) =
+            rest.into_iter().partition(|p| fln_files::is_fln_str(p));
+        // Markdown pages and `.fln` files alone check no Flick sources, not the whole project
+        let mut outcome = if paths.is_empty() && (!pages.is_empty() || !fln_paths.is_empty()) {
             Outcome::default()
         } else {
             self.check_files(&paths)
         };
+        for fln_path in &fln_paths {
+            match sources::load(&mut outcome.sources, fln_path) {
+                Ok(file) => {
+                    let text = &outcome.sources.get(file).text;
+                    outcome
+                        .diagnostics
+                        .extend(fln_files::parse_diagnostics(file, fln_path, text));
+                }
+                Err(error) => outcome.diagnostics.push(error),
+            }
+        }
         if !pages.is_empty()
             && let Err(diagnostic) = builtins::prepare()
         {

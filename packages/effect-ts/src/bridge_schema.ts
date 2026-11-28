@@ -10,7 +10,7 @@ import { schemaExportHooks } from "@flick-lang/runtime/rt/schema_export";
 import { issueOf, codecFields, type Field } from "./schema/codecs.ts";
 import { type SchemaError as HostSchemaError, isSchemaError, schemaError as hostSchemaError, toSchemaError } from "./schema/issues.ts";
 import { codecDecode as hostCodecDecode, codecEncode as hostCodecEncode, codecJsonSchema as hostCodecJsonSchema, isPure, schemaJsonCodec as hostJsonCodec } from "./schema/index.ts";
-import { type AnySchema, type Variant, schemaBigint as hostBigint, schemaInt as hostInt, schemaNumber as hostNumber, schemaString as hostString, schemaBool as hostBool, schemaUnit as hostUnit, schemaNever as hostNever, schemaUnknown as hostUnknown, schemaList, schemaRecord, schemaTuple, schemaEnum, schemaAdt, schemaLazy, schemaOption, schemaRefined, schemaResult, withJson } from "./schema/schemas.ts";
+import { type AnySchema, type Variant, schemaBigint as hostBigint, schemaFloat32 as hostFloat32, schemaInt as hostInt, schemaInt8 as hostInt8, schemaInt16 as hostInt16, schemaInt64 as hostInt64, schemaNumber as hostNumber, schemaString as hostString, schemaBool as hostBool, schemaUInt8 as hostUInt8, schemaUInt16 as hostUInt16, schemaUInt32 as hostUInt32, schemaUInt64 as hostUInt64, schemaUnit as hostUnit, schemaNever as hostNever, schemaUnknown as hostUnknown, schemaList, schemaRecord, schemaTuple, schemaEnum, schemaAdt, schemaLazy, schemaOption, schemaRefined, schemaResult, withJson } from "./schema/schemas.ts";
 import { flickChunk, flickDuration } from "./effect/Schema.ts";
 import { callEffect, fromEffect, causeFromEffect } from "./bridge_runtime.ts";
 import { dataFromEffect, dataToEffect } from "./bridge_data.ts";
@@ -32,7 +32,15 @@ const describedToEffect = (codec: Witness): AnySchema | undefined => {
   switch (description.kind) {
     case "string": return hostString;
     case "number": return hostNumber;
+    case "float32": return hostFloat32;
     case "int": return hostInt;
+    case "int8": return hostInt8;
+    case "int16": return hostInt16;
+    case "int64": return hostInt64;
+    case "uint8": return hostUInt8;
+    case "uint16": return hostUInt16;
+    case "uint32": return hostUInt32;
+    case "uint64": return hostUInt64;
     case "bigint": return hostBigint;
     case "bool": return hostBool;
     case "unit": return hostUnit;

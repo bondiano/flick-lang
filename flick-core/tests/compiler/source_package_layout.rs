@@ -28,6 +28,7 @@ fn standard_library_sources_have_one_dependency_ordered_package_owner() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages");
     let expected = [
         ("std", "Duration"),
+        ("std", "Fln"),
         ("stream", "Stream"),
         ("process", "ChildProcess"),
         ("ui", "Ui"),
@@ -72,7 +73,7 @@ fn standard_library_sources_have_one_dependency_ordered_package_owner() {
     }
     assert_eq!(
         all.len(),
-        222,
+        225,
         "the source split preserves every standard-library module"
     );
 }

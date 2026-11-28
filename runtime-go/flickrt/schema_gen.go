@@ -64,6 +64,22 @@ func drawSchema(fb *Fiber, r rng, s *Schema, depth int) Value {
 	switch s.kind {
 	case kindNumber:
 		return math.Floor(r()*2000) - 1000
+	case kindFloat32:
+		return float32(math.Floor(r()*2000) - 1000)
+	case kindInt8:
+		return int8(math.Floor(r()*256) - 128)
+	case kindInt16:
+		return int16(math.Floor(r()*65536) - 32768)
+	case kindInt64:
+		return int64(math.Floor(r()*2000) - 1000)
+	case kindUInt8:
+		return uint8(math.Floor(r() * 256))
+	case kindUInt16:
+		return uint16(math.Floor(r() * 65536))
+	case kindUInt32:
+		return uint32(math.Floor(r() * 2000))
+	case kindUInt64:
+		return uint64(math.Floor(r() * 2000))
 	case kindString:
 		b := make([]byte, size)
 		for i := range b {

@@ -21,6 +21,7 @@ import { type SchemaError, isSchemaError, requireInert, schemaError, toSchemaErr
 import { erase } from "@flick-lang/runtime/internal";
 import { noteOf, notesOf } from "./notes.ts";
 import { type AnySchema, jsonOf, schemaRefined } from "./schemas.ts";
+import { flnOf } from "./fln.ts";
 
 export {
   codecBigint,
@@ -42,10 +43,14 @@ export {
   schemaAdt,
   schemaBigint,
   schemaBool,
+  schemaFloat32,
+  schemaInt,
+  schemaInt8,
+  schemaInt16,
+  schemaInt64,
   schemaLazy,
   schemaList,
   schemaNever,
-  schemaInt,
   schemaNumber,
   schemaOpaque,
   schemaOption,
@@ -55,6 +60,10 @@ export {
   schemaResult,
   schemaString,
   schemaTuple,
+  schemaUInt8,
+  schemaUInt16,
+  schemaUInt32,
+  schemaUInt64,
   schemaUnit,
   schemaUnknown,
   schemaWithGenerator,
@@ -180,6 +189,9 @@ export const schemaValidateAll = (schema: AnySchema, input: unknown): Result.Res
 
 /** `Codec.json schema`: the canonical JSON codec, compiled when installed. */
 export const schemaJsonCodec = (schema: AnySchema): AnySchema => registerCodec(jsonOf(schema));
+
+/** `Codec.fln schema`: the canonical FLN codec. */
+export const schemaFlnCodec = (schema: AnySchema): AnySchema => flnOf(schema);
 
 export const dslField = (wire: string, codec: AnySchema): FieldSpec => Object.freeze({ wire, codec, optional: false });
 export const dslOptionalField = (wire: string, codec: AnySchema): FieldSpec =>

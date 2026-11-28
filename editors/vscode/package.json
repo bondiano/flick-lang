@@ -29,6 +29,18 @@
           ".fl"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "fln",
+        "aliases": [
+          "FLN",
+          "Flick Notation",
+          "fln"
+        ],
+        "extensions": [
+          ".fln"
+        ],
+        "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
@@ -36,6 +48,11 @@
         "language": "flick",
         "scopeName": "source.flick",
         "path": "./syntaxes/flick.tmLanguage.json"
+      },
+      {
+        "language": "fln",
+        "scopeName": "source.fln",
+        "path": "./syntaxes/fln.tmLanguage.json"
       }
     ],
     "views": {
@@ -55,6 +72,13 @@
         "editor.detectIndentation": false,
         "editor.formatOnSave": true,
         "editor.semanticHighlighting.enabled": true,
+        "editor.defaultFormatter": "bondiano.flick"
+      },
+      "[fln]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.detectIndentation": false,
+        "editor.formatOnSave": true,
         "editor.defaultFormatter": "bondiano.flick"
       }
     },
@@ -101,7 +125,8 @@
   },
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onLanguage:flick"
+    "onLanguage:flick",
+    "onLanguage:fln"
   ],
   "scripts": {
     "bundle": "node scripts/bundle.mjs",

@@ -6,6 +6,8 @@
 /// not wrapped yet.
 module FileSystem exposing (..)
 
+import Codec
+import Fln
 import PlatformError
 
 /// An open file of region `s`, closed when that scope ends.
@@ -219,6 +221,34 @@ let write_file options path bytes = FileSystem.write_file options path bytes
 write_file_string :
   WriteOptions -> String -> String ->{Async, FileSystem; PlatformError.PlatformError} Unit
 let write_file_string options path text = FileSystem.write_file_string options path text
+
+/// Reads a UTF-8 `.fln` file and parses it as an `Fln.Value`.
+read_fln : String ->{Async, FileSystem; PlatformError.PlatformError, Fln.ParseError} Fln.Value
+let read_fln path =
+  let text = read_file_string path
+  (Fln.parse text)?
+
+/// Pretty-prints `value` as `.fln` and writes it to `path`.
+write_fln :
+  WriteOptions -> String -> Fln.Value ->{Async, FileSystem; PlatformError.PlatformError} Unit
+let write_fln options path value = write_file_string options path (Fln.pretty value ++ "\n")
+
+/// Reads a `.fln` file and decodes it with `schema`'s canonical FLN codec.
+read_fln_as : Schema a -> String ->{Async, FileSystem; PlatformError.PlatformError, SchemaError} a
+let read_fln_as schema path =
+  let text = read_file_string path
+  from_result (Codec.decode_fln schema text)
+
+/// Encodes `value` with `schema`'s canonical FLN codec and writes pretty `.fln` text to `path`.
+write_fln_as :
+  WriteOptions ->
+  Schema a ->
+  String ->
+  a ->{Async, FileSystem; PlatformError.PlatformError, SchemaError}
+  Unit
+let write_fln_as options schema path value =
+  let text = from_result (Codec.encode_fln_pretty schema value)
+  write_file_string options path (text ++ "\n")
 
 /// What `stat` tells of the open file.
 file_stat : File s ->{Async; PlatformError.PlatformError} Info

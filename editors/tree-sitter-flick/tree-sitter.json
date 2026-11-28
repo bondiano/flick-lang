@@ -5,7 +5,7 @@
       "camelcase": "Flick",
       "scope": "source.flick",
       "path": ".",
-      "file-types": ["fl"],
+      "file-types": ["fl", "fln"],
       "highlights": "../zed/languages/flick/highlights.scm"
     }
   ],

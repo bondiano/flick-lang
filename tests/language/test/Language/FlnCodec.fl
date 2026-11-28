@@ -1,0 +1,287 @@
+// Canonical FLN codec over derived schemas across records, lists, tuples,
+// ADTs, Option, Result, Unit, Bool, BigInt, and fixed-width numeric types.
+module Language.FlnCodec exposing (tests)
+
+type Shape = Circle Float | Rect Float Float | Dot
+  deriving Eq, Show, Schema
+
+untagged type Method = Get = "GET" | Post = "POST"
+  deriving Eq, Show, Schema
+
+untagged type Status = Ok200 = 200 | Missing = 404
+  deriving Eq, Show, Schema
+
+untagged type Level = Low = "low" | High = "high"
+  deriving Eq, Show, Schema { wire = "tag" }
+
+type alias FixedNums = {
+  i8 : Int8
+  i16 : Int16
+  i64 : Int64
+  u8 : UInt8
+  u16 : UInt16
+  u32 : UInt32
+  u64 : UInt64
+  f32 : Float32
+  f64 : Float
+  big : BigInt
+} deriving Schema
+
+type alias Numbers = {
+  i8 : Int8
+  i16 : Int16
+  i32 : Int
+  i64 : Int64
+  u8 : UInt8
+  u16 : UInt16
+  u32 : UInt32
+  u64 : UInt64
+  f32 : Float32
+  f64 : Float
+  big : BigInt
+} deriving Schema
+
+type alias Bundle = {
+  unit_val : Unit
+  flag : Bool
+  name : String
+  pair : (Int, String)
+  tags : List String
+  maybe : Option Int
+  outcome : Result String Bool
+  shape : Shape
+  nums : Numbers
+} deriving Schema
+
+sample : Bundle
+let sample = {
+  unit_val = ()
+  flag = true
+  name = "flick"
+  pair = (7, "ok")
+  tags = ["a", "b"]
+  maybe = Some 42
+  outcome = Ok true
+  shape = Rect 2.0 3.5
+  nums = {
+    i8 = -12i8
+    i16 = 300i16
+    i32 = -99
+    i64 = 9000000000000i64
+    u8 = 250u8
+    u16 = 60000u16
+    u32 = 4000000000u32
+    u64 = 18000000000000000000u64
+    f32 = 1.5f32
+    f64 = 2.25
+    big = 1234567890123456789012345n
+  }
+}
+
+export_text : Schema a -> String
+let export_text s =
+  match Codec.json_schema "T" (Codec.json s) with
+  | Ok text -> text
+  | Err _ -> "err"
+
+tests : List Test.Test
+let tests = [
+  Test.group "FLN schema round-trip" [
+    Test.test "encodes and decodes complex bundle preserving suffixes, tuples, and ADTs" (fun () ->
+      match Codec.encode_fln Bundle.schema sample with
+      | Err err -> Test.is_true ("encode failed: " ++ show err) false
+      | Ok text ->
+        match Codec.encode_fln_pretty Bundle.schema sample with
+        | Err err -> Test.is_true ("encode pretty failed: " ++ show err) false
+        | Ok pretty ->
+          Test.all [
+            Test.equal (Ok sample) (Codec.decode_fln Bundle.schema text),
+            Test.equal (Ok sample) (Codec.decode_fln Bundle.schema pretty),
+            Test.is_true "preserves u8 suffix" (String.contains "250u8" text),
+            Test.is_true "preserves i64 suffix" (String.contains "9000000000000i64" text),
+            Test.is_true "preserves f32 suffix" (String.contains "1.5f32" text),
+            Test.is_true
+              "preserves BigInt suffix"
+              (String.contains "1234567890123456789012345n" text),
+            Test.is_true "preserves tuple syntax" (String.contains "(7, \"ok\")" text),
+            Test.is_true "preserves constructor syntax" (String.contains "Rect 2.0 3.5" text),
+          ]
+    ),
+    Test.test "None and Err round-trip as FLN constructors" (fun () ->
+      let v = { sample with maybe = None; outcome = Err "boom"; shape = Dot }
+      match Codec.encode_fln Bundle.schema v with
+      | Ok text ->
+        Test.all [
+          Test.equal (Ok v) (Codec.decode_fln Bundle.schema text),
+          Test.is_true "has None" (String.contains "None" text),
+          Test.is_true "has Err" (String.contains "Err \"boom\"" text),
+          Test.is_true "has Dot" (String.contains "Dot" text),
+        ]
+      | Err err -> Test.is_true (show err) false
+    ),
+    Test.test "literal enums and wire-tag enums round-trip through FLN" (fun () ->
+      let m_ok =
+        match Codec.encode_fln Method.schema Post with
+        | Ok "\"POST\"" -> Codec.decode_fln Method.schema "\"POST\"" == Ok Post
+        | _ -> false
+      let s_ok =
+        match Codec.encode_fln Status.schema Missing with
+        | Ok "404" -> Codec.decode_fln Status.schema "404" == Ok Missing
+        | _ -> false
+      let l_ok =
+        match Codec.encode_fln Level.schema High with
+        | Ok "High" -> Codec.decode_fln Level.schema "High" == Ok High
+        | _ -> false
+      Test.all [
+        Test.is_true "string literal enum" m_ok,
+        Test.is_true "int literal enum" s_ok,
+        Test.is_true "wire=tag enum" l_ok,
+        Test.is_true
+          "rejects unknown string enum"
+          (Result.is_err (Codec.decode_fln Method.schema "\"PUT\"")),
+        Test.is_true
+          "rejects unknown int enum"
+          (Result.is_err (Codec.decode_fln Status.schema "500")),
+        Test.is_true
+          "rejects unknown tag enum"
+          (Result.is_err (Codec.decode_fln Level.schema "Medium")),
+        Test.is_true
+          "rejects string for wire=tag enum"
+          (Result.is_err (Codec.decode_fln Level.schema "\"high\"")),
+      ]
+    ),
+    Test.test "fixed-width numeric JSON Schema export matches exact bounds" (fun () ->
+      let i8 = export_text Schema.int8
+      let i16 = export_text Schema.int16
+      let u8 = export_text Schema.uint8
+      let u16 = export_text Schema.uint16
+      let u32 = export_text Schema.uint32
+      let i64 = export_text Schema.int64
+      let u64 = export_text Schema.uint64
+      let f32 = export_text Schema.float32
+      Test.all [
+        Test.is_true
+          ("int8 bounds: " ++ i8)
+          (String.contains "-128" i8 && String.contains "127" i8),
+        Test.is_true
+          ("int16 bounds: " ++ i16)
+          (String.contains "-32768" i16 && String.contains "32767" i16),
+        Test.is_true
+          ("uint8 bounds: " ++ u8)
+          (String.contains "255" u8 && String.contains "\"minimum\": 0" u8),
+        Test.is_true
+          ("uint16 bounds: " ++ u16)
+          (String.contains "65535" u16 && String.contains "\"minimum\": 0" u16),
+        Test.is_true
+          ("uint32 bounds: " ++ u32)
+          (String.contains "4294967295" u32 && String.contains "\"minimum\": 0" u32),
+        Test.is_true ("int64 pattern: " ++ i64) (String.contains "^-?[0-9]+$" i64),
+        Test.is_true ("uint64 pattern: " ++ u64) (String.contains "^-?[0-9]+$" u64),
+        Test.is_true ("float32 number: " ++ f32) (String.contains "\"type\": \"number\"" f32),
+      ]
+    ),
+    Test.property
+      "Schema.arbitrary generates valid fixed-width numbers"
+      (Schema.arbitrary FixedNums.schema)
+      (fun nums ->
+        match Codec.encode_fln FixedNums.schema nums with
+        | Ok text -> Test.equal (Ok nums) (Codec.decode_fln FixedNums.schema text)
+        | Err err -> Test.is_true (show err) false
+      ),
+    Test.property
+      "Schema.arbitrary generates valid tagged enums"
+      (Schema.arbitrary Level.schema)
+      (fun level ->
+        match Codec.encode_fln Level.schema level with
+        | Ok text -> Test.equal (Ok level) (Codec.decode_fln Level.schema text)
+        | Err err -> Test.is_true (show err) false
+      ),
+    Test.effect_test
+      "Arbitrary.from_schema checks fixed-width numbers and tagged enums"
+      (task {
+        let opts = {
+          runs = Some 8
+          size = Some 2
+          maxDiscards = None
+          maxShrinks = Some 0
+          seed = Some 42
+          replay = None
+        }
+        let nums_ok =
+          match
+            Arbitrary.check
+              opts
+              (fun nums ->
+                let f32 = Float32.from_float (Float32.to_float nums.f32)
+                let norm = { nums with f32 = f32 }
+                if not (Float32.is_finite f32 && Float.is_finite norm.f64) then
+                  true
+                else
+                  match Codec.encode_fln FixedNums.schema norm with
+                  | Ok text -> Codec.decode_fln FixedNums.schema text == Ok norm
+                  | Err _ -> false
+              )
+              (Arbitrary.from_schema FixedNums.schema)
+          with
+          | Arbitrary.Passed _ -> true
+          | _ -> false
+        let lvl_ok =
+          match
+            Arbitrary.check
+              opts
+              (fun lvl ->
+                match Codec.encode_fln Level.schema lvl with
+                | Ok text -> Codec.decode_fln Level.schema text == Ok lvl
+                | Err _ -> false
+              )
+              (Arbitrary.from_schema Level.schema)
+          with
+          | Arbitrary.Passed _ -> true
+          | _ -> false
+        Test.check
+          (Test.all [
+            Test.is_true "Arbitrary.from_schema FixedNums.schema" nums_ok,
+            Test.is_true "Arbitrary.from_schema Level.schema" lvl_ok,
+          ])
+      }),
+  ],
+  Test.group "FLN schema errors" [
+    Test.test "rejects non-finite float inside Schema.unknown instead of emitting ()" (fun () ->
+      let nan_val = Codec.fln_to_unknown (Fln.Float (0.0 / 0.0) None)
+      let inf_val = Codec.fln_to_unknown (Fln.Float (1.0 / 0.0) None)
+      Test.all [
+        Test.is_true
+          "encode_fln rejects NaN"
+          (Result.is_err (Codec.encode_fln Schema.unknown nan_val)),
+        Test.is_true
+          "encode_fln_pretty rejects Inf"
+          (Result.is_err (Codec.encode_fln_pretty Schema.unknown inf_val)),
+      ]
+    ),
+    Test.test "reports line and column on malformed FLN" (fun () ->
+      match Codec.decode_fln Shape.schema "{\n  bad = 1\n" with
+      | Err (SchemaError issues) ->
+        let msg = String.join "; " (List.map (fun i -> i.message) issues)
+        Test.is_true ("contains line:col: " ++ msg) (String.contains "not FLN at " msg)
+      | Ok _ -> Test.is_true "should fail" false
+    ),
+    Test.test "rejects list where tuple is expected" (fun () ->
+      match
+        Codec.decode_fln
+          (Schema.unsafe_tuple [Schema.item Schema.int, Schema.item Schema.string])
+          "[1, \"a\"]"
+      with
+      | Err _ -> Test.is_true "rejected" true
+      | Ok _ -> Test.is_true "should reject list for tuple" false
+    ),
+    Test.test "rejects mismatched numeric suffix and out-of-range fixed-width values" (fun () ->
+      Test.all [
+        Test.is_true "wrong suffix" (Result.is_err (Codec.decode_fln Schema.int8 "10u8")),
+        Test.is_true "out of range" (Result.is_err (Codec.decode_fln Schema.int8 "200")),
+        Test.is_true
+          "unknown field"
+          (Result.is_err (Codec.decode_fln Numbers.schema "{ extra = 1 }")),
+      ]
+    ),
+  ],
+]

@@ -15,8 +15,9 @@ const local = ["release", "debug"]
   .filter((p) => existsSync(p))
   .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
 
-/** The TextMate grammar of the VS Code extension highlights `flick` blocks. */
+/** The TextMate grammars of the VS Code extension highlight `flick` and `fln` blocks. */
 const grammar = JSON.parse(readFileSync(new URL("../editors/vscode/syntaxes/flick.tmLanguage.json", import.meta.url), "utf8"));
+const flnGrammar = JSON.parse(readFileSync(new URL("../editors/vscode/syntaxes/fln.tmLanguage.json", import.meta.url), "utf8"));
 
 // GitHub Pages serves the site under the repository name.
 const site = "https://bondiano.github.io";
@@ -128,7 +129,7 @@ export default defineConfig({
         themes: [flickDark, flickLight],
         useStarlightUiThemeColors: false,
         frames: { showCopyToClipboardButton: false },
-        shiki: { langs: [{ ...grammar, name: "flick" }] },
+        shiki: { langs: [{ ...grammar, name: "flick" }, { ...flnGrammar, name: "fln" }] },
         styleOverrides: {
           borderRadius: "0",
           borderColor: "var(--sl-color-hairline)",

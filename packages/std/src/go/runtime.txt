@@ -9,6 +9,14 @@ jsonParse JsonParse
 jsonStringify JsonStringify
 schemaNumber SchemaNumber
 schemaInt SchemaInt
+schemaInt8 SchemaInt8
+schemaInt16 SchemaInt16
+schemaInt64 SchemaInt64
+schemaUInt8 SchemaUInt8
+schemaUInt16 SchemaUInt16
+schemaUInt32 SchemaUInt32
+schemaUInt64 SchemaUInt64
+schemaFloat32 SchemaFloat32
 schemaString SchemaString
 schemaBool SchemaBool
 schemaBigint SchemaBigint
@@ -20,6 +28,7 @@ schemaOption SchemaOption
 schemaResult SchemaResult
 schemaRedacted SchemaRedacted
 schemaJsonCodec SchemaJsonCodec
+schemaFlnCodec SchemaFlnCodec
 codecDecode *CodecDecode
 codecEncode *CodecEncode
 codecDecodeResult *CodecDecodeResult

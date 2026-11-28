@@ -149,7 +149,39 @@ func mergeConstraint(self, that *arbConstraint) *arbConstraint {
 	return out
 }
 
-func floatToInt32(v Value) Value { return int32(v.(float64)) }
+func floatToInt32(v Value) Value   { return int32(v.(float64)) }
+func floatToInt8(v Value) Value    { return int8(v.(float64)) }
+func floatToInt16(v Value) Value   { return int16(v.(float64)) }
+func floatToUInt8(v Value) Value   { return uint8(v.(float64)) }
+func floatToUInt16(v Value) Value  { return uint16(v.(float64)) }
+func floatToUInt32(v Value) Value  { return uint32(v.(float64)) }
+func floatToFloat32(v Value) Value { return float32(v.(float64)) }
+func bigToInt64(v Value) Value     { return v.(*big.Int).Int64() }
+func bigToUInt64(v Value) Value    { return v.(*big.Int).Uint64() }
+
+func boundedIntArb(min, max float64, conv func(Value) Value) *arbAST {
+	n := astNumberNode.withChecks(arbFilter{
+		constraint: &arbConstraint{order: "number", minimum: min, maximum: max, number: "integer"},
+		test: func(_ *Fiber, v Value) bool {
+			x := v.(float64)
+			return x == math.Trunc(x) && x >= min && x <= max
+		},
+	})
+	n.convert = conv
+	return n
+}
+
+func boundedBigIntArb(min, max *big.Int, conv func(Value) Value) *arbAST {
+	n := astBigIntNode.withChecks(arbFilter{
+		constraint: &arbConstraint{order: "bigint", minimum: min, maximum: max},
+		test: func(_ *Fiber, v Value) bool {
+			bi := v.(*big.Int)
+			return bi.Cmp(min) >= 0 && bi.Cmp(max) <= 0
+		},
+	})
+	n.convert = conv
+	return n
+}
 
 var (
 	astNumberNode    = &arbAST{tag: astNumber}
@@ -225,10 +257,34 @@ func (b *arbASTs) build(s *Schema, wire bool) *arbAST {
 			return astNumberNode.withChecks(wireFinite)
 		}
 		return astNumberNode
+	case kindFloat32:
+		n := astNumberNode
+		if wire {
+			n = n.withChecks(wireFinite)
+		} else {
+			c := *n
+			n = &c
+		}
+		n.convert = floatToFloat32
+		return n
 	case kindInt:
 		n := astNumberNode.withChecks(jsInt)
 		n.convert = floatToInt32
 		return n
+	case kindInt8:
+		return boundedIntArb(-128, 127, floatToInt8)
+	case kindInt16:
+		return boundedIntArb(-32768, 32767, floatToInt16)
+	case kindInt64:
+		return boundedBigIntArb(big.NewInt(math.MinInt64), big.NewInt(math.MaxInt64), bigToInt64)
+	case kindUInt8:
+		return boundedIntArb(0, 255, floatToUInt8)
+	case kindUInt16:
+		return boundedIntArb(0, 65535, floatToUInt16)
+	case kindUInt32:
+		return boundedIntArb(0, math.MaxUint32, floatToUInt32)
+	case kindUInt64:
+		return boundedBigIntArb(big.NewInt(0), new(big.Int).SetUint64(math.MaxUint64), bigToUInt64)
 	case kindString:
 		return astStringNode
 	case kindBool:

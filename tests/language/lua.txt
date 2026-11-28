@@ -4,6 +4,7 @@
 BigInts
 Equality
 FixedWidth
+Fln
 Floats
 HashTries
 Ints

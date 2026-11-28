@@ -11,6 +11,7 @@ use flick_core::source::{FileId, SourceMap, Span};
 
 use crate::args::{CommandArguments, FmtArguments};
 use crate::command::{Command, Outcome};
+use crate::fln_files;
 use crate::sources::{self, FsHost};
 
 pub struct FmtCommand {
@@ -75,8 +76,13 @@ impl FmtCommand {
                 }
             };
             let text = &outcome.sources.get(file).text;
-            let found = plugins.of(text, file);
-            match fmt::format_with(text, file, &|head| found.get(head).cloned()) {
+            let formatted = if fln_files::is_fln_str(&path) {
+                fln_files::format_fln(file, &path, text)
+            } else {
+                let found = plugins.of(text, file);
+                fmt::format_with(text, file, &|head| found.get(head).cloned())
+            };
+            match formatted {
                 Ok(out) if out == *text => {}
                 Ok(out) if self.options.check => {
                     let unformatted = not_formatted(&outcome.sources, file, &out);
@@ -117,18 +123,23 @@ impl FmtCommand {
                 return outcome;
             }
         };
-        let host = sources::FsHost::new();
-        let at = host.cwd.join(path);
-        let dir = at
-            .parent()
-            .map_or_else(|| host.cwd.clone(), Path::to_path_buf);
-        let project = self.project_at(&host, &mut outcome.sources, &dir);
-        let mut plugins = FormatPlugins::new(&host, &mut outcome.sources, project.as_ref());
-        let text = &outcome.sources.get(file).text;
-        let found = plugins.of(text, file);
-        match fmt::format_with(text, file, &|head| found.get(head).cloned()) {
+        let text = outcome.sources.get(file).text.clone();
+        let formatted = if fln_files::is_fln_str(path) {
+            fln_files::format_fln(file, path, &text)
+        } else {
+            let host = sources::FsHost::new();
+            let at = host.cwd.join(path);
+            let dir = at
+                .parent()
+                .map_or_else(|| host.cwd.clone(), Path::to_path_buf);
+            let project = self.project_at(&host, &mut outcome.sources, &dir);
+            let mut plugins = FormatPlugins::new(&host, &mut outcome.sources, project.as_ref());
+            let found = plugins.of(&text, file);
+            fmt::format_with(&text, file, &|head| found.get(head).cloned())
+        };
+        match formatted {
             Ok(out) if self.options.check => {
-                if out != *text {
+                if out != text {
                     let unformatted = not_formatted(&outcome.sources, file, &out);
                     outcome.diagnostics.push(unformatted);
                 }

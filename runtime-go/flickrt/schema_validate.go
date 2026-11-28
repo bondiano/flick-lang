@@ -48,6 +48,38 @@ func (s *Schema) validate(fb *Fiber, in Value) (Value, []issue) {
 			return nil, fail("expected an Int, an integer from -2147483648 to 2147483647")
 		}
 		return int32(x), nil
+	case kindInt8:
+		if _, ok := in.(int8); !ok {
+			return nil, expected("an Int8", in)
+		}
+	case kindInt16:
+		if _, ok := in.(int16); !ok {
+			return nil, expected("an Int16", in)
+		}
+	case kindInt64:
+		if _, ok := in.(int64); !ok {
+			return nil, expected("an Int64", in)
+		}
+	case kindUInt8:
+		if _, ok := in.(uint8); !ok {
+			return nil, expected("a UInt8", in)
+		}
+	case kindUInt16:
+		if _, ok := in.(uint16); !ok {
+			return nil, expected("a UInt16", in)
+		}
+	case kindUInt32:
+		if _, ok := in.(uint32); !ok {
+			return nil, expected("a UInt32", in)
+		}
+	case kindUInt64:
+		if _, ok := in.(uint64); !ok {
+			return nil, expected("a UInt64", in)
+		}
+	case kindFloat32:
+		if _, ok := in.(float32); !ok {
+			return nil, expected("a Float32", in)
+		}
 	case kindString:
 		if _, ok := in.(string); !ok {
 			return nil, expected("a string", in)

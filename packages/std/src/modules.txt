@@ -21,6 +21,10 @@ UInt16
 UInt32
 UInt64
 Float32
+Bytes
+Fln.Lex
+Fln.Parse
+Fln
 Redacted
 BigDecimal
 Duration
@@ -69,7 +73,6 @@ Inspectable
 Formatter
 Version
 ByteSize
-Bytes
 Crypto
 Bool
 Predicate

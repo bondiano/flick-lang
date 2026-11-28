@@ -2,6 +2,8 @@
 //! `RenderMode::StrictFlick` parses cleanly in `flick-syntax` with zero diagnostics.
 
 use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
 
 use flick_diagnostics::source::FileId;
 use flick_syntax::syntax::parse;
@@ -9,6 +11,7 @@ use fln::{
     BigInt, Constructor, Float, LayoutOptions, PageWidth, RenderMode, Value, parse_text,
     try_pretty_text, try_render_text,
 };
+use fln_literals::{RESERVED_KEYWORDS, is_record_label_keyword};
 use proptest::prelude::*;
 
 fn arb_field_name() -> impl Strategy<Value = String> {
@@ -160,6 +163,87 @@ fn flick_syntax_accepts_fln_edge_cases() {
     ]));
     let rendered = try_render_text(&rec, RenderMode::StrictFlick).expect("record");
     assert_flick_parses_cleanly(&rendered);
+}
+
+#[test]
+fn fln_std_reserved_keywords_match_fln_literals() {
+    let fln_src = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std/src/Fln/Lex.fl"),
+    )
+    .expect("read packages/std/src/Fln/Lex.fl");
+    let start = fln_src
+        .find("let reserved_keywords = [")
+        .expect("reserved_keywords list in Fln/Lex.fl");
+    let rest = &fln_src[start..];
+    let end = rest
+        .find(']')
+        .expect("closing bracket of reserved_keywords");
+    let block = &rest[..end];
+    let actual: Vec<String> = block
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim().trim_end_matches(',');
+            trimmed
+                .strip_prefix('"')
+                .and_then(|s| s.strip_suffix('"'))
+                .map(str::to_owned)
+        })
+        .collect();
+
+    let mut expected: Vec<String> = RESERVED_KEYWORDS
+        .iter()
+        .copied()
+        .filter(|w| !is_record_label_keyword(w))
+        .map(str::to_owned)
+        .collect();
+    expected.push("_".to_owned());
+    expected.sort();
+
+    assert_eq!(actual, expected);
+    assert_eq!(actual.len(), 45);
+    for word in &actual {
+        let doc = format!("{{ {word} = 1 }}");
+        assert!(
+            parse_text("<test>", &doc).is_err(),
+            "fln crate should reject reserved record field `{word}`"
+        );
+    }
+    for allowed in [
+        "orelse",
+        "catch",
+        "echo",
+        "todo",
+        "alias",
+        "and",
+        "or",
+        "handle",
+        "effect",
+        "pure",
+        "ref",
+        "while",
+        "loop",
+        "return",
+        "pub",
+        "private",
+        "unboxed",
+        "untagged",
+        "enum",
+        "refined",
+        "of",
+        "on",
+        "arena",
+        "var",
+        "proof",
+        "law",
+        "component",
+        "plugin",
+    ] {
+        let doc = format!("{{ {allowed} = 1 }}");
+        assert!(
+            parse_text("<test>", &doc).is_ok(),
+            "fln crate should accept record field `{allowed}`"
+        );
+    }
 }
 
 proptest! {

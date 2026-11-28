@@ -1,62 +1,41 @@
 // Pure codec values on Flick's own runtime. The JSON codec accepts only
 // finite numbers: parsing 1e400 yields Infinity.
 import { type Result, err, none, ok, some } from "../core/data.ts";
-import { structuralValue } from "./schema_value.ts";
-import { type Case, type SchemaNode, node } from "./schema_nodes.ts";
+import { type Case, node } from "./schema_nodes.ts";
 export { schemaDescription } from "./schema_nodes.ts";
-import { tag } from "../tags.ts";
-
-const SCHEMA_ERROR = /*#__PURE__*/ tag("Prelude.SchemaError.SchemaError");
-
-export interface SchemaIssue {
-  readonly path: string;
-  readonly message: string;
-}
-
-export interface SchemaError {
-  readonly _tag: string;
-  readonly _0: ReadonlyArray<SchemaIssue>;
-}
-
-export interface ExportError {
-  readonly _tag: string;
-  readonly _0: string;
-}
-
-export const schemaError = (path: string, message: string): SchemaError => ({
-  _tag: SCHEMA_ERROR,
-  _0: [{ path: path || "(root)", message }],
-});
-
-export interface Codec<A = unknown> {
-  readonly kind: string;
-  readonly decode: (input: unknown) => Result<A, SchemaError>;
-  readonly encode: (value: A) => Result<unknown, SchemaError>;
-}
-
-type Check = (value: unknown, path: string) => Result<unknown, SchemaError>;
-export type Witness = Codec & { readonly decodeAt: Check; readonly encodeAt: Check; readonly value: Check };
-
-const at = (path: string, key: string | number): string =>
-  typeof key === "number" ? `${path}[${key}]` : path ? `${path}.${key}` : key;
-
-export const witness = (kind: string, decode: Check, encode: Check,
-  value?: Check,
-  description?: SchemaNode): Witness => {
-  const schema = {
-    kind,
-    decode: (input: unknown) => decode(input, ""),
-    encode: (input: unknown) => encode(input, ""),
-    decodeAt: decode,
-    encodeAt: encode,
-    value: value ?? ((input: unknown, path: string) => structuralValue(description, input, path, schemaError) ?? map(encode(input, path), () => input)),
-  };
-  return description ? node(schema, description) : schema;
-};
-
-const mismatch = (path: string, expected: string, input: unknown): Result<never, SchemaError> =>
-  err(schemaError(path, `expected ${expected}, got ${describe(input)}`));
-
+import {
+  SCHEMA_ERROR,
+  type Check,
+  type Codec,
+  type SchemaError,
+  type SchemaIssue,
+  type Witness,
+  at,
+  describe,
+  mapResult as map,
+  mismatch,
+  schemaError,
+  witness,
+} from "./schema_core.ts";
+export {
+  type Codec,
+  type ExportError,
+  type SchemaError,
+  type SchemaIssue,
+  type Witness,
+  schemaError,
+  witness,
+} from "./schema_core.ts";
+export {
+  schemaFloat32,
+  schemaInt8,
+  schemaInt16,
+  schemaInt64,
+  schemaUInt8,
+  schemaUInt16,
+  schemaUInt32,
+  schemaUInt64,
+} from "./schema_numeric.ts";
 
 const primitive = (kind: string, expected: string, valid: (v: unknown) => boolean): Witness => {
   const check: Check = (input, path) => valid(input) ? ok(input) : mismatch(path, expected, input);
@@ -313,8 +292,6 @@ export const schemaValidate = (schema: Witness, value: unknown): Result<unknown,
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
-const map = <A, B>(r: Result<A, SchemaError>, f: (v: A) => B): Result<B, SchemaError> =>
-  r._tag === "Success" ? ok(f(r.success)) : r;
 /** Sets an own property, `__proto__` too; assignment is much faster than defineProperty. */
 const assign = <A>(record: Record<string, A>, key: string, item: A): void => {
   if (key === "__proto__") Object.defineProperty(record, key, { value: item, writable: true, enumerable: true, configurable: true });
@@ -338,13 +315,6 @@ const inertProblem = (input: unknown): SchemaIssue | undefined => {
     return undefined;
   };
   return walk(input, "");
-};
-
-const describe = (value: unknown): string => {
-  if (value === null) return "null";
-  if (typeof value === "number" && !Number.isFinite(value)) return String(value);
-  if (Array.isArray(value)) return "an array";
-  return typeof value === "object" ? "an object" : typeof value;
 };
 
 const isJson = (value: unknown, ancestors: Set<object> = new Set()): boolean => {

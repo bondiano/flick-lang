@@ -14,6 +14,14 @@ use crate::tier0::Data;
 const INT32_MIN: f64 = -2_147_483_648.0;
 const INT32_MAX: f64 = 2_147_483_647.0;
 
+fn int_schema(min: f64, max: f64) -> JVal {
+    JVal::obj(vec![
+        ("type", JVal::Str("integer".into())),
+        ("minimum", JVal::Num(min)),
+        ("maximum", JVal::Num(max)),
+    ])
+}
+
 struct Exporter {
     defs: Vec<(String, Option<JVal>)>,
 }
@@ -57,11 +65,12 @@ impl Exporter {
         let (tag, fields) = tagged_fields(heap, meta)?;
         match tag.as_str() {
             "Codec.$Meta.$Number" => Ok(JVal::obj(vec![("type", JVal::Str("number".into()))])),
-            "Codec.$Meta.$Int" => Ok(JVal::obj(vec![
-                ("type", JVal::Str("integer".into())),
-                ("minimum", JVal::Num(INT32_MIN)),
-                ("maximum", JVal::Num(INT32_MAX)),
-            ])),
+            "Codec.$Meta.$Int" => Ok(int_schema(INT32_MIN, INT32_MAX)),
+            "Codec.$Meta.$Int8" => Ok(int_schema(-128.0, 127.0)),
+            "Codec.$Meta.$Int16" => Ok(int_schema(-32_768.0, 32_767.0)),
+            "Codec.$Meta.$UInt8" => Ok(int_schema(0.0, 255.0)),
+            "Codec.$Meta.$UInt16" => Ok(int_schema(0.0, 65_535.0)),
+            "Codec.$Meta.$UInt32" => Ok(int_schema(0.0, 4_294_967_295.0)),
             "Codec.$Meta.$String" => Ok(JVal::obj(vec![("type", JVal::Str("string".into()))])),
             "Codec.$Meta.$Bool" => Ok(JVal::obj(vec![("type", JVal::Str("boolean".into()))])),
             "Codec.$Meta.$BigInt" => Ok(JVal::obj(vec![

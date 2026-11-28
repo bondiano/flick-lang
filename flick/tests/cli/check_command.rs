@@ -1,6 +1,7 @@
 use crate::common;
 
 use std::fs;
+use std::path::Path;
 
 use common::flick;
 
@@ -324,4 +325,31 @@ let listed rows = ui { fragment rows }
             "ui { text \"a\"; text \"b\" }",
         );
     assert_eq!(fixed, want);
+}
+
+#[test]
+fn check_validates_standalone_fln_files() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("check_fln");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("tmp dir");
+    let good = dir.join("good.fln");
+    let bad = dir.join("bad.fln");
+    fs::write(
+        &good,
+        "// ok\nApp.Config { host = \"localhost\"; port = 8080u16; ratio = 1.5f32 }\n",
+    )
+    .expect("write good");
+    fs::write(&bad, "{\n  a = 1\n  b = [\n}\n").expect("write bad");
+
+    let ok = flick(&["check", good.to_str().expect("utf-8")]);
+    assert_eq!(ok.status.code(), Some(0), "{ok:?}");
+    assert!(ok.stderr.is_empty());
+
+    let fail = flick(&["check", "--color", "never", bad.to_str().expect("utf-8")]);
+    assert_eq!(fail.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&fail.stderr);
+    assert!(
+        stderr.contains("FLICK-S007") && stderr.contains("bad.fln:"),
+        "{stderr}"
+    );
 }
