@@ -6,6 +6,19 @@ break programs.
 
 ## Unreleased
 
+- **Plugin protocol `0.6.0`: extensible plugin-declared `@attributes` on
+  declarations, variants, and record fields.** Plugins can declare checked plain
+  (`@rename`) or namespaced (`@pkg.prefix`) custom attributes with allowed
+  targets (`Declaration`, `Variant`, `RecordField`) and documentation in
+  `PluginMetadata.attributes`. Record type fields accept leading `@attributes`
+  (including numeric and negative numeric arguments such as `@default -1`) and
+  expose deterministic `attributes: Vec<AttributeMeta>` with exact spans on
+  `RecordField` while preserving UTF-16 order and `source_index`. Unknown or
+  misplaced attributes report `FLICK-S014`, conflicting attribute declarations
+  report `FLICK-P044`, module and derive caches invalidate on attribute changes,
+  and LSP hover documents plugin attributes. Components built for `0.5.0` are
+  rejected with `FLICK-P035` until rebuilt.
+
 - **Native types.** A `type` with constructors can say where it is the
   backend's own: `@native when js || go` on its own line after the
   variants. Where the condition holds, its values are the backend's and it

@@ -219,7 +219,7 @@ impl Checker<'_> {
                     let label_text = label.text(self.text).to_owned();
                     let ty = child
                         .nodes()
-                        .next()
+                        .find(|n| n.kind != K::Attribute)
                         .map_or(Type::Error, |t| self.ty(t, &Kind::Type, free));
                     if entries.iter().any(|(l, _)| *l == label_text) {
                         self.duplicate_label(&label_text, self.token_span(label));

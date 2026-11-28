@@ -101,7 +101,7 @@ fn read(package: &str, path: &Path) -> Result<Wasm, String> {
 }
 
 /// The version of `flick:plugin` a component imports the compiler of, as
-/// its import `flick:plugin/compiler@0.5.0` names it, read without compiling
+/// its import `flick:plugin/compiler@0.6.0` names it, read without compiling
 /// it: a build from caches calls no plugin.
 fn interface_version(bytes: &[u8]) -> Option<&str> {
     const NAME: &[u8] = b"flick:plugin/compiler@";

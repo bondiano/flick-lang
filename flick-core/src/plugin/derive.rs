@@ -8,6 +8,7 @@ mod target;
 
 pub use declared::{Declared, declared};
 use deriving::Deriving;
+pub(super) use target::attribute_meta;
 pub use target::{target, target_in};
 
 use flick_plugin::{Block, DeriveTarget};
@@ -23,6 +24,7 @@ use super::{EditorBlock, Expander, Failure, ROUNDS, blocks_under, first_party, p
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::ModuleSyntax;
 use crate::source::{FileId, Span};
+use crate::syntax::attr::attr_parts;
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::parse;
@@ -60,15 +62,21 @@ pub fn derived_classes(tree: &Node, text: &str) -> Vec<Derived> {
     let mut pending: Option<Option<String>> = None;
     for child in tree.nodes() {
         if child.kind == K::Attribute {
-            let words: Vec<&str> = (child.child_tokens())
-                .filter(|t| t.kind == K::Ident)
-                .map(|t| t.text(text))
-                .collect();
-            pending = match words[..] {
-                ["derive"] => Some(None),
-                ["derive", package] => Some(Some(package.to_owned())),
-                _ => pending,
-            };
+            if let Some(parts) = attr_parts(child, text)
+                && !parts.namespaced
+                && parts.name == "derive"
+            {
+                let args: Vec<(K, &str)> = child
+                    .child_tokens()
+                    .filter(|t| t.start >= parts.name_end)
+                    .map(|t| (t.kind, t.text(text)))
+                    .collect();
+                pending = match args[..] {
+                    [] => Some(None),
+                    [(K::Ident, package)] => Some(Some(package.to_owned())),
+                    _ => pending,
+                };
+            }
             continue;
         }
         if let Some(package) = pending.take()

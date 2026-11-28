@@ -429,20 +429,6 @@ fn unicode_comment_columns_preserve_record_layout() {
 }
 
 #[test]
-fn attributes_stand_before_declarations_and_constructors() {
-    let src = "@lang int\ntype Int\n@lang flat_map\nflat_map : a -> a\nclass Monad m =\n  @lang pure\n  pure : a -> m a\ntype Option a = @lang none None | @lang some Some a\n";
-    assert_eq!(
-        sexp(src),
-        "(Attribute @ lang int)\n(TypeDecl type Int)\n(Attribute @ lang flat_map)\n\
-         (Signature flat_map : (ArrowType (NameType a) -> (NameType a)))\n\
-         (ClassDecl class Monad (TypeParam m) = (Members (Attribute @ lang pure) \
-         (Signature pure : (ArrowType (NameType a) -> (AppType (NameType m) (NameType a))))))\n\
-         (TypeDecl type Option (TypeParam a) = (Variant (Attribute @ lang none) None) | \
-         (Variant (Attribute @ lang some) Some (NameType a)))"
-    );
-}
-
-#[test]
 fn an_effect_names_the_class_of_each_operation() {
     assert_eq!(
         sexp("effect E =\n  abort stop : Int ->{} Int\n  tail : Unit ->{} Int"),

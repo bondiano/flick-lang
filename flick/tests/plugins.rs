@@ -103,6 +103,7 @@ mod wasm {
     mod compiled;
     mod invariant;
     mod metadata;
+    mod metadata_attrs;
     mod opened;
     mod stages;
     mod watched;

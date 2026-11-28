@@ -5,7 +5,8 @@
 //! attribute errors are validated by the checker against the active backend's
 //! descriptor.
 
-use super::cst::{Node, Token};
+use super::attr::attr_parts;
+use super::cst::Node;
 use super::export_attr;
 use super::heads::{CHECKED_BY, INVARIANT_OF};
 use super::kind::SyntaxKind as K;
@@ -15,13 +16,15 @@ use crate::source::{FileId, Span};
 use crate::syntax::lang::Lang;
 
 /// Placement context of an attribute being validated.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Placement {
     TopLevel {
         before_module_header: bool,
         duplicate_when: bool,
     },
     Nested,
+    Variant,
+    RecordField,
 }
 
 /// `@lang item`, with an item the compiler knows, `@derive` before a
@@ -50,12 +53,22 @@ pub(super) fn check(
             before_module_header,
             duplicate_when,
         } => (true, before_module_header, duplicate_when),
-        Placement::Nested => (false, false, false),
+        Placement::Nested | Placement::Variant | Placement::RecordField => (false, false, false),
     };
+    let Some(parts) = attr_parts(node, src) else {
+        return;
+    };
+    if parts.namespaced {
+        return;
+    }
     let next = before.map(|n| n.kind);
-    let words: Vec<Token> = node.child_tokens().filter(|t| t.kind == K::Ident).collect();
-    let message = match &words[..] {
-        [name, ..] if name.text(src) == "export" => match export_attr::read_raw(node, src) {
+    let args: Vec<(K, &str)> = node
+        .child_tokens()
+        .filter(|t| t.start >= parts.name_end)
+        .map(|t| (t.kind, t.text(src)))
+        .collect();
+    let message = match (parts.name, args.as_slice()) {
+        ("export", _) => match export_attr::read_raw(node, src) {
             Some(Err(why)) => why.to_owned(),
             _ if !top_level => "`@export` belongs before a top-level function".to_owned(),
             _ if matches!(next, Some(K::Signature | K::LetDecl))
@@ -65,7 +78,7 @@ pub(super) fn check(
             }
             _ => "`@export` belongs before a top-level function".to_owned(),
         },
-        [name, ..] if name.text(src) == "when" => {
+        ("when", _) => {
             if duplicate_when && before_module_header {
                 "a module may have at most one `@when` attribute: combine conditions with `&&`"
                     .to_owned()
@@ -79,13 +92,28 @@ pub(super) fn check(
                 }
             }
         }
-        [name, ..] if name.text(src) == "native" => {
+        ("native", _) => {
             "`@native` belongs indented after the body of a top-level `let` definition".to_owned()
         }
-        [name] | [name, _] if name.text(src) == "derive" => return,
-        [name] if name.text(src) == "maker" => return,
-        [name, ..] if name.text(src) == "maker" => "`@maker` takes no argument".to_owned(),
-        [name] if name.text(src) == "cell" => {
+        ("derive", [] | [(K::Ident, _)]) => {
+            if matches!(placement, Placement::RecordField | Placement::Variant) {
+                "`@derive` belongs before a class declaration".to_owned()
+            } else {
+                return;
+            }
+        }
+        ("derive", _) => {
+            "`@derive` names at most the package of its plugin: `@derive std`".to_owned()
+        }
+        ("maker", []) => {
+            if matches!(placement, Placement::RecordField | Placement::Variant) {
+                "`@maker` belongs before a declaration".to_owned()
+            } else {
+                return;
+            }
+        }
+        ("maker", _) => "`@maker` takes no argument".to_owned(),
+        ("cell", []) => {
             if matches!(next, Some(K::TypeDecl | K::Attribute))
                 || (next.is_none() && allow_trailing_attribute)
             {
@@ -93,8 +121,8 @@ pub(super) fn check(
             }
             "`@cell` belongs before a type declaration".to_owned()
         }
-        [name, ..] if name.text(src) == "cell" => "`@cell` takes no argument".to_owned(),
-        [name, _] if name.text(src) == "label" => {
+        ("cell", _) => "`@cell` takes no argument".to_owned(),
+        ("label", [(K::Ident, _)]) => {
             if matches!(next, Some(K::TypeDecl | K::Attribute))
                 || (next.is_none() && allow_trailing_attribute)
             {
@@ -102,24 +130,18 @@ pub(super) fn check(
             }
             "`@label` belongs before a type declaration".to_owned()
         }
-        [name, ..] if name.text(src) == "label" => {
-            "`@label` names one kind, as `@label atom`".to_owned()
-        }
-        [name] | [name, _] if name.text(src) == "sync" => {
-            let reader = words.get(1).is_none_or(|w| w.text(src) == "reader");
-            if !reader {
-                "`@sync` takes `reader` or nothing".to_owned()
-            } else if matches!(next, Some(K::ServiceDecl | K::Attribute))
+        ("label", _) => "`@label` names one kind, as `@label atom`".to_owned(),
+        ("sync", [] | [(K::Ident, "reader")]) => {
+            if matches!(next, Some(K::ServiceDecl | K::Attribute))
                 || (next.is_none() && allow_trailing_attribute)
             {
                 return;
-            } else {
-                "`@sync` belongs before a service declaration".to_owned()
             }
+            "`@sync` belongs before a service declaration".to_owned()
         }
-        [name, ..] if name.text(src) == "sync" => "`@sync` takes `reader` or nothing".to_owned(),
+        ("sync", _) => "`@sync` takes `reader` or nothing".to_owned(),
         // generated code alone writes it: a source cannot spell `$`
-        [name, _] if CHECKED_BY.ends_with(name.text(src)) && name.text(src).contains('$') => {
+        (name, [(K::Ident, _)]) if CHECKED_BY.ends_with(name) && name.contains('$') => {
             if matches!(next, Some(K::LetDecl)) {
                 return;
             }
@@ -127,15 +149,15 @@ pub(super) fn check(
         }
         // generated code alone writes it, before the type it is the
         // invariant of
-        [name, _, _, _]
-            if INVARIANT_OF.ends_with(name.text(src)) && name.text(src).contains('$') =>
+        (name, [(K::Ident, _), (K::Ident, _), (K::Ident, _)])
+            if INVARIANT_OF.ends_with(name) && name.contains('$') =>
         {
             if matches!(next, Some(K::TypeDecl)) {
                 return;
             }
             "an invariant is named before the type whose values it holds for".to_owned()
         }
-        [name] if name.text(src) == "owner" => {
+        ("owner", []) => {
             if matches!(next, Some(K::ServiceDecl | K::Attribute))
                 || (next.is_none() && allow_trailing_attribute)
             {
@@ -143,8 +165,8 @@ pub(super) fn check(
             }
             "`@owner` belongs before a service declaration".to_owned()
         }
-        [name, ..] if name.text(src) == "owner" => "`@owner` takes no argument".to_owned(),
-        [name] if name.text(src) == "stores" => {
+        ("owner", _) => "`@owner` takes no argument".to_owned(),
+        ("stores", []) => {
             // constructors or a body show what a type stores itself
             if before.is_some_and(|d| d.kind == K::TypeDecl && d.has_token(K::Eq)) {
                 "`@stores` belongs before a type without constructors or a body".to_owned()
@@ -156,8 +178,8 @@ pub(super) fn check(
                 "`@stores` belongs before a type declaration".to_owned()
             }
         }
-        [name, ..] if name.text(src) == "stores" => "`@stores` takes no argument".to_owned(),
-        [name] if name.text(src) == "implicit" => {
+        ("stores", _) => "`@stores` takes no argument".to_owned(),
+        ("implicit", []) => {
             // a lone attribute is a fragment the formatter checks on its own
             if matches!(next, Some(K::InstanceDecl)) || (next.is_none() && allow_trailing_attribute)
             {
@@ -165,14 +187,13 @@ pub(super) fn check(
             }
             "`@implicit` belongs before an instance declaration".to_owned()
         }
-        [name, ..] if name.text(src) == "implicit" => "`@implicit` takes no argument".to_owned(),
-        [name, ..] if name.text(src) == "derive" => {
-            "`@derive` names at most the package of its plugin: `@derive std`".to_owned()
+        ("implicit", _) => "`@implicit` takes no argument".to_owned(),
+        ("lang", [(K::Ident, _)]) if placement == Placement::RecordField => {
+            "`@lang` belongs before a declaration or variant".to_owned()
         }
-        [name, ..] if name.text(src) != "lang" => return,
-        [_, item] if Lang::from_name(item.text(src)).is_some() => return,
-        [_, item] => format!("unknown lang item `{}`", item.text(src)),
-        [name] if name.text(src) == "lang" => "`@lang` names one lang item".to_owned(),
+        ("lang", [(K::Ident, item)]) if Lang::from_name(item).is_some() => return,
+        ("lang", [(K::Ident, item)]) => format!("unknown lang item `{item}`"),
+        ("lang", _) => "`@lang` names one lang item".to_owned(),
         _ => return,
     };
     let (start, end) = node.range();

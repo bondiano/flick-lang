@@ -105,6 +105,7 @@ fn consumer(interface: &Interface, text: &str) -> Vec<Diagnostic> {
             foreign_backend: types::ForeignBackendSpec::default_js(),
             validate_foreign_metadata: true,
             native_overrides: None,
+            plugin_attributes: &[],
         },
         &mut checked,
     ));

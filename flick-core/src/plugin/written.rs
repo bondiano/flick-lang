@@ -5,6 +5,7 @@ use flick_plugin::{
     ConstraintMeta, EffectRow, Hole, HoleKind, RecordField, Span, Written, WrittenKind,
 };
 
+use super::derive::attribute_meta;
 use super::source::{BlockSource, docs_above_item};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -55,9 +56,14 @@ pub fn written(node: &Node, text: &str, origin: u32) -> Written {
                 let Some(label_tok) = f.child_tokens().find(|t| t.kind == K::Ident) else {
                     continue;
                 };
-                let Some(ty) = f.nodes().next() else {
+                let Some(ty) = f.nodes().find(|n| n.kind != K::Attribute) else {
                     continue;
                 };
+                let attributes = f
+                    .nodes()
+                    .filter(|n| n.kind == K::Attribute)
+                    .filter_map(|a| attribute_meta(a, text, Some(origin)))
+                    .collect();
                 let (f_start, f_end) = f.range();
                 fields.push(RecordField {
                     name: label_tok.text(text).to_owned(),
@@ -72,6 +78,7 @@ pub fn written(node: &Node, text: &str, origin: u32) -> Written {
                     ty: written(ty, text, origin),
                     docs: docs_above_item(text, f_start, false),
                     source_index,
+                    attributes,
                 });
                 source_index += 1;
             }
@@ -347,6 +354,74 @@ mod tests {
                 .collect();
             assert_eq!(actual, names);
         }
+    }
+
+    #[test]
+    fn record_field_attributes_keep_spans_docs_utf16_order_and_source_index() {
+        let src = "\
+module A exposing (User(..))
+type User = User {
+  /// Display name
+  @rename \"user_id\"
+  @meta.flag true
+  zebra : String
+  /// Retries
+  @default -1
+  alpha : Int
+}
+";
+        let file = FileId::default();
+        let parsed = parse(src, file);
+        assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+        let decl = parsed
+            .tree
+            .nodes()
+            .find(|n| n.kind == K::TypeDecl)
+            .expect("type decl");
+        let variant = decl
+            .nodes()
+            .find(|n| n.kind == K::Variant)
+            .expect("variant");
+        let rec = variant
+            .nodes()
+            .find(|n| n.kind == K::RecordType)
+            .expect("record");
+        let origin = decl.range().0;
+        let WrittenKind::Record {
+            fields,
+            open: false,
+        } = written(rec, src, origin).kind
+        else {
+            panic!("expected closed record");
+        };
+        assert_eq!(fields.len(), 2);
+        // Canonical UTF-16 order: alpha (source_index 1), zebra (source_index 0).
+        assert_eq!(fields[0].name, "alpha");
+        assert_eq!(fields[0].source_index, 1);
+        assert_eq!(fields[0].docs, "Retries");
+        assert_eq!(fields[0].attributes.len(), 1);
+        assert_eq!(fields[0].attributes[0].name, "default");
+        assert_eq!(fields[0].attributes[0].args, "-1");
+        let decl_text = &src[origin as usize..];
+        assert_eq!(
+            &decl_text[fields[0].attributes[0].span.start as usize
+                ..fields[0].attributes[0].span.end as usize],
+            "@default -1"
+        );
+
+        assert_eq!(fields[1].name, "zebra");
+        assert_eq!(fields[1].source_index, 0);
+        assert_eq!(fields[1].docs, "Display name");
+        assert_eq!(fields[1].attributes.len(), 2);
+        assert_eq!(fields[1].attributes[0].name, "rename");
+        assert_eq!(fields[1].attributes[0].args, "\"user_id\"");
+        assert_eq!(
+            &decl_text[fields[1].attributes[0].span.start as usize
+                ..fields[1].attributes[0].span.end as usize],
+            "@rename \"user_id\""
+        );
+        assert_eq!(fields[1].attributes[1].name, "meta.flag");
+        assert_eq!(fields[1].attributes[1].args, "true");
     }
 
     #[test]

@@ -34,4 +34,13 @@ type alias Props c = {
   render : (a -> Ui^c)^c
 }
 
+@meta.prefix "usr"
+type alias User = {
+  @rename "user_id"
+  user_name : String
+  @skip
+  @default -1
+  retries : Int
+}
+
 holes : List _ -> (_, Float)

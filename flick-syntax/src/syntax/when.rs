@@ -15,6 +15,7 @@
 
 use std::{fmt, mem};
 
+use super::attr::attr_parts;
 use super::cst::Node;
 use super::kind::SyntaxKind as K;
 use crate::source::Span;
@@ -167,9 +168,7 @@ pub fn is_valid_tag(name: &str) -> bool {
 /// Whether `node` is a `@when` attribute (regardless of whether its arguments
 /// are valid).
 pub fn is_when(node: &Node, text: &str) -> bool {
-    node.child_tokens()
-        .find(|t| t.kind == K::Ident)
-        .is_some_and(|t| t.text(text) == TAG)
+    attr_parts(node, text).is_some_and(|parts| !parts.namespaced && parts.name == TAG)
 }
 
 const USAGE: &str = "`@when` takes one condition string, as `@when \"js && !browser\"`";
@@ -178,14 +177,14 @@ const USAGE: &str = "`@when` takes one condition string, as `@when \"js && !brow
 /// `@when` attribute, or `Some(Err(..))` if its argument is missing, malformed,
 /// or fails to parse as a condition.
 pub fn read(node: &Node, text: &str) -> Option<Result<WhenAttr, String>> {
-    let mut tokens = node
-        .child_tokens()
-        .filter(|t| matches!(t.kind, K::Ident | K::String));
-    let head = tokens.next()?;
-    if head.kind != K::Ident || head.text(text) != TAG {
+    let parts = attr_parts(node, text)?;
+    if parts.namespaced || parts.name != TAG {
         return None;
     }
-    let rest: Vec<_> = tokens.collect();
+    let rest: Vec<_> = node
+        .child_tokens()
+        .filter(|t| t.start >= parts.name_end)
+        .collect();
     let [arg] = rest.as_slice() else {
         return Some(Err(USAGE.to_owned()));
     };

@@ -57,6 +57,7 @@ fn check_with_backend(
             foreign_backend: backend,
             validate_foreign_metadata: true,
             native_overrides: None,
+            plugin_attributes: &[],
         },
         &mut iface,
         StaticContext {

@@ -185,3 +185,23 @@ pub fn stages_by_class(host: &dyn Host, project: Option<&Project>, rt: Option<bo
         }
     }
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn has_own_export_attrs(modules: &[super::Loaded], sources: &SourceMap) -> bool {
+    use crate::syntax::{cst::Node, export_attr, kind::SyntaxKind as K};
+    modules.iter().any(|m| {
+        if !matches!(m.root, super::Root::Source | super::Root::Other(_)) {
+            return false;
+        }
+        let text = &sources.get(m.file).text;
+        m.parse.tree.nodes().any(|n| match n.kind {
+            K::Attribute => export_attr::is_export(n, text),
+            K::RecGroup => n
+                .nodes()
+                .filter(|c| c.kind == K::Members)
+                .flat_map(Node::nodes)
+                .any(|c| c.kind == K::Attribute && export_attr::is_export(c, text)),
+            _ => false,
+        })
+    })
+}

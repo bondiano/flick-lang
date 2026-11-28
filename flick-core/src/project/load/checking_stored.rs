@@ -204,6 +204,12 @@ impl Checking<'_> {
                 serde_json::to_vec(w.watched.names()).unwrap_or_default(),
             );
         }
+        if !self.plugin_attributes.is_empty() {
+            key.add(
+                "plugin-attributes",
+                serde_json::to_vec(self.plugin_attributes.as_ref()).unwrap_or_default(),
+            );
+        }
         // which modules are the project's decides what is local and private
         let mut modules = String::new();
         for (name, &j) in self.by_name {

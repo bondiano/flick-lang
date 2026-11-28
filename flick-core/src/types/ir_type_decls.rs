@@ -16,6 +16,7 @@ use super::ty::Type;
 use super::typing::Typing;
 use super::variance::decl_param_names;
 use crate::iface::Namespace;
+use crate::syntax::attr::attr_parts;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal::string_value;
@@ -266,26 +267,27 @@ impl Checker<'_> {
     fn collect_foreign_type_forms(&self, attrs: &[&Node]) -> Vec<ForeignTypeForm> {
         let mut forms = Vec::new();
         for attr in attrs {
-            let mut tokens = attr
-                .child_tokens()
-                .filter(|t| matches!(t.kind, K::Ident | K::String))
-                .map(|t| (t.kind, t.text(self.text)));
-            let Some((K::Ident, name)) = tokens.next() else {
+            let Some(parts) = attr_parts(attr, self.text) else {
                 continue;
             };
-            if name == "ts"
+            if parts.namespaced
+                || parts.name == "ts"
                 || self
                     .options
                     .foreign_backend
-                    .type_form_attribute(name)
+                    .type_form_attribute(parts.name)
                     .is_none()
             {
                 continue;
             }
-            let rest: Vec<(K, &str)> = tokens.collect();
+            let rest: Vec<(K, &str)> = attr
+                .child_tokens()
+                .filter(|t| t.start >= parts.name_end)
+                .map(|t| (t.kind, t.text(self.text)))
+                .collect();
             match rest.as_slice() {
                 [(K::String, form)] => forms.push(ForeignTypeForm {
-                    attr: name.to_owned(),
+                    attr: parts.name.to_owned(),
                     form: string_value(form),
                     from: None,
                 }),
@@ -294,7 +296,7 @@ impl Checker<'_> {
                     (K::String, pkg),
                     (K::String, form),
                 ] => forms.push(ForeignTypeForm {
-                    attr: name.to_owned(),
+                    attr: parts.name.to_owned(),
                     form: string_value(form),
                     from: Some(string_value(pkg)),
                 }),

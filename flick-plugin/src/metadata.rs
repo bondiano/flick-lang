@@ -64,6 +64,22 @@ pub struct HeadSpec {
     pub bracket_args: bool,
 }
 
+/// Where a plugin-declared `@attribute` may be placed in Flick source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum AttributeTarget {
+    Declaration,
+    Variant,
+    RecordField,
+}
+
+/// One custom `@attribute` declared by a plugin.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AttributeSpec {
+    pub name: String,
+    pub targets: Vec<AttributeTarget>,
+    pub doc: String,
+}
+
 /// Static metadata declared by a plugin.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PluginMetadata {
@@ -72,6 +88,8 @@ pub struct PluginMetadata {
     pub derives: Vec<String>,
     /// Compiler-owned diagnostic codes (honored only for first-party `std`).
     pub own_codes: Vec<String>,
+    /// Custom `@attributes` accepted on declarations, variants, or record fields.
+    pub attributes: Vec<AttributeSpec>,
 }
 
 /// A type a class's derive makes an instance for: its declaration as a

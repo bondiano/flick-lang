@@ -367,6 +367,7 @@ fn check_reporting(
             validate_foreign_metadata: true,
             // every clause, for the selection of each build
             native_overrides: Some(super::NativeOverrideEnv::builtins()),
+            plugin_attributes: &[],
         };
         let (checked, typing, _) = super::run_in(
             &module,

@@ -253,6 +253,7 @@ class ShowFn a =
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
         native_overrides: None,
+        plugin_attributes: &[],
     };
     let mut checker = checker_in(
         &module,
@@ -389,6 +390,7 @@ let first = base (fun () -> ())
             foreign_backend: ForeignBackendSpec::default_js(),
             validate_foreign_metadata: true,
             native_overrides: None,
+            plugin_attributes: &[],
         };
         let (more, _) =
             check_with_evidence(&module, &imported, builtins(), options, &mut interface);

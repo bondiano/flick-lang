@@ -78,6 +78,7 @@ fn check_file_with(
         modules[0].collect_contract_names(text, &mut all_contracted);
     }
     let env_ctx = super::environment::EnvironmentContext::standalone();
+    let plugin_attributes: Arc<[types::PluginAttribute]> = Arc::from([]);
     #[cfg(not(target_arch = "wasm32"))]
     let package_when = BTreeMap::new();
     let checking = Checking {
@@ -107,6 +108,7 @@ fn check_file_with(
         cache: None,
         watching: &watching,
         watched: &watched,
+        plugin_attributes: &plugin_attributes,
         privates: &BTreeMap::new(),
     };
     let builtin = |name: &str| {

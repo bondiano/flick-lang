@@ -193,6 +193,7 @@ fn standalone_checker<'a>(interfaces: &[Interface], builtins: &'a Builtins) -> C
             foreign_backend: &EMPTY_FOREIGN_BACKEND,
             validate_foreign_metadata: false,
             native_overrides: None,
+            plugin_attributes: &[],
         },
         classes: classes::State::default(),
         typing: Typing::default(),

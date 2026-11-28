@@ -52,6 +52,7 @@ fn interface_of(text: &str) -> Interface {
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
         native_overrides: None,
+        plugin_attributes: &[],
     };
     diagnostics.extend(types::check(
         &module,

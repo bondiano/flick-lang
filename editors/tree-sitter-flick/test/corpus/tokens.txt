@@ -353,13 +353,16 @@ Attributes
 ==================
 
 @lang int
-type Option a = @lang none None | Some a
+@meta.prefix "v1"
+type Option a = @lang none None | Some { @rename "id" id : Int }
 
 ---
 
 (source_file
   (attribute)
   (identifier)
+  (attribute)
+  (string)
   (keyword)
   (constructor)
   (identifier)
@@ -369,7 +372,12 @@ type Option a = @lang none None | Some a
   (constructor)
   (operator)
   (constructor)
-  (identifier))
+  (braces
+    (attribute)
+    (string)
+    (identifier)
+    (operator)
+    (constructor)))
 
 ==================
 An attribute without arguments

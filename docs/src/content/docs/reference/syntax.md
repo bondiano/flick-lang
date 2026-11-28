@@ -583,9 +583,12 @@ rec {
 
 ## Attributes
 
-An attribute is a line `@name`, maybe with arguments, before a declaration,
-a member or a constructor. It is metadata for the compiler or a plugin, not a
-name: nothing resolves it, and a program cannot declare another.
+An attribute is `@name` or namespaced `@ns.name`, optionally followed by word,
+string, or numeric arguments (including negative numbers such as `-1`), before
+a declaration, a member, a constructor variant, or a record type field. It is
+metadata for the compiler, active backend, or an active plugin, not a resolved
+name: plugins declare their accepted custom attributes and allowed targets via
+`PluginMetadata.attributes`.
 
 ```flick
 @label gauge
@@ -603,6 +606,7 @@ type Gauge = Gauge Float
 | `@label` | a type | its top-level values carry their names where the program runs; the kind, `@label atom`, says which builds keep them | [observability](../observability/#ui-actions-and-atom-writes) |
 | `@cell`, `@maker`, `@owner` | a type; a value; a service | each value of the type holds one value; the value makes an atom, an action or a view; the service's handler owns what is made under it | [checks of calls](../plugins/#checks-of-calls) |
 | `@lang`, `@sync` | a declaration; a service | built-in modules only: a lang item the compiler knows by its role; a service whose operations run at once | [direct calls](../../spec/01-direct-calls/) |
+| `@name` / `@ns.name` (plugin-declared) | a declaration, variant, or record type field | plugin-defined metadata exposed to derives and editor hover | [plugins](../plugins/#what-a-plugin-gives) |
 
 An unknown attribute, a misplaced one, or one with arguments it does not take
 is `FLICK-S014`. Hovering an attribute in the editor shows what it says.
@@ -621,7 +625,7 @@ app         = capture { capture }
 capture     = atom { "^" (name | "(" type ")" | "{" … "}") }
 atom        = name | Con { "." Con } | "none" | "(" ")" | "(" type ")"
             | "(" type "," type { "," type } ")"
-            | "{" field ":" type { (";" | line break) field ":" type } ["|" union] "}"
+            | "{" { attr } field ":" type { (";" | line break) { attr } field ":" type } ["|" union] "}"
             | "{" [union { "," union }] ["|" union] "}"
 ```
 

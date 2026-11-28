@@ -39,6 +39,7 @@ fn check_go(source: &str) -> Vec<Diagnostic> {
         foreign_backend: &backend,
         validate_foreign_metadata: true,
         native_overrides: None,
+        plugin_attributes: &[],
     };
     let (diags, _) = types::check_typed_with_static_context(
         &module,

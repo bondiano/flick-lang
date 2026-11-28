@@ -73,6 +73,7 @@ change needs.
 | [`flick-vm` `native-host` feature gate and `wasm32` runtime](#flick-vm-native-host-feature-gate-and-wasm32-runtime) | no | — |
 | [Live VM hot swap and atomic typed state migrations](#live-vm-hot-swap-and-atomic-typed-state-migrations) | no | — |
 | [VM Tier 1 is the default for `--target vm`](#vm-tier-1-is-the-default-for---target-vm) | no | — |
+| [Plugin protocol `0.6.0`: extensible `@attributes`](#plugin-protocol-060-extensible-attributes) | no | `FLICK-P035`, `FLICK-P036`, `FLICK-P044`, `FLICK-S014` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -988,3 +989,22 @@ and Go) and native `Host.Process.spawn`. The tier-0 reference VM remains
 selectable as an oracle via `--vm-tier 0`, `--vm-tier tier0`, or
 `[target.vm] tier = "0"` in `flick.toml` (and remains the default for
 `flick repl`). Existing Flick sources require no edits.
+
+## Plugin protocol `0.6.0`: extensible `@attributes`
+
+The `flick:plugin` component protocol moves from `0.5.0` to `0.6.0`:
+
+- `PluginMetadata` adds `attributes: Vec<AttributeSpec>` (WIT `list<attribute-spec>`),
+  allowing plugins to declare plain (`@rename`) or namespaced (`@pkg.prefix`)
+  custom `@attributes` targeting `Declaration`, `Variant`, and/or `RecordField`.
+  Malformed attribute specs fail with `FLICK-P036`, collisions with core,
+  backend, `std`, or another plugin's attributes fail with `FLICK-P044`, and
+  undeclared or misplaced attributes fail with `FLICK-S014` at the exact
+  attribute span.
+- Record type fields accept leading `@attributes` (with word, string, and
+  numeric arguments such as `@default -1`), formatted one field per line, and
+  `RecordField` (`written-record-field` in WIT) exposes `attributes: Vec<AttributeMeta>`
+  with exact spans while preserving UTF-16 canonical order and `source_index`.
+- WASM plugin components built for `flick:plugin@0.5.0` are rejected with
+  `FLICK-P035` until rebuilt against `flick-plugin` (`0.6.0`). Existing Flick
+  programs require no source changes.

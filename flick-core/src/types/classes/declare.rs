@@ -11,6 +11,7 @@ use super::{NUMERIC_CLASSES, RECORD_CLASSES, split, vars, which};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve;
 use crate::source::Span;
+use crate::syntax::attr::attr_parts;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::convert::{Free, is_type};
@@ -92,10 +93,8 @@ impl<'n> Checker<'_> {
         let mut implicit = false;
         for &decl in decls {
             if decl.kind == K::Attribute {
-                implicit |= decl
-                    .child_tokens()
-                    .find(|t| t.kind == K::Ident)
-                    .is_some_and(|t| t.text(self.text) == "implicit");
+                implicit |= attr_parts(decl, self.text)
+                    .is_some_and(|parts| !parts.namespaced && parts.name == "implicit");
                 continue;
             }
             let implicit = mem::take(&mut implicit);

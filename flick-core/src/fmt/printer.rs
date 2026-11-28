@@ -162,6 +162,7 @@ impl<'a> Printer<'a> {
             }
             K::RecordExpr | K::RecordUpdate | K::RecordType | K::RecordPat => self.record(n, &[]),
             K::RecordField => self.field(n),
+            K::RecordTypeField => self.record_type_field(n),
             K::ArrowType => self.arrow(n),
             K::Signature => self.signature(n),
             K::TypeDecl | K::ModuleTypeMember | K::KindDecl | K::ErrorDecl => self.type_decl(n),
@@ -352,7 +353,10 @@ fn space((a, a_parent): (K, K), (b, b_parent): (K, K)) -> bool {
         (_, K::RBrace) => !tight_braces(b_parent),
         (K::Bang | K::Minus, _) if a_parent == K::WhenCond => false,
         (_, K::Minus) if b_parent == K::WhenCond => false,
-        (K::Minus, _) => !matches!(a_parent, K::PrefixExpr | K::LitPat | K::RowOmit),
+        (K::Minus, _) => !matches!(
+            a_parent,
+            K::PrefixExpr | K::LitPat | K::RowOmit | K::Attribute
+        ),
         (K::Tilde, _) => false,
         (K::Con, K::LParen) => !matches!(
             b_parent,

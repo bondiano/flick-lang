@@ -14,6 +14,7 @@ use super::ui::members;
 use super::{Checker, Range, let_parts};
 use crate::iface::{self, Namespace};
 use crate::source::Span;
+use crate::syntax::attr::attr_parts;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use flick_plugin::{CallSite, Enclosing, Lacking, Tagged};
@@ -324,8 +325,8 @@ pub(super) fn marked(decls: &[&Node], text: &str, tag: &str, kind: K) -> Vec<Str
     let mut pending = false;
     for decl in decls {
         if decl.kind == K::Attribute {
-            let mut words = (decl.child_tokens()).filter(|t| t.kind == K::Ident);
-            pending |= words.next().is_some_and(|w| w.text(text) == tag);
+            pending |=
+                attr_parts(decl, text).is_some_and(|parts| !parts.namespaced && parts.name == tag);
             continue;
         }
         if mem::take(&mut pending)

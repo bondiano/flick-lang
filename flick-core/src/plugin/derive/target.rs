@@ -10,6 +10,7 @@ use super::named_classes;
 use crate::plugin::source::docs_above_item;
 use crate::plugin::written::{constraints_of, written};
 use crate::resolve::{ItemKind, ModuleSyntax};
+use crate::syntax::attr::attr_parts;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::is_type;
@@ -226,11 +227,14 @@ fn decl_visibility(
     }
 }
 
-/// Extracts `@name args...` metadata from a `K::Attribute` node.
-fn attribute_meta(attr: &Node, text: &str, origin: Option<u32>) -> Option<AttributeMeta> {
-    let name_tok = attr.child_tokens().find(|t| t.kind == K::Ident)?;
+/// Extracts `@name args...` (or `@ns.name args...`) metadata from a `K::Attribute` node.
+pub(crate) fn attribute_meta(
+    attr: &Node,
+    text: &str,
+    origin: Option<u32>,
+) -> Option<AttributeMeta> {
+    let parts = attr_parts(attr, text)?;
     let (start, end) = attr.range();
-    let args = text[name_tok.end as usize..end as usize].trim().to_owned();
     let span = match origin {
         Some(orig) if start >= orig => BlockSpan {
             start: start - orig,
@@ -239,8 +243,8 @@ fn attribute_meta(attr: &Node, text: &str, origin: Option<u32>) -> Option<Attrib
         _ => BlockSpan::default(),
     };
     Some(AttributeMeta {
-        name: name_tok.text(text).to_owned(),
-        args,
+        name: parts.name.to_owned(),
+        args: parts.args.to_owned(),
         span,
     })
 }

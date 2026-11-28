@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::Span;
+use crate::{AttributeMeta, Span};
 
 /// A type as written, at its span of the text of its declaration or
 /// signature. Parentheses are gone; the span of a parenthesized type keeps
@@ -27,6 +27,7 @@ pub struct RecordField {
     pub ty: Written,
     pub docs: String,
     pub source_index: u32,
+    pub attributes: Vec<AttributeMeta>,
 }
 
 /// A class constraint `C a b` in a `forall`, `=>` context, or GADT constructor.
@@ -104,6 +105,7 @@ pub struct FlatRecordField {
     pub ty: u32,
     pub docs: String,
     pub source_index: u32,
+    pub attributes: Vec<AttributeMeta>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -184,6 +186,7 @@ impl Written {
                         ty: f.ty.push(out),
                         docs: f.docs.clone(),
                         source_index: f.source_index,
+                        attributes: f.attributes.clone(),
                     })
                     .collect(),
                 open: *open,
@@ -263,6 +266,7 @@ impl Written {
                             ty: one(f.ty)?,
                             docs: f.docs.clone(),
                             source_index: f.source_index,
+                            attributes: f.attributes.clone(),
                         })
                     })
                     .collect::<Option<_>>()?,
@@ -324,6 +328,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn a_type_crosses_as_nodes_and_comes_back_whole() {
         let int = at(
             0,
@@ -399,6 +404,11 @@ mod tests {
                                         ty: int,
                                         docs: "field doc".into(),
                                         source_index: 1,
+                                        attributes: vec![AttributeMeta {
+                                            name: "rename".into(),
+                                            args: "\"user_id\"".into(),
+                                            span: Span { start: 25, end: 34 },
+                                        }],
                                     },
                                     RecordField {
                                         name: "b".into(),
@@ -407,6 +417,7 @@ mod tests {
                                         ty: label,
                                         docs: String::new(),
                                         source_index: 0,
+                                        attributes: Vec::new(),
                                     },
                                 ],
                                 open: false,

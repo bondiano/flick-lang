@@ -119,9 +119,9 @@
           }
         },
         {
-          "comment": "`@lang int`: an attribute of the declaration that follows",
+          "comment": "`@lang int` or `@pkg.rename \"x\"`: an attribute of a declaration, variant, or record field",
           "name": "entity.other.attribute-name.flick",
-          "match": "@[a-z_][A-Za-z0-9_]*"
+          "match": "@[a-z_][A-Za-z0-9_]*(?:\\.[a-z_][A-Za-z0-9_]*)?"
         }
       ]
     },

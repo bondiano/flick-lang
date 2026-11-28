@@ -16,7 +16,7 @@ use crate::plugin::expansion::Expansion;
 use crate::project::{Host, Project};
 use crate::source::{FileId, SourceMap};
 use crate::syntax::cst::Node;
-use crate::types::{ForeignBackendSpec, Typing};
+use crate::types::{ForeignBackendSpec, PluginAttribute, Typing};
 
 /// A module as editors see it.
 #[derive(Clone)]
@@ -71,6 +71,8 @@ pub struct Analysis {
     pub diagnostics: Vec<Diagnostic>,
     /// Foreign adapter words and type-form attributes declared by the active backend.
     pub foreign_backend: ForeignBackendSpec,
+    /// Custom `@attributes` declared by active plugins.
+    pub plugin_attributes: Arc<[PluginAttribute]>,
 }
 
 impl Analysis {
@@ -96,6 +98,7 @@ pub fn analyze(
         compilation: output.compilation,
         diagnostics: output.diagnostics,
         foreign_backend: output.foreign_backend,
+        plugin_attributes: output.plugin_attributes,
     }
 }
 
@@ -127,6 +130,7 @@ pub fn analyze_rt(
         compilation: output.compilation,
         diagnostics: output.diagnostics,
         foreign_backend: output.foreign_backend,
+        plugin_attributes: output.plugin_attributes,
     }
 }
 
@@ -153,6 +157,7 @@ pub fn analyze_with(
         compilation: output.compilation,
         diagnostics: output.diagnostics,
         foreign_backend: output.foreign_backend,
+        plugin_attributes: output.plugin_attributes,
     }
 }
 

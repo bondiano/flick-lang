@@ -220,6 +220,8 @@ struct Key {
     /// What tells the watching plugins apart: a module without blocks is
     /// checked again when one of them changes.
     watching: Vec<String>,
+    /// Active validated plugin-declared custom `@attributes`.
+    plugin_attributes: Arc<[types::PluginAttribute]>,
 }
 
 impl Loader<'_> {
@@ -284,6 +286,7 @@ impl Loader<'_> {
             project: self.project,
             watching: &self.watchers.plugins,
             watched: &self.watchers.watched,
+            plugin_attributes: &self.plugin_attributes,
             stages_by_class: self.stages_by_class,
             env_ctx: self.env_ctx,
             #[cfg(not(target_arch = "wasm32"))]
@@ -430,6 +433,8 @@ struct Checking<'a> {
     watching: &'a [super::plugins::Watching],
     /// Every name they watch, which the checker collects.
     watched: &'a types::Watched,
+    /// Active validated plugin-declared custom `@attributes`.
+    plugin_attributes: &'a Arc<[types::PluginAttribute]>,
     /// What each test companion sees of its module, by the module's name.
     privates: &'a BTreeMap<String, Interface>,
 }

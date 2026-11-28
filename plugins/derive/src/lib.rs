@@ -46,6 +46,7 @@ pub fn metadata() -> PluginMetadata {
             "HttpApi.Derive.HttpApi".into(),
         ],
         own_codes: Vec::new(),
+        attributes: Vec::new(),
     }
 }
 

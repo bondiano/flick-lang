@@ -89,6 +89,7 @@ impl Loader<'_> {
             foreign_backend: &self.env_ctx.foreign_backend,
             validate_foreign_metadata: self.env_ctx.validate_foreign_metadata,
             native_overrides: Some(self.env_ctx.native_overrides()),
+            plugin_attributes: &self.plugin_attributes,
         };
         diagnostics.extend(types::check(
             &checked,
