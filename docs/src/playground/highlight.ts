@@ -1,6 +1,6 @@
 import type { HighlighterCore, LanguageRegistration, ThemeRegistration } from "shiki/core";
 
-export type HighlightLanguage = "flick" | "javascript";
+export type HighlightLanguage = "flick" | "fln" | "javascript";
 export type HighlightToken = {
   readonly text: string;
   readonly class_name: "" | "fp-token-comment" | "fp-token-keyword" | "fp-token-string" | "fp-token-invalid" | "fp-token-needs" | "fp-token-fails";
@@ -38,11 +38,12 @@ let loading: Promise<void> | undefined;
 /** Optional decoration loads independently of the native editor and compiler. */
 export const loadHighlighting = (): Promise<void> => {
   loading ??= (async () => {
-    const [{ createHighlighterCore }, { createJavaScriptRegexEngine }, javascript, flick] = await Promise.all([
+    const [{ createHighlighterCore }, { createJavaScriptRegexEngine }, javascript, flick, fln] = await Promise.all([
       import("shiki/core"),
       import("shiki/engine/javascript"),
       import("shiki/langs/javascript.mjs"),
       import("../../../editors/vscode/syntaxes/flick.tmLanguage.json", { with: { type: "json" } }),
+      import("../../../editors/vscode/syntaxes/fln.tmLanguage.json", { with: { type: "json" } }),
     ]);
     const { promise, resolve } = Promise.withResolvers<void>();
     if (typeof requestIdleCallback === "function") requestIdleCallback(() => resolve(), { timeout: 1000 });
@@ -51,7 +52,11 @@ export const loadHighlighting = (): Promise<void> => {
     highlighter = await createHighlighterCore({
       engine: createJavaScriptRegexEngine(),
       themes: [theme],
-      langs: [{ ...flick.default, name: "flick" } as LanguageRegistration, javascript.default],
+      langs: [
+        { ...flick.default, name: "flick" } as LanguageRegistration,
+        { ...fln.default, name: "fln" } as LanguageRegistration,
+        javascript.default,
+      ],
     });
   })().catch((error: unknown) => {
     loading = undefined;

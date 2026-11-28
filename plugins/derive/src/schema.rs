@@ -13,9 +13,19 @@ use crate::ty::Ty;
 pub type Fail = (String, String);
 
 /// The Prelude's types that take no argument, with their schemas.
-const PRIMITIVES: [(&str, &str); 8] = [
+const PRIMITIVES: [(&str, &str); 18] = [
     ("Int", "Schema.int"),
+    ("Int8", "Schema.int8"),
+    ("Int16", "Schema.int16"),
+    ("Int32", "Schema.int"),
+    ("Int64", "Schema.int64"),
+    ("UInt8", "Schema.uint8"),
+    ("Byte", "Schema.uint8"),
+    ("UInt16", "Schema.uint16"),
+    ("UInt32", "Schema.uint32"),
+    ("UInt64", "Schema.uint64"),
     ("Float", "Schema.number"),
+    ("Float32", "Schema.float32"),
     ("String", "Schema.string"),
     ("Bool", "Schema.bool"),
     ("BigInt", "Schema.bigint"),

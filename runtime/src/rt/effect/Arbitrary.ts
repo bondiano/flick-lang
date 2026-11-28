@@ -41,7 +41,15 @@ const fromSchema = (schema: Witness, random: Random, size: number, depth = 0): D
   const next = (child: Witness): Draw<unknown> => fromSchema(child, random, Math.max(0, size - 1), depth + 1);
   switch (node.kind) {
     case "number": return drawn(choice(random, Math.max(1, size * 4 + 1)) - size);
+    case "float32": return drawn(Math.fround(choice(random, Math.max(1, size * 4 + 1)) - size));
     case "int": return drawn(choice(random, Math.max(1, size * 4 + 1)) - size);
+    case "int8": return drawn(choice(random, 256) - 128);
+    case "int16": return drawn(choice(random, 65536) - 32768);
+    case "uint8": return drawn(choice(random, 256));
+    case "uint16": return drawn(choice(random, 65536));
+    case "uint32": return drawn(choice(random, Math.max(1, size * 4 + 1)));
+    case "int64": return drawn(BigInt(choice(random, Math.max(1, size * 4 + 1)) - size));
+    case "uint64": return drawn(BigInt(choice(random, Math.max(1, size * 4 + 1))));
     case "bigint": return drawn(BigInt(choice(random, Math.max(1, size * 4 + 1)) - size));
     case "string": return drawn(word(random, size));
     case "bool": return drawn(random() < 0.5);
@@ -51,7 +59,7 @@ const fromSchema = (schema: Witness, random: Random, size: number, depth = 0): D
     case "never":
     case "opaque": return undefined;
     case "literals": return node.values.length ? drawn(node.values[choice(random, node.values.length)]) : undefined;
-    case "enum-tags": return node.pairs.length ? drawn({ _tag: node.pairs[choice(random, node.pairs.length)]?.[0] }) : undefined;
+    case "enum-tags": return node.pairs.length ? drawn(node.pairs[choice(random, node.pairs.length)]?.[1]) : undefined;
     case "option": {
       if (size === 0 || random() < 0.35) return drawn(none);
       const item = next(node.item);

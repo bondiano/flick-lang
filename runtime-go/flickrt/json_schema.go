@@ -127,15 +127,25 @@ func (x *schemaExport) schema(s *Schema, path string) Value {
 			x.defs.put(s.name, x.schema(s.target, path))
 		}
 		return Rec("$ref", "#/$defs/"+s.name)
-	case kindNumber:
+	case kindNumber, kindFloat32:
 		return Rec("type", "number")
 	case kindInt:
 		return Rec(append([]Value{"type", "integer"}, int32Bounds...)...)
+	case kindInt8:
+		return Rec("type", "integer", "minimum", float64(-128), "maximum", float64(127))
+	case kindInt16:
+		return Rec("type", "integer", "minimum", float64(-32768), "maximum", float64(32767))
+	case kindUInt8:
+		return Rec("type", "integer", "minimum", float64(0), "maximum", float64(255))
+	case kindUInt16:
+		return Rec("type", "integer", "minimum", float64(0), "maximum", float64(65535))
+	case kindUInt32:
+		return Rec("type", "integer", "minimum", float64(0), "maximum", float64(4294967295))
 	case kindString:
 		return Rec("type", "string")
 	case kindBool:
 		return Rec("type", "boolean")
-	case kindBigint:
+	case kindBigint, kindInt64, kindUInt64:
 		return Rec("type", "string", "pattern", "^-?[0-9]+$")
 	case kindUnit:
 		return Rec("type", "null")

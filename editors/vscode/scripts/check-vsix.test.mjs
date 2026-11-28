@@ -35,6 +35,7 @@ const vsix = ({ bundle = bundled, version = "0.1.0", grammar = "{}" } = {}) => {
   );
   writeFileSync(path.join(extension, "dist", "extension.js"), bundle);
   writeFileSync(path.join(extension, "syntaxes", "flick.tmLanguage.json"), grammar);
+  writeFileSync(path.join(extension, "syntaxes", "fln.tmLanguage.json"), grammar);
   writeFileSync(path.join(extension, "language-configuration.json"), "{}");
   return dir;
 };

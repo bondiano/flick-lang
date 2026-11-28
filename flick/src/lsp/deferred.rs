@@ -10,6 +10,7 @@ use tracing::warn;
 use super::Server;
 use super::protocol;
 use super::snapshot::Context;
+use crate::fln_files;
 
 /// A request waiting for the analysis of a document it reads.
 pub(super) struct Deferred {
@@ -57,6 +58,9 @@ impl Server {
         else {
             return false;
         };
+        if fln_files::is_fln_path(&path) {
+            return false;
+        }
         let context = Context::of(&self.docs, &path);
         self.pending.contains_key(&context)
     }

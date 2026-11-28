@@ -7,6 +7,7 @@ use flick_ir::BinOp;
 use super::expr_builder::{ExprBuilder, arm};
 use super::std_schema_rt::{meta_con, pair_pat, rt, triple_pat};
 use super::std_schema_rt_block::make_block_codec_helper;
+use super::std_schema_rt_fln::{decode_fln_helper, encode_fln_helper};
 use super::std_schema_rt_tree::{check_tree_helper, decode_tree_helper, encode_tree_helper};
 use super::{Expr, Pat, Span, Stmt};
 
@@ -21,6 +22,8 @@ pub(super) fn helper_expr(name: &str, span: Span) -> Option<Expr> {
         "check_tree" => Some(check_tree_helper(&b)),
         "decode_tree" => Some(decode_tree_helper(&b)),
         "encode_tree" => Some(encode_tree_helper(&b)),
+        "decode_fln" => Some(decode_fln_helper(&b)),
+        "encode_fln" => Some(encode_fln_helper(&b)),
         _ => None,
     }
 }

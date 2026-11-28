@@ -471,3 +471,58 @@ fn definition_reaches_into_installed_packages() {
     );
     lsp.close();
 }
+
+#[test]
+fn lsp_serves_fln_diagnostics_and_formatting_over_stdio() {
+    let dir = project(
+        "lsp_fln_stdio",
+        &[
+            ("flick.toml", LIB),
+            ("src/App/Domain.fl", DOMAIN),
+            (
+                "config.fln",
+                "{   host  =  \"localhost\";  port  =  8080u16  }\n",
+            ),
+        ],
+    );
+    let fln = dir.join("config.fln");
+    let fln_uri = uri(&fln);
+    let mut lsp = Lsp::start(&dir);
+
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({
+            "textDocument": {
+                "uri": fln_uri,
+                "languageId": "fln",
+                "version": 1,
+                "text": "{   host  =  \"localhost\";  port  =  8080u16  }\n"
+            }
+        }),
+    );
+    assert!(lsp.diagnostics(&fln_uri).is_empty());
+
+    let formatted = lsp.request(
+        "textDocument/formatting",
+        &json!({ "textDocument": { "uri": fln_uri }, "options": { "tabSize": 2, "insertSpaces": true } }),
+    )["result"][0]["newText"]
+        .as_str()
+        .expect("formatted text")
+        .to_owned();
+    assert_eq!(formatted, "{ host = \"localhost\"; port = 8080u16 }\n");
+
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({
+            "textDocument": { "uri": fln_uri, "version": 2 },
+            "contentChanges": [{ "text": "{\n  host = [\n}\n" }]
+        }),
+    );
+    let diags = lsp.diagnostics(&fln_uri);
+    assert!(
+        !diags.is_empty(),
+        "expected syntax diagnostic for malformed .fln"
+    );
+    assert_eq!(diags[0]["code"], "FLICK-S007");
+    lsp.close();
+}

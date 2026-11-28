@@ -25,6 +25,7 @@ export const REQUIRED = [
   "extension/package.json",
   "extension/dist/extension.js",
   "extension/syntaxes/flick.tmLanguage.json",
+  "extension/syntaxes/fln.tmLanguage.json",
   "extension/language-configuration.json",
 ];
 

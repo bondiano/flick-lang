@@ -199,7 +199,13 @@ pub(super) fn accepts_leaf(
     let kind = heap.string_lossy(kind_val)?;
     let ok = match kind.as_str() {
         "number"
+        | "float32"
         | "int"
+        | "int8"
+        | "int16"
+        | "uint8"
+        | "uint16"
+        | "uint32"
         | "natural"
         | "port"
         | "duration_millis"
@@ -208,6 +214,8 @@ pub(super) fn accepts_leaf(
         | "datetime_zone_offset" => number_of(input).is_some(),
         "string"
         | "bigint"
+        | "int64"
+        | "uint64"
         | "trim"
         | "to_lower"
         | "to_upper"
@@ -459,7 +467,8 @@ pub(super) fn decode_leaf(
         }
         "natural" => decode_checked_number(heap, input, 0.0, None, None),
         "port" => decode_checked_number(heap, input, 0.0, Some(65535.0), Some("a port number")),
-        _ => decode_std_leaf(heap, &kind, input),
+        _ => super::schema_fln_leaves::decode_extra_leaf(heap, &kind, input)
+            .unwrap_or_else(|| decode_std_leaf(heap, &kind, input)),
     }
 }
 

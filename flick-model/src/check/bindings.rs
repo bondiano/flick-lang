@@ -138,7 +138,34 @@ impl Checker<'_> {
         }
     }
 
+    /// Type-check or infer the right-hand side of a `let` binding.
+    fn let_rhs(&mut self, sig: Option<&Scheme>, e1: &Term) -> Check<Scheme> {
+        if let Some(s) = sig {
+            self.signed(e1, s, None)
+        } else {
+            self.level += 1;
+            let outer = mem::replace(&mut self.stage, Stage::Pure);
+            let t1 = self.infer(e1);
+            let inner = mem::replace(&mut self.stage, outer);
+            self.level -= 1;
+            let t1 = t1?;
+            if inner == Stage::Pure {
+                Ok(self.generalize(&t1))
+            } else {
+                // the result of a runtime step is not generalized, by a
+                // later `let` either
+                self.perform(&inner)?;
+                self.lower(&t1, self.level);
+                Ok(mono(t1))
+            }
+        }
+    }
+
     /// (Let-Gen), (Let-Mono) and (Let-Sig).
+    ///
+    /// Sequential `let` chains in a block iterate rather than recursing through
+    /// `check`/`infer` -> `let_` -> `body`, keeping long blocks within a 2 MiB
+    /// test stack.
     pub(super) fn let_(
         &mut self,
         whole: &Term,
@@ -148,55 +175,92 @@ impl Checker<'_> {
         e2: &Term,
         expected: Option<&Type>,
     ) -> Check<Type> {
-        if sig.is_none()
-            && let Some((owner, target)) = operand_call(x, e1, e2)
-        {
-            return self.operand_let(whole, owner, target, expected);
-        }
-        let s = if let Some(s) = sig {
-            self.signed(e1, s, None)?
-        } else {
-            self.level += 1;
-            let outer = mem::replace(&mut self.stage, Stage::Pure);
-            let t1 = self.infer(e1);
-            let inner = mem::replace(&mut self.stage, outer);
-            self.level -= 1;
-            let t1 = t1?;
-            if inner == Stage::Pure {
-                self.generalize(&t1)
-            } else {
-                // the result of a runtime step is not generalized, by a
-                // later `let` either
-                self.perform(&inner)?;
-                self.lower(&t1, self.level);
-                mono(t1)
+        let saved_locals = self.locals.len();
+        let mut traced_infer: Vec<&Term> = Vec::new();
+        let mut cur_whole = whole;
+        let mut cur_x = x;
+        let mut cur_sig = sig;
+        let mut cur_e1 = e1;
+        let mut cur_e2 = e2;
+
+        let result = loop {
+            if cur_sig.is_none()
+                && let Some((owner, target)) = operand_call(cur_x, cur_e1, cur_e2)
+            {
+                break self.operand_let(cur_whole, owner, target, expected);
             }
-        };
-        let bound = s.clone();
-        self.note(e1, |n| n.scheme = Some(bound));
-        let (s, opened) = self.open_let_binding(x, s, e2)?;
-        if let Some((w, sig)) = opened {
-            self.level += 1;
-            self.witness_levels.insert(w, self.level);
-            let res = self.body(x, s, e2, expected);
-            self.level -= 1;
-            let t = self.zonk(&res?);
-            let t = if expected.is_none() {
-                Self::close_witness(&t, w)
-            } else {
-                t
+            let s = match self.let_rhs(cur_sig, cur_e1) {
+                Ok(s) => s,
+                Err(err) => break Err(err),
             };
-            if self.mentions_witness(&t, w) {
-                return error(
-                    "Module",
-                    format!("abstract type of `{}` leaves its `unpack` scope", sig.name),
-                );
+            let bound = s.clone();
+            self.note(cur_e1, |n| n.scheme = Some(bound));
+            let (s, opened) = match self.open_let_binding(cur_x, s, cur_e2) {
+                Ok(v) => v,
+                Err(err) => break Err(err),
+            };
+            if let Some((w, sig)) = opened {
+                self.level += 1;
+                self.witness_levels.insert(w, self.level);
+                let res = self.body(cur_x, s, cur_e2, expected);
+                self.level -= 1;
+                let t = match res {
+                    Ok(t) => self.zonk(&t),
+                    Err(err) => break Err(err),
+                };
+                let t = if expected.is_none() {
+                    Self::close_witness(&t, w)
+                } else {
+                    t
+                };
+                if self.mentions_witness(&t, w) {
+                    break error(
+                        "Module",
+                        format!("abstract type of `{}` leaves its `unpack` scope", sig.name),
+                    );
+                }
+                self.lower(&t, self.level);
+                break Ok(t);
             }
-            self.lower(&t, self.level);
-            Ok(t)
-        } else {
-            self.body(x, s, e2, expected)
+            self.locals.push((cur_x.clone(), s));
+            if let Term::Let(next_x, next_sig, next_e1, next_e2) = cur_e2 {
+                let can_continue =
+                    expected.is_none_or(|exp| !matches!(self.resolve(exp), Type::Forall(_)));
+                if can_continue {
+                    if self.trace.is_some() {
+                        if let Some(exp) = expected {
+                            let exp = exp.clone();
+                            self.note(cur_e2, |n| n.expected = Some(exp));
+                        } else {
+                            traced_infer.push(cur_e2);
+                        }
+                    }
+                    cur_whole = cur_e2;
+                    cur_x = next_x;
+                    cur_sig = next_sig.as_deref();
+                    cur_e1 = next_e1;
+                    cur_e2 = next_e2;
+                    continue;
+                }
+            }
+            break match expected {
+                Some(t) => self.check(cur_e2, t).map(|()| t.clone()),
+                None => self.infer(cur_e2),
+            };
+        };
+
+        self.locals.truncate(saved_locals);
+        if let Ok(ref t) = result
+            && self.trace.is_some()
+        {
+            for term in traced_infer.into_iter().rev() {
+                let inferred = t.clone();
+                self.note(term, |n| {
+                    n.inferred = Some(inferred);
+                });
+            }
         }
+        result
     }
 
     fn body(&mut self, x: &Name, s: Scheme, e2: &Term, expected: Option<&Type>) -> Check<Type> {

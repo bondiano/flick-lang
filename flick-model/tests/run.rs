@@ -7,7 +7,7 @@
 //! stops the model, so a case is run here or says why it is not.
 
 use std::path::{Path, PathBuf};
-use std::{env, fs, panic};
+use std::{env, fs, panic, thread};
 
 use flick_model::eval::Outcome;
 use flick_model::run;
@@ -472,4 +472,19 @@ let main () =
     );
     let ran = run::run_main(&program, &main, 100_000);
     assert_eq!(ran.stdout, "ok\n", "{:?}", ran.outcome);
+}
+
+#[test]
+fn long_stdlib_config_block_translates_and_checks_on_test_stack() {
+    let file = root().join("stdlib/effect/config.fl");
+    let handle = thread::Builder::new()
+        .stack_size(2 << 20)
+        .spawn(move || {
+            let modules = run::compile(&file).expect("config.fl compiles");
+            let program = run::program(&modules);
+            let errors = run::check(&modules, &program);
+            assert!(errors.is_empty(), "{errors:?}");
+        })
+        .expect("spawn test thread");
+    handle.join().expect("test thread must not overflow stack");
 }

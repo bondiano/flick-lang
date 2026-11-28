@@ -1,7 +1,7 @@
 //! Central `Schema.$Kind`-to-graph dispatcher (`arb_add_schema`).
 
 use super::super::expr_builder::{ExprBuilder, arm};
-use super::super::std_schema_rt::{con_app, rt, str_lit};
+use super::super::std_schema_rt::{con_app, pair_pat, rt, str_lit};
 use super::super::{Arm, Expr, Pat};
 use super::schema_arms::{
     adt_arm, chunk_arm, lazy_arm, list_arm, opt_arm, rec_arm, res_arm, tuple_arm,
@@ -71,6 +71,62 @@ fn enum_arm(b: &ExprBuilder) -> Expr {
     )
 }
 
+fn enum_tags_arm(b: &ExprBuilder) -> Expr {
+    let mids = b.gen_strict(b.each(
+        "p",
+        b.loc("pairs"),
+        b.match_(
+            b.loc("p"),
+            [arm(
+                pair_pat(b, "_n", "v"),
+                b.yield_(push_simple(
+                    b,
+                    b.list(vec![]),
+                    node_con(b, "$Literal", vec![b.loc("v")]),
+                )),
+            )],
+        ),
+    ));
+    b.block(
+        [b.let_("mids", mids)],
+        push_simple(b, b.loc("mids"), node_con(b, "$Union", vec![b.loc("mids")])),
+    )
+}
+
+pub(super) fn fixed_int_entry(b: &ExprBuilder, min: f64, max: f64, conv: &str) -> Expr {
+    raw_entry(
+        b,
+        b.list(vec![]),
+        node_con(
+            b,
+            "$Number",
+            vec![
+                b.some(b.float(min)),
+                b.some(b.float(max)),
+                str_lit(b, "integer"),
+            ],
+        ),
+        b.list(vec![]),
+        b.some(rt(b, conv)),
+        false,
+    )
+}
+
+fn fixed_bigint_entry(b: &ExprBuilder, min: &str, max: &str, conv: &str) -> Expr {
+    raw_entry(
+        b,
+        b.list(vec![]),
+        node_con(
+            b,
+            "$BigInt",
+            vec![b.some(b.bigint(min)), b.some(b.bigint(max)), b.bigint("0")],
+        ),
+        b.list(vec![]),
+        b.some(rt(b, conv)),
+        false,
+    )
+}
+
 fn kind_pat(b: &ExprBuilder, c: &str, names: &[&str]) -> Pat {
     let args = names
         .iter()
@@ -85,13 +141,25 @@ fn kind_pat(b: &ExprBuilder, c: &str, names: &[&str]) -> Pat {
     Pat::Con(ExprBuilder::con("Schema", "$Kind", c, names.len()), args)
 }
 
-fn scalar_kind_arms(b: &ExprBuilder) -> [Arm; 8] {
+#[expect(
+    clippy::too_many_lines,
+    reason = "closed scalar Schema.$Kind arbitrary arms"
+)]
+fn scalar_kind_arms(b: &ExprBuilder) -> [Arm; 16] {
     let num_entry = raw_entry(
         b,
         b.list(vec![]),
         b.app(rt(b, "Helper.arb_build_number"), b.loc("c_opt")),
         b.if_(b.loc("wire"), b.list([wire_finite_fn(b)]), b.list(vec![])),
         b.none(),
+        false,
+    );
+    let f32_entry = raw_entry(
+        b,
+        b.list(vec![]),
+        b.app(rt(b, "Helper.arb_build_number"), b.loc("c_opt")),
+        b.if_(b.loc("wire"), b.list([wire_finite_fn(b)]), b.list(vec![])),
+        b.some(rt(b, "FixedWidth.ToFloat32")),
         false,
     );
     let int_entry = raw_entry(
@@ -108,8 +176,73 @@ fn scalar_kind_arms(b: &ExprBuilder) -> [Arm; 8] {
             push_node(b, b.loc("ctx"), num_entry),
         ),
         arm(
+            kind_pat(b, "$Float32", &[]),
+            push_node(b, b.loc("ctx"), f32_entry),
+        ),
+        arm(
             kind_pat(b, "$Int", &[]),
             push_node(b, b.loc("ctx"), int_entry),
+        ),
+        arm(
+            kind_pat(b, "$Int8", &[]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_int_entry(b, -128.0, 127.0, "FixedWidth.ToInt8"),
+            ),
+        ),
+        arm(
+            kind_pat(b, "$Int16", &[]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_int_entry(b, -32_768.0, 32_767.0, "FixedWidth.ToInt16"),
+            ),
+        ),
+        arm(
+            kind_pat(b, "$Int64", &[]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_bigint_entry(
+                    b,
+                    "-9223372036854775808",
+                    "9223372036854775807",
+                    "FixedWidth.ToInt64",
+                ),
+            ),
+        ),
+        arm(
+            kind_pat(b, "$UInt8", &[]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_int_entry(b, 0.0, 255.0, "FixedWidth.ToUInt8"),
+            ),
+        ),
+        arm(
+            kind_pat(b, "$UInt16", &[]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_int_entry(b, 0.0, 65_535.0, "FixedWidth.ToUInt16"),
+            ),
+        ),
+        arm(
+            kind_pat(b, "$UInt32", &[]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_int_entry(b, 0.0, 4_294_967_295.0, "FixedWidth.ToUInt32"),
+            ),
+        ),
+        arm(
+            kind_pat(b, "$UInt64", &[]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_bigint_entry(b, "0", "18446744073709551615", "FixedWidth.ToUInt64"),
+            ),
         ),
         arm(
             kind_pat(b, "$String", &[]),
@@ -166,6 +299,7 @@ pub(super) fn add_schema_helper(b: &ExprBuilder) -> Expr {
             refined_arm(b),
         ),
         arm(kind_pat(b, "$Enum", &["vals"]), enum_arm(b)),
+        arm(kind_pat(b, "$EnumTags", &["pairs"]), enum_tags_arm(b)),
         arm(
             kind_pat(b, "$Duration", &[]),
             b.app2(

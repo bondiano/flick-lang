@@ -1,0 +1,218 @@
+// Pure FLN parsing, formatting, spans, errors, and typed value helpers.
+module Language.Fln exposing (tests)
+
+assert_roundtrip : String -> Fln.Value -> Test.Assertion
+let assert_roundtrip src expected =
+  match Fln.parse src with
+  | Err err -> Test.is_true ("parse failed: " ++ Fln.format_parse_error err) false
+  | Ok parsed ->
+    let compact = Fln.stringify parsed
+    let pretty = Fln.pretty parsed
+    let ok_parsed = parsed == expected
+    let ok_compact =
+      match Fln.parse compact with
+      | Ok v -> v == expected
+      | Err _ -> false
+    let ok_pretty =
+      match Fln.parse pretty with
+      | Ok v -> v == expected
+      | Err _ -> false
+    Test.equal
+      "ok"
+      (
+        if ok_parsed && ok_compact && ok_pretty then
+          "ok"
+        else
+          "parsed=" ++ Fln.stringify parsed ++ " expected=" ++ Fln.stringify expected
+      )
+
+assert_parse_err : String -> Int -> Int -> Test.Assertion
+let assert_parse_err src want_line want_col =
+  match Fln.parse src with
+  | Ok v -> Test.is_true ("expected parse error, got " ++ Fln.stringify v) false
+  | Err (Fln.ParseError err) ->
+    Test.equal
+      (show want_line ++ ":" ++ show want_col ++ ":true")
+      (show err.line ++ ":" ++ show err.column ++ ":" ++ show (String.length err.message > 0))
+
+tests : List Test.Test
+let tests = [
+  Test.group "scalars and literals" [
+    Test.test "unit" (fun () -> assert_roundtrip "()" Fln.Unit),
+    Test.test "true" (fun () -> assert_roundtrip "true" (Fln.Bool true)),
+    Test.test "false" (fun () -> assert_roundtrip "false" (Fln.Bool false)),
+    Test.test "zero" (fun () -> assert_roundtrip "0" (Fln.Int 0n None)),
+    Test.test "negative int" (fun () -> assert_roundtrip "-42" (Fln.Int (-42n) None)),
+    Test.test "underscores" (fun () -> assert_roundtrip "1_000_000" (Fln.Int 1000000n None)),
+    Test.test "hex" (fun () -> assert_roundtrip "0xFF" (Fln.Int 255n None)),
+    Test.test "octal" (fun () -> assert_roundtrip "0o755" (Fln.Int 493n None)),
+    Test.test "binary" (fun () -> assert_roundtrip "0b1010_0101" (Fln.Int 165n None)),
+    Test.test "i8 min" (fun () -> assert_roundtrip "-128i8" (Fln.Int (-128n) (Some Fln.I8))),
+    Test.test "i8 max" (fun () -> assert_roundtrip "127i8" (Fln.Int 127n (Some Fln.I8))),
+    Test.test "i16 min" (fun () -> assert_roundtrip "-32768i16" (Fln.Int (-32768n) (Some Fln.I16))),
+    Test.test "i32" (fun () -> assert_roundtrip "42i32" (Fln.Int 42n (Some Fln.I32))),
+    Test.test "i64 max" (fun () ->
+      assert_roundtrip "9223372036854775807i64" (Fln.Int 9223372036854775807n (Some Fln.I64))
+    ),
+    Test.test "u8 max" (fun () -> assert_roundtrip "255u8" (Fln.Int 255n (Some Fln.U8))),
+    Test.test "u16 max" (fun () -> assert_roundtrip "65535u16" (Fln.Int 65535n (Some Fln.U16))),
+    Test.test "u32 max" (fun () ->
+      assert_roundtrip "4294967295u32" (Fln.Int 4294967295n (Some Fln.U32))
+    ),
+    Test.test "u64 max" (fun () ->
+      assert_roundtrip "18446744073709551615u64" (Fln.Int 18446744073709551615n (Some Fln.U64))
+    ),
+    Test.test "hex f32 digits" (fun () -> assert_roundtrip "0x1f32" (Fln.Int 7986n None)),
+    Test.test "bigint small" (fun () -> assert_roundtrip "10n" (Fln.BigInt 10n)),
+    Test.test "bigint large negative" (fun () ->
+      assert_roundtrip "-99999999999999999999999999n" (Fln.BigInt (-99999999999999999999999999n))
+    ),
+    Test.test "float" (fun () -> assert_roundtrip "3.5" (Fln.Float 3.5 None)),
+    Test.test "float exponent" (fun () -> assert_roundtrip "-1.25e2" (Fln.Float (-125.0) None)),
+    Test.test "float32" (fun () -> assert_roundtrip "2.5f32" (Fln.Float 2.5 (Some Fln.F32))),
+    Test.test "float integer-valued" (fun () -> assert_roundtrip "42.0" (Fln.Float 42.0 None)),
+    Test.test "string escapes" (fun () ->
+      assert_roundtrip "\"hello\\n\\t\\\"\\\\\\0\\u{1F600}\"" (Fln.String "hello\n\t\"\\\0😀")
+    ),
+    Test.test "nul before digit" (fun () -> assert_roundtrip "\"\\u{0}5\"" (Fln.String "\u{0}5")),
+    Test.test "raw string" (fun () ->
+      assert_roundtrip "r\"C:\\temp\\{not_interp}\"" (Fln.String "C:\\temp\\{not_interp}")
+    ),
+    Test.test "hashed raw string" (fun () ->
+      assert_roundtrip "r#\"say \"hi\"\"#" (Fln.String "say \"hi\"")
+    ),
+    Test.test "multiline string" (fun () ->
+      let multi = "\"\"\"\n    first\n      second\n\n    \\u{20}third\n    \"\"\""
+      assert_roundtrip multi (Fln.String "first\n  second\n\n third")
+    ),
+  ],
+  Test.group "collections, comments, and constructors" [
+    Test.test "empty list" (fun () -> assert_roundtrip "[]" (Fln.List [])),
+    Test.test "trailing comma list" (fun () ->
+      assert_roundtrip "[1, 2, 3,]" (Fln.List [Fln.Int 1n None, Fln.Int 2n None, Fln.Int 3n None])
+    ),
+    Test.test "parenthesized negative" (fun () -> assert_roundtrip "(-1)" (Fln.Int (-1n) None)),
+    Test.test "single-element tuple" (fun () ->
+      assert_roundtrip "(1,)" (Fln.Tuple [Fln.Int 1n None])
+    ),
+    Test.test "tuple" (fun () ->
+      assert_roundtrip
+        "(1, \"a\", true)"
+        (Fln.Tuple [Fln.Int 1n None, Fln.String "a", Fln.Bool true])
+    ),
+    Test.test "records, contextual labels, and nested comments" (fun () ->
+      let src =
+        "// leading comment\n/* outer /* nested */ comment */\n{\n  host = \"localhost\"\n  port = 8080u16;\n  orelse = 1\n  catch = 2\n  echo = 3\n  todo = 4\n}"
+      let expected =
+        Fln.Record [
+          ("host", Fln.String "localhost"),
+          ("port", Fln.Int 8080n (Some Fln.U16)),
+          ("orelse", Fln.Int 1n None),
+          ("catch", Fln.Int 2n None),
+          ("echo", Fln.Int 3n None),
+          ("todo", Fln.Int 4n None),
+        ]
+      assert_roundtrip src expected
+    ),
+    Test.test "non-reserved words accepted as record field labels (fln-literals parity)" (fun () ->
+      let src =
+        "{ alias = 1; and = 2; or = 3; handle = 4; effect = 5; pure = 6; ref = 7; while = 8; loop = 9; return = 10; pub = 11; private = 12; unboxed = 13; untagged = 14; enum = 15; refined = 16; of = 17; on = 18; arena = 19; var = 20; proof = 21; law = 22; component = 23; plugin = 24 }"
+      let expected =
+        Fln.Record [
+          ("alias", Fln.Int 1n None),
+          ("and", Fln.Int 2n None),
+          ("or", Fln.Int 3n None),
+          ("handle", Fln.Int 4n None),
+          ("effect", Fln.Int 5n None),
+          ("pure", Fln.Int 6n None),
+          ("ref", Fln.Int 7n None),
+          ("while", Fln.Int 8n None),
+          ("loop", Fln.Int 9n None),
+          ("return", Fln.Int 10n None),
+          ("pub", Fln.Int 11n None),
+          ("private", Fln.Int 12n None),
+          ("unboxed", Fln.Int 13n None),
+          ("untagged", Fln.Int 14n None),
+          ("enum", Fln.Int 15n None),
+          ("refined", Fln.Int 16n None),
+          ("of", Fln.Int 17n None),
+          ("on", Fln.Int 18n None),
+          ("arena", Fln.Int 19n None),
+          ("var", Fln.Int 20n None),
+          ("proof", Fln.Int 21n None),
+          ("law", Fln.Int 22n None),
+          ("component", Fln.Int 23n None),
+          ("plugin", Fln.Int 24n None),
+        ]
+      assert_roundtrip src expected
+    ),
+    Test.test "unqualified and qualified constructors" (fun () ->
+      let src = "App.Config { host = \"localhost\"; retries = Some (-1); mode = None }"
+      let expected =
+        Fln.Constructor ["App"] "Config" [
+          Fln.Record [
+            ("host", Fln.String "localhost"),
+            ("retries", Fln.Constructor [] "Some" [Fln.Int (-1n) None]),
+            ("mode", Fln.Constructor [] "None" []),
+          ],
+        ]
+      assert_roundtrip src expected
+    ),
+  ],
+  Test.group "spanned parse and pure helpers" [
+    Test.test "parse_spanned preserves line and column" (fun () ->
+      match Fln.parse_spanned "\n  42" with
+      | Ok node ->
+        let sp = Fln.spanned_span node
+        Test.equal
+          "2:3:42"
+          (show sp.line ++ ":" ++ show sp.column ++ ":" ++ Fln.stringify (Fln.spanned_value node))
+      | Err err -> Test.is_true (Fln.format_parse_error err) false
+    ),
+    Test.test "pure field and scalar decoders" (fun () ->
+      match Fln.parse "{ host = \"db\"; port = 5432u16; tags = [\"a\", \"b\"] }" with
+      | Err err -> Test.is_true (Fln.format_parse_error err) false
+      | Ok v ->
+        let host_s =
+          match Fln.field "host" Fln.as_string v with
+          | Ok s -> s
+          | Err _ -> "err"
+        let port_s =
+          match Fln.field "port" Fln.as_uint16 v with
+          | Ok p -> display p
+          | Err _ -> "err"
+        let tags_s =
+          match Fln.field "tags" (Fln.as_list Fln.as_string) v with
+          | Ok xs -> String.join "," xs
+          | Err _ -> "err"
+        let miss_s =
+          match Fln.field_opt "missing" Fln.as_int v with
+          | Ok None -> "none"
+          | _ -> "err"
+        Test.equal "db:5432:a,b:none" (host_s ++ ":" ++ port_s ++ ":" ++ tags_s ++ ":" ++ miss_s)
+    ),
+  ],
+  Test.group "actionable parse errors with spans" [
+    Test.test "rejects tab" (fun () -> assert_parse_err "\n\t1" 2 1),
+    Test.test "rejects interpolation escape" (fun () -> assert_parse_err "\"bad \\{interp}\"" 1 6),
+    Test.test "rejects out-of-range i8" (fun () -> assert_parse_err "128i8" 1 1),
+    Test.test "rejects negative unsigned" (fun () -> assert_parse_err "-1u8" 1 1),
+    Test.test "rejects duplicate record field" (fun () ->
+      assert_parse_err "{\n  a = 1\n  a = 2\n}" 3 3
+    ),
+    Test.test "rejects keyword label" (fun () -> assert_parse_err "{ let = 1 }" 1 3),
+    Test.test "rejects wildcard label" (fun () -> assert_parse_err "{ _ = 1 }" 1 3),
+    Test.test "rejects await label" (fun () -> assert_parse_err "{ await = 1 }" 1 3),
+    Test.test "rejects error label" (fun () -> assert_parse_err "{ error = 1 }" 1 3),
+    Test.test "rejects from label" (fun () -> assert_parse_err "{ from = 1 }" 1 3),
+    Test.test "rejects ignore label" (fun () -> assert_parse_err "{ ignore = 1 }" 1 3),
+    Test.test "rejects kind label" (fun () -> assert_parse_err "{ kind = 1 }" 1 3),
+    Test.test "rejects lazy label" (fun () -> assert_parse_err "{ lazy = 1 }" 1 3),
+    Test.test "rejects none label" (fun () -> assert_parse_err "{ none = 1 }" 1 3),
+    Test.test "rejects task label" (fun () -> assert_parse_err "{ task = 1 }" 1 3),
+    Test.test "rejects unterminated nested block comment" (fun () ->
+      assert_parse_err "/* unterminated /* nested */" 1 1
+    ),
+    Test.test "rejects trailing token" (fun () -> assert_parse_err "1 2" 1 3),
+  ],
+]

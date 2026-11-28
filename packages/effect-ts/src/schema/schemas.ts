@@ -22,8 +22,25 @@ export const annotate = (schema: AnySchema, notes: Notes): AnySchema => schema.a
 const jsonMakers = new WeakMap<AnySchema, () => AnySchema>();
 const jsonCodecs = /*#__PURE__*/ new WeakMap<AnySchema, AnySchema>();
 
-export const withJson = <S extends AnySchema>(schema: S, make: () => AnySchema): S => {
+export type FlnDesc =
+  | { readonly kind: "number" | "string" | "bool" | "int" | "bigint" | "unit" | "never" | "unknown" | "int8" | "int16" | "int64" | "uint8" | "uint16" | "uint32" | "uint64" | "float32" }
+  | { readonly kind: "list" | "option"; readonly item: AnySchema }
+  | { readonly kind: "result"; readonly error: AnySchema; readonly value: AnySchema }
+  | { readonly kind: "tuple"; readonly items: ReadonlyArray<AnySchema> }
+  | { readonly kind: "record"; readonly fields: ReadonlyArray<readonly [string, AnySchema]> }
+  | { readonly kind: "adt"; readonly variants: ReadonlyArray<Variant> }
+  | { readonly kind: "lazy"; readonly get: () => AnySchema }
+  | { readonly kind: "opaque"; readonly reason: string }
+  | { readonly kind: "literals"; readonly values: ReadonlyArray<string | number> }
+  | { readonly kind: "enum-tags"; readonly pairs: ReadonlyArray<readonly [string, string | number]> }
+  | { readonly kind: "refined"; readonly name: string; readonly base: AnySchema; readonly check: (value: unknown) => boolean };
+
+const flnDescs = /*#__PURE__*/ new WeakMap<AnySchema, FlnDesc>();
+export const flnDescOf = (schema: AnySchema): FlnDesc | undefined => flnDescs.get(schema);
+
+export const withJson = <S extends AnySchema>(schema: S, make: () => AnySchema, fln?: FlnDesc): S => {
   jsonMakers.set(schema, make);
+  if (fln !== undefined) flnDescs.set(schema, fln);
   return schema;
 };
 
@@ -94,25 +111,84 @@ const jsonUnit = /*#__PURE__*/ mapped(
   () => null,
 )(Schema.Null);
 
-export const schemaInt: AnySchema = /*#__PURE__*/ withJson(Schema.Number.check(int32), () => jsonInt);
-export const schemaNumber: AnySchema = /*#__PURE__*/ withJson(Schema.Number, () => jsonNumber);
-export const schemaString: AnySchema = /*#__PURE__*/ withJson(Schema.String, () => Schema.String);
-export const schemaBool: AnySchema = /*#__PURE__*/ withJson(Schema.Boolean, () => Schema.Boolean);
-export const schemaBigint: AnySchema = /*#__PURE__*/ withJson(Schema.BigInt, () => jsonBigint);
-export const schemaUnit: AnySchema = /*#__PURE__*/ withJson(annotate(Schema.Undefined, { expected: "()" }), () => jsonUnit);
-export const schemaNever: AnySchema = /*#__PURE__*/ withJson(Schema.Never, () => Schema.Never);
-export const schemaUnknown: AnySchema = /*#__PURE__*/ withJson(Schema.Unknown, () => Schema.Unknown);
+const intGen = (span: number, offset: number) => (rng: () => number) => Math.floor(rng() * span) - offset;
+const bigintGen = (span: number, offset: number) => (rng: () => number) => BigInt(Math.floor(rng() * span) - offset);
+
+const boundedIntSchema = (
+  kind: "int8" | "int16" | "uint8" | "uint16" | "uint32",
+  label: string,
+  min: number,
+  max: number,
+  genSpan: number,
+  genOffset: number,
+): AnySchema => {
+  const message = `expected ${label}, an integer from ${min} to ${max}`;
+  const checked = Schema.Number.check(
+    Schema.isInt({ message }),
+    Schema.isBetween({ minimum: min, maximum: max }, { message }),
+  );
+  const type = annotate(checked, { expected: label, "flick/generator": intGen(genSpan, genOffset) });
+  return withJson(type, () => checked, { kind });
+};
+
+const boundedBigIntSchema = (
+  kind: "int64" | "uint64",
+  label: string,
+  min: bigint,
+  max: bigint,
+  genOffset: number,
+): AnySchema => {
+  const check = Schema.isBetweenBigInt(
+    { minimum: min, maximum: max },
+    {
+      message: `expected ${label}, an integer from ${String(min)} to ${String(max)}`,
+      "flick/wire": true,
+    } satisfies Notes,
+  );
+  const base = Schema.BigInt.check(check);
+  const type = annotate(base, { expected: label, "flick/generator": bigintGen(2000, genOffset) });
+  const json = mapped(
+    base,
+    (s: string) => BigInt(s),
+    (n) => String(n),
+  )(Schema.String.annotate({ expected: "a string of digits" }).check(digits));
+  return withJson(type, () => json, { kind });
+};
+
+export const schemaInt: AnySchema = /*#__PURE__*/ withJson(Schema.Number.check(int32), () => jsonInt, { kind: "int" });
+export const schemaInt8: AnySchema = /*#__PURE__*/ boundedIntSchema("int8", "an Int8", -128, 127, 256, 128);
+export const schemaInt16: AnySchema = /*#__PURE__*/ boundedIntSchema("int16", "an Int16", -32768, 32767, 65536, 32768);
+export const schemaInt64: AnySchema = /*#__PURE__*/ boundedBigIntSchema("int64", "an Int64", -9223372036854775808n, 9223372036854775807n, 1000);
+export const schemaUInt8: AnySchema = /*#__PURE__*/ boundedIntSchema("uint8", "a UInt8", 0, 255, 256, 0);
+export const schemaUInt16: AnySchema = /*#__PURE__*/ boundedIntSchema("uint16", "a UInt16", 0, 65535, 65536, 0);
+export const schemaUInt32: AnySchema = /*#__PURE__*/ boundedIntSchema("uint32", "a UInt32", 0, 4294967295, 2000, 0);
+export const schemaUInt64: AnySchema = /*#__PURE__*/ boundedBigIntSchema("uint64", "a UInt64", 0n, 18446744073709551615n, 0);
+export const schemaFloat32: AnySchema = /*#__PURE__*/ withJson(
+  annotate(Schema.Number, {
+    expected: "a Float32",
+    "flick/generator": (rng: () => number) => Math.fround(Math.floor(rng() * 2000) - 1000),
+  }),
+  () => jsonNumber,
+  { kind: "float32" },
+);
+export const schemaNumber: AnySchema = /*#__PURE__*/ withJson(Schema.Number, () => jsonNumber, { kind: "number" });
+export const schemaString: AnySchema = /*#__PURE__*/ withJson(Schema.String, () => Schema.String, { kind: "string" });
+export const schemaBool: AnySchema = /*#__PURE__*/ withJson(Schema.Boolean, () => Schema.Boolean, { kind: "bool" });
+export const schemaBigint: AnySchema = /*#__PURE__*/ withJson(Schema.BigInt, () => jsonBigint, { kind: "bigint" });
+export const schemaUnit: AnySchema = /*#__PURE__*/ withJson(annotate(Schema.Undefined, { expected: "()" }), () => jsonUnit, { kind: "unit" });
+export const schemaNever: AnySchema = /*#__PURE__*/ withJson(Schema.Never, () => Schema.Never, { kind: "never" });
+export const schemaUnknown: AnySchema = /*#__PURE__*/ withJson(Schema.Unknown, () => Schema.Unknown, { kind: "unknown" });
 
 export const schemaList = (item: AnySchema): AnySchema =>
-  withJson(annotate(Schema.Array(item), { expected: "a list" }), () => Schema.Array(jsonOf(item)));
+  withJson(annotate(Schema.Array(item), { expected: "a list" }), () => Schema.Array(jsonOf(item)), { kind: "list", item });
 
 export const schemaTuple = (items: ReadonlyArray<AnySchema>): AnySchema =>
   withJson(annotate(Schema.Tuple(items), { expected: `a tuple of ${items.length}` }), () =>
-    Schema.Tuple(items.map(jsonOf)),
+    Schema.Tuple(items.map(jsonOf)), { kind: "tuple", items },
   );
 
 export const schemaOption = (item: AnySchema): AnySchema =>
-  withJson(Schema.Option(item), () => Schema.OptionFromNullOr(jsonOf(item)));
+  withJson(Schema.Option(item), () => Schema.OptionFromNullOr(jsonOf(item)), { kind: "option", item });
 
 interface Wire {
   readonly ok?: unknown;
@@ -131,16 +207,21 @@ export const schemaResult = (error: AnySchema, value: AnySchema): AnySchema =>
         "flick/oneOf": true,
       }),
     ),
+    { kind: "result", error, value },
   );
 
 export const schemaRedacted = (item: AnySchema): AnySchema =>
-  withJson(Schema.Redacted(item), () => refuse("a Redacted value has no JSON form without an explicit policy"));
+  withJson(Schema.Redacted(item), () => refuse("a Redacted value has no JSON form without an explicit policy"), {
+    kind: "opaque",
+    reason: "a Redacted value has no FLN form without an explicit policy",
+  });
 
 /** A record: `fields` lists `[label, schema]`, canonicalized to UTF-16 label order. */
 export const schemaRecord = (fields: ReadonlyArray<readonly [string, AnySchema]>): AnySchema => {
   const sorted = fields.toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   return withJson(annotate(Schema.Struct(Object.fromEntries(sorted)), { expected: "a record" }), () =>
     Schema.Struct(Object.fromEntries(sorted.map(([label, s]) => [label, jsonOf(s)]))),
+    { kind: "record", fields: sorted },
   );
 };
 
@@ -176,13 +257,14 @@ export const schemaAdt = (name: string, variants: ReadonlyArray<Variant>): AnySc
       ),
       { expected: "an object with a `_tag`", "flick/tags": names, "flick/oneOf": true },
     ),
+    { kind: "adt", variants },
   );
 };
 
 /** An enum: its values are its literals, and so is its wire form; with `tags`, the wire form of a variant type, `{ _tag }` of each literal's constructor. */
 export const schemaEnum = (literals: ReadonlyArray<string | number>, tags: ReadonlyArray<string> | null): AnySchema => {
   const type = Schema.Union(literals.map((l) => Schema.Literal(l)));
-  if (tags === null) return withJson(type, () => type);
+  if (tags === null) return withJson(type, () => type, { kind: "literals", values: literals });
   return withJson(type, () =>
     annotate(
       Schema.Union(
@@ -200,6 +282,7 @@ export const schemaEnum = (literals: ReadonlyArray<string | number>, tags: Reado
       ),
       { expected: "an object with a `_tag`", "flick/tags": tags, "flick/oneOf": true },
     ),
+    { kind: "enum-tags", pairs: literals.map((l, i) => [tags[i] ?? "", l] as const) },
   );
 };
 
@@ -217,7 +300,7 @@ export const schemaRefined = (
       "flick/known": known,
       "flick/refined": name,
     } satisfies Notes);
-  return withJson(base.check(filter()), () => jsonOf(base).check(filter()));
+  return withJson(base.check(filter()), () => jsonOf(base).check(filter()), { kind: "refined", name, base, check: checked });
 };
 
 /** A reference resolved on use: recursive and mutually recursive types. */
@@ -230,13 +313,14 @@ export const schemaLazy = (name: string, get: () => AnySchema): AnySchema => {
       Schema.suspend(() => jsonOf(once())),
       { "flick/ref": name },
     ),
+    { kind: "lazy", get: once },
   );
 };
 
 /** A type whose owner gives no wire form, as a scoped resource. */
 export const schemaOpaque = (name: string, reason: string): AnySchema =>
-  withJson(annotate(Schema.Unknown, { expected: name }), () => refuse(reason));
+  withJson(annotate(Schema.Unknown, { expected: name }), () => refuse(reason), { kind: "opaque", reason });
 
 /** A schema with an explicit generator for property tests. */
 export const schemaWithGenerator = (gen: (rng: Rng) => unknown, schema: AnySchema): AnySchema =>
-  withJson(annotate(schema, { "flick/generator": gen }), () => jsonOf(schema));
+  withJson(annotate(schema, { "flick/generator": gen }), () => jsonOf(schema), flnDescOf(schema));

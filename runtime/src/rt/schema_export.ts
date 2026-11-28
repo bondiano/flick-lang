@@ -31,10 +31,18 @@ const exportSchema = (schema: Witness, path: string, defs: Map<string, JsonSchem
   const description = schemaDescription(schema);
   if (!description) throw new Unsupported(path, "a schema made outside Flick has no canonical JSON form", true);
   switch (description.kind) {
-    case "number": return { type: "number" };
+    case "number":
+    case "float32": return { type: "number" };
     case "string": return { type: "string" };
     case "bool": return { type: "boolean" };
     case "int": return { type: "integer", minimum: -2147483648, maximum: 2147483647 };
+    case "int8": return { type: "integer", minimum: -128, maximum: 127 };
+    case "int16": return { type: "integer", minimum: -32768, maximum: 32767 };
+    case "uint8": return { type: "integer", minimum: 0, maximum: 255 };
+    case "uint16": return { type: "integer", minimum: 0, maximum: 65535 };
+    case "uint32": return { type: "integer", minimum: 0, maximum: 4294967295 };
+    case "int64":
+    case "uint64":
     case "bigint": return { type: "string", pattern: "^-?[0-9]+$" };
     case "unit": return { type: "null" };
     case "never": return false;

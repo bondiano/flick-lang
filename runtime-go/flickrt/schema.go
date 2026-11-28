@@ -41,6 +41,14 @@ type schemaKind int
 const (
 	kindNumber schemaKind = iota
 	kindInt
+	kindInt8
+	kindInt16
+	kindInt64
+	kindUInt8
+	kindUInt16
+	kindUInt32
+	kindUInt64
+	kindFloat32
 	kindString
 	kindBool
 	kindBigint
@@ -72,6 +80,14 @@ func sch(v Value) *Schema { return v.(*Schema) }
 var (
 	SchemaNumber  Value = &Schema{kind: kindNumber}
 	SchemaInt     Value = &Schema{kind: kindInt}
+	SchemaInt8    Value = &Schema{kind: kindInt8}
+	SchemaInt16   Value = &Schema{kind: kindInt16}
+	SchemaInt64   Value = &Schema{kind: kindInt64}
+	SchemaUInt8   Value = &Schema{kind: kindUInt8}
+	SchemaUInt16  Value = &Schema{kind: kindUInt16}
+	SchemaUInt32  Value = &Schema{kind: kindUInt32}
+	SchemaUInt64  Value = &Schema{kind: kindUInt64}
+	SchemaFloat32 Value = &Schema{kind: kindFloat32}
 	SchemaString  Value = &Schema{kind: kindString}
 	SchemaBool    Value = &Schema{kind: kindBool}
 	SchemaBigint  Value = &Schema{kind: kindBigint}
@@ -199,10 +215,10 @@ func (w *wire) accepts(in Value) bool {
 	switch s.kind {
 	case kindRefined:
 		return s.item.jsonOf().accepts(in)
-	case kindNumber, kindInt:
+	case kindNumber, kindInt, kindInt8, kindInt16, kindUInt8, kindUInt16, kindUInt32, kindFloat32:
 		_, ok := number(in)
 		return ok
-	case kindString, kindBigint:
+	case kindString, kindBigint, kindInt64, kindUInt64:
 		_, ok := in.(string)
 		return ok
 	case kindBool:
@@ -250,6 +266,83 @@ func (w *wire) decode(fb *Fiber, in Value) (Value, []issue) {
 			return nil, fail("expected an Int, an integer from -2147483648 to 2147483647")
 		}
 		return int32(x), nil
+	case kindInt8:
+		x, ok := number(in)
+		if !ok {
+			return nil, expected("an Int8", in)
+		}
+		if x != math.Trunc(x) || x < -128 || x > 127 {
+			return nil, fail("expected an Int8, an integer from -128 to 127")
+		}
+		return int8(x), nil
+	case kindInt16:
+		x, ok := number(in)
+		if !ok {
+			return nil, expected("an Int16", in)
+		}
+		if x != math.Trunc(x) || x < -32768 || x > 32767 {
+			return nil, fail("expected an Int16, an integer from -32768 to 32767")
+		}
+		return int16(x), nil
+	case kindInt64:
+		text, ok := in.(string)
+		if !ok {
+			return nil, expected("a string of digits", in)
+		}
+		if !digitsPattern.re().MatchString(text) {
+			return nil, fail("expected a string of digits")
+		}
+		n, err := strconv.ParseInt(text, 10, 64)
+		if err != nil {
+			return nil, fail("expected an Int64, an integer from -9223372036854775808 to 9223372036854775807")
+		}
+		return n, nil
+	case kindUInt8:
+		x, ok := number(in)
+		if !ok {
+			return nil, expected("a UInt8", in)
+		}
+		if x != math.Trunc(x) || x < 0 || x > 255 {
+			return nil, fail("expected a UInt8, an integer from 0 to 255")
+		}
+		return uint8(x), nil
+	case kindUInt16:
+		x, ok := number(in)
+		if !ok {
+			return nil, expected("a UInt16", in)
+		}
+		if x != math.Trunc(x) || x < 0 || x > 65535 {
+			return nil, fail("expected a UInt16, an integer from 0 to 65535")
+		}
+		return uint16(x), nil
+	case kindUInt32:
+		x, ok := number(in)
+		if !ok {
+			return nil, expected("a UInt32", in)
+		}
+		if x != math.Trunc(x) || x < 0 || x > math.MaxUint32 {
+			return nil, fail("expected a UInt32, an integer from 0 to 4294967295")
+		}
+		return uint32(x), nil
+	case kindUInt64:
+		text, ok := in.(string)
+		if !ok {
+			return nil, expected("a string of digits", in)
+		}
+		if !digitsPattern.re().MatchString(text) {
+			return nil, fail("expected a string of digits")
+		}
+		n, err := strconv.ParseUint(text, 10, 64)
+		if err != nil {
+			return nil, fail("expected a UInt64, an integer from 0 to 18446744073709551615")
+		}
+		return n, nil
+	case kindFloat32:
+		x, ok := number(in)
+		if !ok || math.IsNaN(x) || math.IsInf(x, 0) || math.IsInf(float64(float32(x)), 0) {
+			return nil, expected("a finite Float32", in)
+		}
+		return float32(x), nil
 	case kindString:
 		if _, ok := in.(string); !ok {
 			return nil, expected("a string", in)
@@ -438,6 +531,26 @@ func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 		return x, nil
 	case kindInt:
 		return float64(v.(int32)), nil
+	case kindInt8:
+		return float64(v.(int8)), nil
+	case kindInt16:
+		return float64(v.(int16)), nil
+	case kindInt64:
+		return strconv.FormatInt(v.(int64), 10), nil
+	case kindUInt8:
+		return float64(v.(uint8)), nil
+	case kindUInt16:
+		return float64(v.(uint16)), nil
+	case kindUInt32:
+		return float64(v.(uint32)), nil
+	case kindUInt64:
+		return strconv.FormatUint(v.(uint64), 10), nil
+	case kindFloat32:
+		x := float64(v.(float32))
+		if math.IsNaN(x) || math.IsInf(x, 0) {
+			return nil, fail(ShowNumber(x) + " has no JSON form")
+		}
+		return x, nil
 	case kindBigint:
 		return v.(*big.Int).String(), nil
 	case kindUnit:

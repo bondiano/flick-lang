@@ -1,0 +1,584 @@
+/// Flick Literal Notation (`.fln`): pure parsing, formatting, and value helpers
+/// for Flick's human-readable data format.
+module Fln exposing (..)
+
+import BigInt
+import Float32
+import Fln.Lex
+import Fln.Parse
+import Int16
+import Int32
+import Int64
+import Int8
+import UInt16
+import UInt32
+import UInt64
+import UInt8
+
+/// A source span in UTF-16 code-unit offsets and 1-based line/column positions.
+type alias Span = {
+  start : Int
+  end : Int
+  line : Int
+  column : Int
+  end_line : Int
+  end_column : Int
+}
+
+/// An explicit fixed-width numeric suffix on an FLN numeric literal.
+type NumSuffix = I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64 | F32
+  deriving Eq, Show
+
+/// An FLN value.
+type Value =
+  | Unit
+  | Bool Bool
+  | Int BigInt (Option NumSuffix)
+  | BigInt BigInt
+  | Float Float (Option NumSuffix)
+  | String String
+  | Tuple (List Value)
+  | List (List Value)
+  | Record (List (String, Value))
+  | Constructor (List String) String (List Value)
+  deriving Show
+
+eq_list : (a -> a -> Bool) -> List a -> List a -> Bool
+let rec eq_list f xs ys =
+  match xs with
+  | [] ->
+    match ys with
+    | [] -> true
+    | _ -> false
+  | [xh, ...xt] ->
+    match ys with
+    | [yh, ...yt] -> if f xh yh then eq_list f xt yt else false
+    | [] -> false
+
+eq_opt_suffix : Option NumSuffix -> Option NumSuffix -> Bool
+let eq_opt_suffix a b =
+  match a with
+  | None ->
+    match b with
+    | None -> true
+    | Some _ -> false
+  | Some sa ->
+    match b with
+    | Some sb -> sa == sb
+    | None -> false
+
+eq_value : Value -> Value -> Bool
+let rec eq_value a b =
+  match a with
+  | Unit ->
+    match b with
+    | Unit -> true
+    | _ -> false
+  | Bool x ->
+    match b with
+    | Bool y -> x == y
+    | _ -> false
+  | Int x sx ->
+    match b with
+    | Int y sy -> x == y && eq_opt_suffix sx sy
+    | _ -> false
+  | BigInt x ->
+    match b with
+    | BigInt y -> x == y
+    | _ -> false
+  | Float x sx ->
+    match b with
+    | Float y sy -> x == y && eq_opt_suffix sx sy
+    | _ -> false
+  | String x ->
+    match b with
+    | String y -> x == y
+    | _ -> false
+  | Tuple xs ->
+    match b with
+    | Tuple ys -> eq_list eq_value xs ys
+    | _ -> false
+  | List xs ->
+    match b with
+    | List ys -> eq_list eq_value xs ys
+    | _ -> false
+  | Record xs ->
+    match b with
+    | Record ys -> eq_list (fun (k1, v1) (k2, v2) -> k1 == k2 && eq_value v1 v2) xs ys
+    | _ -> false
+  | Constructor p1 n1 a1 ->
+    match b with
+    | Constructor p2 n2 a2 ->
+      n1 == n2 && eq_list (fun s1 s2 -> s1 == s2) p1 p2 && eq_list eq_value a1 a2
+    | _ -> false
+
+instance Eq Value =
+  let eq a b = eq_value a b
+
+/// An FLN value retaining source spans on every node.
+type SpannedValue =
+  | SpannedUnit Span
+  | SpannedBool Span Bool
+  | SpannedInt Span BigInt (Option NumSuffix)
+  | SpannedBigInt Span BigInt
+  | SpannedFloat Span Float (Option NumSuffix)
+  | SpannedString Span String
+  | SpannedTuple Span (List SpannedValue)
+  | SpannedList Span (List SpannedValue)
+  | SpannedRecord Span (List (String, Span, SpannedValue))
+  | SpannedConstructor Span (List String) String (List SpannedValue)
+  deriving Eq, Show
+
+/// A syntax error from parsing `.fln` text, with 1-based line and column.
+type error ParseError =
+  ParseError {
+    message : String
+    line : Int
+    column : Int
+    offset : Int
+    span : Span
+  }
+  deriving Eq, Show
+
+/// A typed decoding error from reading an FLN value.
+type error DecodeError =
+  DecodeError {
+    path : String
+    message : String
+    span : Option Span
+  }
+  deriving Eq, Show
+
+/// Either a syntax error or a typed decoding error.
+type Error = Parse ParseError | Decode DecodeError
+  deriving Eq, Show
+
+/// Formats a `ParseError` as `line:column: message`.
+format_parse_error : ParseError -> String
+let format_parse_error (ParseError err) =
+  show err.line ++ ":" ++ show err.column ++ ": " ++ err.message
+
+/// The source span of a `SpannedValue`.
+spanned_span : SpannedValue -> Span
+let spanned_span node =
+  match node with
+  | SpannedUnit s -> s
+  | SpannedBool s _ -> s
+  | SpannedInt s _ _ -> s
+  | SpannedBigInt s _ -> s
+  | SpannedFloat s _ _ -> s
+  | SpannedString s _ -> s
+  | SpannedTuple s _ -> s
+  | SpannedList s _ -> s
+  | SpannedRecord s _ -> s
+  | SpannedConstructor s _ _ _ -> s
+
+/// Strips spans from a `SpannedValue`.
+spanned_value : SpannedValue -> Value
+let rec spanned_value node =
+  match node with
+  | SpannedUnit _ -> Unit
+  | SpannedBool _ b -> Bool b
+  | SpannedInt _ n suf -> Int n suf
+  | SpannedBigInt _ n -> BigInt n
+  | SpannedFloat _ x suf -> Float x suf
+  | SpannedString _ s -> String s
+  | SpannedTuple _ xs -> Tuple (Fln.Lex.map_list spanned_value xs)
+  | SpannedList _ xs -> List (Fln.Lex.map_list spanned_value xs)
+  | SpannedRecord _ fs -> Record (Fln.Lex.map_list (fun (k, _, v) -> (k, spanned_value v)) fs)
+  | SpannedConstructor _ path name args ->
+    Constructor path name (Fln.Lex.map_list spanned_value args)
+
+suffix_from_string : String -> Option NumSuffix
+let suffix_from_string s =
+  if s == "i8" then
+    Some I8
+  else if s == "i16" then
+    Some I16
+  else if s == "i32" then
+    Some I32
+  else if s == "i64" then
+    Some I64
+  else if s == "u8" then
+    Some U8
+  else if s == "u16" then
+    Some U16
+  else if s == "u32" then
+    Some U32
+  else if s == "u64" then
+    Some U64
+  else if s == "f32" then
+    Some F32
+  else
+    None
+
+opt_suffix_from_string : Option String -> Option NumSuffix
+let opt_suffix_from_string opt =
+  match opt with
+  | Some s -> suffix_from_string s
+  | None -> None
+
+spanned_builders : Fln.Parse.Builders SpannedValue
+let spanned_builders = {
+  unit = SpannedUnit
+  bool = SpannedBool
+  int = fun sp n suf -> SpannedInt sp n (opt_suffix_from_string suf)
+  bigint = SpannedBigInt
+  float = fun sp x suf -> SpannedFloat sp x (opt_suffix_from_string suf)
+  string = SpannedString
+  tuple = SpannedTuple
+  list = SpannedList
+  record = SpannedRecord
+  con = SpannedConstructor
+}
+
+/// Parses FLN text into a `SpannedValue` retaining spans on every node.
+parse_spanned : String -> Result ParseError SpannedValue
+let parse_spanned text = Result.map_err ParseError (Fln.Parse.parse_spanned spanned_builders text)
+
+/// Parses FLN text into a `Value`.
+parse : String -> Result ParseError Value
+let parse text = Result.map spanned_value (parse_spanned text)
+
+// --- Formatting ---
+
+suffix_to_string : Option NumSuffix -> String
+let suffix_to_string suf =
+  match suf with
+  | None -> ""
+  | Some I8 -> "i8"
+  | Some I16 -> "i16"
+  | Some I32 -> "i32"
+  | Some I64 -> "i64"
+  | Some U8 -> "u8"
+  | Some U16 -> "u16"
+  | Some U32 -> "u32"
+  | Some U64 -> "u64"
+  | Some F32 -> "f32"
+
+format_float_body : Float -> Option NumSuffix -> Result String String
+let format_float_body x suf =
+  if not (Float.is_finite x) then
+    Err "non-finite float has no FLN representation"
+  else
+    let base = Float.to_string x
+    let with_dot = if Fln.Lex.has_dot_or_exp base then base else base ++ ".0"
+    Ok (with_dot ++ suffix_to_string suf)
+
+arg_needs_parens : Value -> Bool
+let arg_needs_parens v =
+  match v with
+  | Int n _ -> n < 0n
+  | BigInt n -> n < 0n
+  | Float x _ -> x < 0.0
+  | Constructor _ _ args -> List.length args > 0
+  | _ -> false
+
+/// Formats a `Value` as single-line FLN, failing on non-finite floats.
+try_stringify : Value -> Result String String
+let rec try_stringify v =
+  match v with
+  | Unit -> Ok "()"
+  | Bool true -> Ok "true"
+  | Bool false -> Ok "false"
+  | Int n suf -> Ok (BigInt.to_string n ++ suffix_to_string suf)
+  | BigInt n -> Ok (BigInt.to_string n ++ "n")
+  | Float x suf -> format_float_body x suf
+  | String s -> Ok (Fln.Lex.escape_string s)
+  | Tuple [x] -> Result.map (fun s -> "(" ++ s ++ ",)") (try_stringify x)
+  | Tuple xs ->
+    Result.map (fun ps -> "(" ++ String.join ", " ps ++ ")") (Fln.Lex.map_result try_stringify xs)
+  | List xs ->
+    Result.map (fun ps -> "[" ++ String.join ", " ps ++ "]") (Fln.Lex.map_result try_stringify xs)
+  | Record [] -> Ok "{}"
+  | Record fields ->
+    Result.map
+      (fun ps -> "{ " ++ String.join "; " ps ++ " }")
+      (Fln.Lex.map_result
+        (fun (k, fv) -> Result.map (fun s -> k ++ " = " ++ s) (try_stringify fv))
+        fields)
+  | Constructor path name [] -> Ok (Fln.Lex.format_con_name path name)
+  | Constructor path name args ->
+    let head = Fln.Lex.format_con_name path name
+    Result.map
+      (fun ps -> head ++ " " ++ String.join " " ps)
+      (Fln.Lex.map_result
+        (fun arg ->
+          Result.map
+            (fun s -> if arg_needs_parens arg then "(" ++ s ++ ")" else s)
+            (try_stringify arg)
+        )
+        args)
+
+/// Formats a `Value` as single-line FLN text.
+stringify : Value -> String
+let stringify v =
+  match try_stringify v with
+  | Ok s -> s
+  | Err _ -> "()"
+
+pretty_node : Int -> Int -> Value -> Result String String
+let rec pretty_node width indent v =
+  match try_stringify v with
+  | Err e -> Err e
+  | Ok flat ->
+    if indent + String.length flat <= width then
+      Ok flat
+    else
+      let next_indent = indent + 2
+      let pad = Fln.Lex.spaces next_indent
+      let close_pad = Fln.Lex.spaces indent
+      match v with
+      | List [] -> Ok "[]"
+      | List xs ->
+        Result.map
+          (fun ps -> "[\n" ++ String.join "\n" ps ++ "\n" ++ close_pad ++ "]")
+          (Fln.Lex.map_result
+            (fun item -> Result.map (fun s -> pad ++ s ++ ",") (pretty_node width next_indent item))
+            xs)
+      | Tuple [] -> Ok "()"
+      | Tuple [x] ->
+        Result.map
+          (fun s -> "(\n" ++ pad ++ s ++ ",\n" ++ close_pad ++ ")")
+          (pretty_node width next_indent x)
+      | Tuple xs ->
+        Result.map
+          (fun ps -> "(\n" ++ String.join "\n" ps ++ "\n" ++ close_pad ++ ")")
+          (Fln.Lex.map_result
+            (fun item -> Result.map (fun s -> pad ++ s ++ ",") (pretty_node width next_indent item))
+            xs)
+      | Record [] -> Ok "{}"
+      | Record fields ->
+        Result.map
+          (fun ps -> "{\n" ++ String.join "\n" ps ++ "\n" ++ close_pad ++ "}")
+          (Fln.Lex.map_result
+            (fun (k, fv) ->
+              Result.map (fun s -> pad ++ k ++ " = " ++ s) (pretty_node width next_indent fv)
+            )
+            fields)
+      | Constructor path name [single] ->
+        let head = Fln.Lex.format_con_name path name
+        Result.map
+          (fun s -> if arg_needs_parens single then head ++ " (" ++ s ++ ")" else head ++ " " ++ s)
+          (pretty_node width indent single)
+      | Constructor path name args ->
+        let head = Fln.Lex.format_con_name path name
+        Result.map
+          (fun ps -> head ++ "\n" ++ String.join "\n" ps)
+          (Fln.Lex.map_result
+            (fun arg ->
+              Result.map
+                (fun s -> pad ++ (if arg_needs_parens arg then "(" ++ s ++ ")" else s))
+                (pretty_node width next_indent arg)
+            )
+            args)
+      | _ -> Ok flat
+
+/// Pretty-prints a `Value` using the given target line width, failing on non-finite floats.
+try_pretty_with : Int -> Value -> Result String String
+let try_pretty_with width v = pretty_node width 0 v
+
+/// Pretty-prints a `Value` using Flick's 100-column layout, failing on non-finite floats.
+try_pretty : Value -> Result String String
+let try_pretty v = pretty_node 100 0 v
+
+/// Pretty-prints a `Value` using the given target line width.
+pretty_with : Int -> Value -> String
+let pretty_with width v =
+  match pretty_node width 0 v with
+  | Ok s -> s
+  | Err _ -> "()"
+
+/// Pretty-prints a `Value` using Flick's 100-column layout.
+pretty : Value -> String
+let pretty v = pretty_with 100 v
+
+// --- Pure typed decoding & encoding helpers ---
+
+decode_err : String -> String -> Result DecodeError a
+let decode_err path msg = Err (DecodeError { path = path; message = msg; span = None })
+
+prefix_err : String -> DecodeError -> DecodeError
+let prefix_err seg (DecodeError e) =
+  let next = if e.path == "" || e.path == "(root)" then seg else seg ++ "." ++ e.path
+  DecodeError { path = next; message = e.message; span = e.span }
+
+decode_int_with : String -> NumSuffix -> (BigInt -> Option a) -> Value -> Result DecodeError a
+let decode_int_with label expected convert v =
+  match v with
+  | Int n None ->
+    match convert n with
+    | Some x -> Ok x
+    | None -> decode_err "(root)" (label ++ " out of range")
+  | Int n (Some s) ->
+    if s == expected then
+      match convert n with
+      | Some x -> Ok x
+      | None -> decode_err "(root)" (label ++ " out of range")
+    else
+      decode_err "(root)" ("expected " ++ label)
+  | _ -> decode_err "(root)" ("expected " ++ label)
+
+as_unit : Value -> Result DecodeError Unit
+let as_unit v =
+  match v with
+  | Unit -> Ok ()
+  | _ -> decode_err "(root)" "expected ()"
+
+as_bool : Value -> Result DecodeError Bool
+let as_bool v =
+  match v with
+  | Bool b -> Ok b
+  | _ -> decode_err "(root)" "expected Bool"
+
+as_bigint : Value -> Result DecodeError BigInt
+let as_bigint v =
+  match v with
+  | BigInt n -> Ok n
+  | _ -> decode_err "(root)" "expected BigInt"
+
+as_int : Value -> Result DecodeError Int
+let as_int v = decode_int_with "Int" I32 Int32.from_bigint v
+
+as_int8 : Value -> Result DecodeError Int8
+let as_int8 v = decode_int_with "Int8" I8 Int8.from_bigint v
+
+as_int16 : Value -> Result DecodeError Int16
+let as_int16 v = decode_int_with "Int16" I16 Int16.from_bigint v
+
+as_int64 : Value -> Result DecodeError Int64
+let as_int64 v = decode_int_with "Int64" I64 Int64.from_bigint v
+
+as_uint8 : Value -> Result DecodeError UInt8
+let as_uint8 v = decode_int_with "UInt8" U8 UInt8.from_bigint v
+
+as_uint16 : Value -> Result DecodeError UInt16
+let as_uint16 v = decode_int_with "UInt16" U16 UInt16.from_bigint v
+
+as_uint32 : Value -> Result DecodeError UInt32
+let as_uint32 v = decode_int_with "UInt32" U32 UInt32.from_bigint v
+
+as_uint64 : Value -> Result DecodeError UInt64
+let as_uint64 v = decode_int_with "UInt64" U64 UInt64.from_bigint v
+
+as_float : Value -> Result DecodeError Float
+let as_float v =
+  match v with
+  | Float x None -> Ok x
+  | Int n None -> Ok (BigInt.to_number n)
+  | _ -> decode_err "(root)" "expected Float"
+
+as_float32 : Value -> Result DecodeError Float32
+let as_float32 v =
+  match v with
+  | Float x (Some F32) | Float x None -> Ok (Float32.from_float x)
+  | Int n None -> Ok (Float32.from_bigint n)
+  | _ -> decode_err "(root)" "expected Float32"
+
+as_string : Value -> Result DecodeError String
+let as_string v =
+  match v with
+  | String s -> Ok s
+  | _ -> decode_err "(root)" "expected String"
+
+as_list : (Value -> Result DecodeError a) -> Value -> Result DecodeError (List a)
+let as_list decode_item v =
+  match v with
+  | List xs ->
+    go : Int -> List Value -> List a -> Result DecodeError (List a)
+    let rec go i rem acc =
+      match rem with
+      | [] -> Ok (List.reverse acc)
+      | [h, ...t] ->
+        match decode_item h with
+        | Ok y -> go (i + 1) t ([y] ++ acc)
+        | Err e -> Err (prefix_err ("[" ++ show i ++ "]") e)
+    go 0 xs []
+  | _ -> decode_err "(root)" "expected List"
+
+as_tuple : Value -> Result DecodeError (List Value)
+let as_tuple v =
+  match v with
+  | Tuple xs -> Ok xs
+  | _ -> decode_err "(root)" "expected Tuple"
+
+as_record : Value -> Result DecodeError (List (String, Value))
+let as_record v =
+  match v with
+  | Record fields -> Ok fields
+  | _ -> decode_err "(root)" "expected Record"
+
+field : String -> (Value -> Result DecodeError a) -> Value -> Result DecodeError a
+let field key decode_val v =
+  match v with
+  | Record fields ->
+    match Fln.Lex.find_list (fun (k, _) -> k == key) fields with
+    | Some (_, fv) -> Result.map_err (prefix_err key) (decode_val fv)
+    | None -> decode_err key "missing field"
+  | _ -> decode_err "(root)" "expected Record"
+
+field_opt : String -> (Value -> Result DecodeError a) -> Value -> Result DecodeError (Option a)
+let field_opt key decode_val v =
+  match v with
+  | Record fields ->
+    match Fln.Lex.find_list (fun (k, _) -> k == key) fields with
+    | Some (_, fv) -> Result.map Some (Result.map_err (prefix_err key) (decode_val fv))
+    | None -> Ok None
+  | _ -> decode_err "(root)" "expected Record"
+
+as_constructor : Value -> Result DecodeError (List String, String, List Value)
+let as_constructor v =
+  match v with
+  | Constructor path name args -> Ok (path, name, args)
+  | _ -> decode_err "(root)" "expected Constructor"
+
+encode_unit : Unit -> Value
+let encode_unit () = Unit
+
+encode_bool : Bool -> Value
+let encode_bool b = Bool b
+
+encode_int : Int -> Value
+let encode_int n = Int (into n) None
+
+encode_int8 : Int8 -> Value
+let encode_int8 n = Int (Int8.to_bigint n) (Some I8)
+
+encode_int16 : Int16 -> Value
+let encode_int16 n = Int (Int16.to_bigint n) (Some I16)
+
+encode_int64 : Int64 -> Value
+let encode_int64 n = Int (Int64.to_bigint n) (Some I64)
+
+encode_uint8 : UInt8 -> Value
+let encode_uint8 n = Int (UInt8.to_bigint n) (Some U8)
+
+encode_uint16 : UInt16 -> Value
+let encode_uint16 n = Int (UInt16.to_bigint n) (Some U16)
+
+encode_uint32 : UInt32 -> Value
+let encode_uint32 n = Int (UInt32.to_bigint n) (Some U32)
+
+encode_uint64 : UInt64 -> Value
+let encode_uint64 n = Int (UInt64.to_bigint n) (Some U64)
+
+encode_bigint : BigInt -> Value
+let encode_bigint n = BigInt n
+
+encode_float : Float -> Value
+let encode_float x = Float x None
+
+encode_float32 : Float32 -> Value
+let encode_float32 x = Float (Float32.to_float x) (Some F32)
+
+encode_string : String -> Value
+let encode_string s = String s
+
+encode_list : (a -> Value) -> List a -> Value
+let encode_list f xs =
+  go : List a -> List Value -> Value
+  let rec go rem acc =
+    match rem with
+    | [] -> List (List.reverse acc)
+    | [h, ...t] -> go t ([f h] ++ acc)
+  go xs []

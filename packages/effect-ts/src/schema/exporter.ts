@@ -33,6 +33,11 @@ type Defs = Map<string, JsonSchema | null>;
 const KNOWN: Readonly<Record<string, JsonSchema>> = {
   email: { format: "email" },
   int: { type: "integer", minimum: -0x80000000, maximum: 0x7fffffff },
+  int8: { type: "integer", minimum: -128, maximum: 127 },
+  int16: { type: "integer", minimum: -32768, maximum: 32767 },
+  uint8: { type: "integer", minimum: 0, maximum: 255 },
+  uint16: { type: "integer", minimum: 0, maximum: 65535 },
+  uint32: { type: "integer", minimum: 0, maximum: 4294967295 },
   non_empty: { minLength: 1 },
   positive: { exclusiveMinimum: 0 },
 };

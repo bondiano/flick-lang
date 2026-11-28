@@ -238,7 +238,8 @@ pub(super) fn encode_leaf(
         | "datetime_zone_offset" => {
             super::datetime_ops::encode_datetime_leaf(heap, kind.as_str(), val)
         }
-        _ => Err(Error::RangeError(format!("unknown leaf encoder: {kind}"))),
+        _ => super::schema_fln_encode::encode_extra_leaf(heap, &kind, val)
+            .unwrap_or_else(|| Err(Error::RangeError(format!("unknown leaf encoder: {kind}")))),
     }
 }
 
@@ -319,7 +320,8 @@ pub(super) fn validate_leaf(
                 expected_err(heap, "BigDecimal", input)
             }
         }
-        _ => Err(Error::RangeError(format!("unknown leaf validator: {kind}"))),
+        _ => super::schema_fln_encode::validate_extra_leaf(heap, &kind, input)
+            .unwrap_or_else(|| Err(Error::RangeError(format!("unknown leaf validator: {kind}")))),
     }
 }
 

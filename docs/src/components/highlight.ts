@@ -8,17 +8,18 @@ import toml from "shiki/langs/toml.mjs";
 import typescript from "shiki/langs/typescript.mjs";
 
 import grammar from "../../../editors/vscode/syntaxes/flick.tmLanguage.json";
+import flnGrammar from "../../../editors/vscode/syntaxes/fln.tmLanguage.json";
 import { flickDark, flickLight } from "../styles/code-themes.mjs";
 
 const highlighter = await createHighlighterCore({
   engine: createJavaScriptRegexEngine(),
   themes: [flickLight, flickDark],
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the editor grammar is a TextMate grammar
-  langs: [{ ...grammar, name: "flick" } as LanguageRegistration, typescript, toml],
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the editor grammars are TextMate grammars
+  langs: [{ ...grammar, name: "flick" } as LanguageRegistration, { ...flnGrammar, name: "fln" } as LanguageRegistration, typescript, toml],
 });
 
 /** Highlighted markup in both themes; `focus` is the one line under discussion, counted from 1. */
-export const highlight = (code: string, lang: "flick" | "typescript" | "toml", focus?: number): string =>
+export const highlight = (code: string, lang: "flick" | "fln" | "typescript" | "toml", focus?: number): string =>
   highlighter.codeToHtml(code.trimEnd(), {
     lang,
     themes: { light: flickLight.name, dark: flickDark.name },

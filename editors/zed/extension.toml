@@ -15,4 +15,4 @@ path = "editors/tree-sitter-flick"
 
 [language_servers.flick]
 name = "Flick"
-languages = ["Flick"]
+languages = ["Flick", "FLN"]

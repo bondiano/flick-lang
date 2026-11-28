@@ -645,6 +645,7 @@ dependencies = [
  "flick-test-support",
  "flick-vm",
  "flick-wasm",
+ "fln",
  "insta",
  "rustix",
  "semver",

@@ -1,5 +1,6 @@
-// Links a build directory as the playground does, with `data:` URLs, and runs it.
+// Links a build directory as the playground does, with virtual blob URLs, and runs it.
 import { readdirSync, readFileSync, statSync } from "node:fs";
+import { registerHooks } from "node:module";
 import path from "node:path";
 
 import { link, packages } from "../src/playground/loader.ts";
@@ -29,5 +30,21 @@ walk("");
 const store: Record<string, Readonly<Record<string, unknown>>> = {};
 for (const spec of packages(files, entry)) store[spec] = (await import(spec)) as Readonly<Record<string, unknown>>;
 (globalThis as { __flickPackages?: unknown }).__flickPackages = store;
-const url = (code: string): string => `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
+const blobs = new Map<string, string>();
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier.startsWith("flick-blob:")) return { url: specifier, shortCircuit: true };
+    return nextResolve(specifier, context);
+  },
+  load(specifier, context, nextLoad) {
+    const source = blobs.get(specifier);
+    if (source !== undefined) return { format: "module", source, shortCircuit: true };
+    return nextLoad(specifier, context);
+  },
+});
+const url = (code: string): string => {
+  const id = `flick-blob:${blobs.size}`;
+  blobs.set(id, code);
+  return id;
+};
 await import(link(files, entry, url));

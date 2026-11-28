@@ -286,6 +286,22 @@ let main () =
               expandVariables = false
               preserveEmptyStrings = false
             }
+          FileSystem.write_fln
+            { flag = None; mode = None }
+            (dir ++ "/app.fln")
+            (Fln.Record [
+              (
+                "app",
+                Fln.Record [("name", Fln.String "fln-app"), ("port", Fln.Int 9090n (Some Fln.U16))],
+              ),
+              ("ports", Fln.List [Fln.Int 80n None, Fln.Int 443n None]),
+            ])
+          let fln_prov =
+            ConfigProvider.from_fln {
+              path = Some (dir ++ "/app.fln")
+              preserveEmptyStrings = false
+            }
+          let fln_bad = ConfigProvider.from_fln_contents { preserveEmptyStrings = false } "{ a ="
           let tree = ConfigProvider.from_dir { rootPath = Some dir; preserveEmptyStrings = false }
           let a =
             try Config.parse dot (Config.string "FROM_FILE") with
@@ -293,7 +309,37 @@ let main () =
           let b =
             try Config.parse tree (Config.nested "db" (Config.string "host")) with
             | Config.ConfigError m -> m
-          a ++ " " ++ b
+          let c =
+            try Config.parse fln_prov (Config.nested "app" (Config.string "name")) with
+            | Config.ConfigError m -> m
+          let d =
+            try Config.parse fln_prov (Config.array { separator = None } Schema.int "ports") with
+            | Config.ConfigError _ -> []
+          let bad =
+            try Config.parse fln_bad (Config.string "a") with
+            | Config.ConfigError m -> show (String.contains "invalid FLN at 1:" m)
+          let typed_path = dir ++ "/server.fln"
+          let typed =
+            try
+              FileSystem.write_fln_as
+                { flag = None; mode = None }
+                (Schema.unsafe_record [
+                  Schema.field "host" Schema.string,
+                  Schema.field "port" Schema.uint16,
+                ])
+                typed_path
+                { host = "127.0.0.1"; port = 3000u16 }
+              let got : { host : String; port : UInt16 } =
+                FileSystem.read_fln_as
+                  (Schema.unsafe_record [
+                    Schema.field "host" Schema.string,
+                    Schema.field "port" Schema.uint16,
+                  ])
+                  typed_path
+              got.host ++ ":" ++ display got.port
+            with
+            | SchemaError _ -> "schema-err"
+          a ++ " " ++ b ++ " " ++ c ++ " " ++ show d ++ " " ++ bad ++ " " ++ typed
         }
       }
     with

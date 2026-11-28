@@ -18,7 +18,7 @@ impl Server {
         };
         let fresh: Vec<String> = loaded
             .filter_map(|p| p.extension()?.to_str())
-            .filter(|e| *e != "fl")
+            .filter(|e| !matches!(*e, "fl" | "fln"))
             .filter(|e| done.insert((*e).to_owned()))
             .map(str::to_owned)
             .collect();

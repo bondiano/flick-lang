@@ -23,6 +23,7 @@ mod commands;
 #[cfg(feature = "wasm-backends")]
 mod component;
 mod fetch;
+mod fln_files;
 mod lsp;
 mod package_cache;
 mod plugins;

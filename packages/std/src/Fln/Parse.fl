@@ -1,0 +1,438 @@
+/// Recursive-descent parser and numeric literal decoder for `Fln`.
+module Fln.Parse exposing (..)
+
+import BigInt
+import Float32
+import Fln.Lex
+
+type alias Builders a = {
+  unit : Fln.Lex.Span -> a
+  bool : Fln.Lex.Span -> Bool -> a
+  int : Fln.Lex.Span -> BigInt -> Option String -> a
+  bigint : Fln.Lex.Span -> BigInt -> a
+  float : Fln.Lex.Span -> Float -> Option String -> a
+  string : Fln.Lex.Span -> String -> a
+  tuple : Fln.Lex.Span -> List a -> a
+  list : Fln.Lex.Span -> List a -> a
+  record : Fln.Lex.Span -> List (String, Fln.Lex.Span, a) -> a
+  con : Fln.Lex.Span -> List String -> String -> List a -> a
+}
+
+max_depth : Int
+let max_depth = 200
+
+min_i128 : BigInt
+let min_i128 = -170141183460469231731687303715884105728n
+
+max_i128 : BigInt
+let max_i128 = 170141183460469231731687303715884105727n
+
+parse_radix_int :
+  Int ->
+  Fln.Lex.Cursor ->
+  Fln.Lex.Cursor ->
+  Bool ->
+  Result Fln.Lex.LexError (BigInt, Fln.Lex.Cursor)
+let parse_radix_int base start c neg =
+  let base_bi = into base
+  go : Fln.Lex.Cursor -> BigInt -> Bool -> Result Fln.Lex.LexError (BigInt, Fln.Lex.Cursor)
+  let rec go cur acc has_digit =
+    let ch = Fln.Lex.peek cur
+    if ch == 95 then
+      go (Fln.Lex.bump cur) acc has_digit
+    else
+      let d = Fln.Lex.hex_val ch
+      if d >= 0 && d < base then
+        go (Fln.Lex.bump cur) (acc * base_bi + into d) true
+      else if not has_digit then
+        Fln.Lex.err_span start cur "expected digits after base prefix"
+      else
+        Ok (if neg then -acc else acc, cur)
+  go c 0n false
+
+parse_suffix :
+  Fln.Lex.Cursor ->
+  Fln.Lex.Cursor ->
+  Bool ->
+  Result Fln.Lex.LexError (Option String, Fln.Lex.Cursor)
+let parse_suffix start c allow_f32 =
+  let ch = Fln.Lex.peek c
+  if not (Fln.Lex.is_ident_start ch) then
+    Ok (None, c)
+  else
+    scan : Fln.Lex.Cursor -> Fln.Lex.Cursor
+    let rec scan cur =
+      if Fln.Lex.is_ident_cont (Fln.Lex.peek cur) then scan (Fln.Lex.bump cur) else cur
+    let end_c = scan c
+    let s = String.slice c.pos end_c.pos c.src
+    if s == "n"
+      || s == "i8"
+      || s == "i16"
+      || s == "i32"
+      || s == "i64"
+      || s == "u8"
+      || s == "u16"
+      || s == "u32"
+      || s == "u64"
+      || (allow_f32 && s == "f32") then
+      Ok (Some s, end_c)
+    else
+      Fln.Lex.err_span start end_c ("unknown numeric suffix `" ++ s ++ "`")
+
+check_int_bounds :
+  Builders a ->
+  Fln.Lex.Cursor ->
+  Fln.Lex.Cursor ->
+  BigInt ->
+  Option String ->
+  Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+let check_int_bounds b start end_c n suf =
+  let sp = Fln.Lex.make_span start end_c
+  let in_range =
+    match suf with
+    | None -> n >= min_i128 && n <= max_i128
+    | Some "i8" -> n >= -128n && n <= 127n
+    | Some "i16" -> n >= -32768n && n <= 32767n
+    | Some "i32" -> n >= -2147483648n && n <= 2147483647n
+    | Some "i64" -> n >= -9223372036854775808n && n <= 9223372036854775807n
+    | Some "u8" -> n >= 0n && n <= 255n
+    | Some "u16" -> n >= 0n && n <= 65535n
+    | Some "u32" -> n >= 0n && n <= 4294967295n
+    | Some "u64" -> n >= 0n && n <= 18446744073709551615n
+    | _ -> false
+  if in_range then
+    Ok (b.int sp n suf, end_c)
+  else
+    Fln.Lex.err_span start end_c "integer literal out of range for its type"
+
+parse_radix_with :
+  Builders a ->
+  Int ->
+  Fln.Lex.Cursor ->
+  Fln.Lex.Cursor ->
+  Bool ->
+  Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+let parse_radix_with b base start c0 neg =
+  match parse_radix_int base start (Fln.Lex.bump_n 2 c0) neg with
+  | Err e -> Err e
+  | Ok (n, c1) ->
+    match parse_suffix start c1 false with
+    | Err e -> Err e
+    | Ok (None, c2) -> check_int_bounds b start c2 n None
+    | Ok (Some "n", c2) -> Ok (b.bigint (Fln.Lex.make_span start c2) n, c2)
+    | Ok (Some suf_str, c2) -> check_int_bounds b start c2 n (Some suf_str)
+
+parse_number : Builders a -> Fln.Lex.Cursor -> Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+let parse_number b start =
+  let neg = Fln.Lex.peek start == 45
+  let c0 = if neg then Fln.Lex.bump start else start
+  let ch0 = Fln.Lex.peek c0
+  if not (Fln.Lex.is_digit ch0) then
+    Fln.Lex.err_span start c0 "expected a digit after `-`"
+  else if ch0 == 48 && (Fln.Lex.peek_at 1 c0 == 120 || Fln.Lex.peek_at 1 c0 == 88) then
+    parse_radix_with b 16 start c0 neg
+  else if ch0 == 48 && (Fln.Lex.peek_at 1 c0 == 111 || Fln.Lex.peek_at 1 c0 == 79) then
+    parse_radix_with b 8 start c0 neg
+  else if ch0 == 48 && (Fln.Lex.peek_at 1 c0 == 98 || Fln.Lex.peek_at 1 c0 == 66) then
+    parse_radix_with b 2 start c0 neg
+  else
+    scan_dec : Fln.Lex.Cursor -> BigInt -> (Fln.Lex.Cursor, BigInt)
+    let rec scan_dec cur acc =
+      let ch = Fln.Lex.peek cur
+      if Fln.Lex.is_digit ch then
+        scan_dec (Fln.Lex.bump cur) (acc * 10n + into (ch - 48))
+      else if ch == 95 then
+        scan_dec (Fln.Lex.bump cur) acc
+      else
+        (cur, acc)
+    let (c_int, int_abs) = scan_dec c0 0n
+    let (c_frac, has_dot) =
+      if Fln.Lex.peek c_int == 46 && Fln.Lex.is_digit (Fln.Lex.peek_at 1 c_int) then
+        let (cf, _) = scan_dec (Fln.Lex.bump c_int) 0n
+        (cf, true)
+      else
+        (c_int, false)
+    let exp_res =
+      if Fln.Lex.peek c_frac == 101 || Fln.Lex.peek c_frac == 69 then
+        let ce0 = Fln.Lex.bump c_frac
+        let ce1 = if Fln.Lex.peek ce0 == 43 || Fln.Lex.peek ce0 == 45 then Fln.Lex.bump ce0 else ce0
+        if not (Fln.Lex.is_digit (Fln.Lex.peek ce1)) then
+          Fln.Lex.err_span start ce1 "expected exponent digits in float literal"
+        else
+          let (ce2, _) = scan_dec ce1 0n
+          Ok (ce2, true)
+      else
+        Ok (c_frac, false)
+    match exp_res with
+    | Err e -> Err e
+    | Ok (c_num, has_exp) ->
+      let is_float = has_dot || has_exp
+      match parse_suffix start c_num true with
+      | Err e -> Err e
+      | Ok (Some "f32", c_end) ->
+        let raw = Fln.Lex.strip_underscores (String.slice start.pos c_num.pos start.src)
+        match Float.parse raw with
+        | Some x ->
+          let f32 = Float32.from_float x
+          if Float32.is_finite f32 then
+            Ok (b.float (Fln.Lex.make_span start c_end) (Float32.to_float f32) (Some "f32"), c_end)
+          else
+            Fln.Lex.err_span start c_end "float32 literal out of range"
+        | None -> Fln.Lex.err_span start c_end "invalid float literal"
+      | Ok (Some "n", c_end) ->
+        if is_float then
+          Fln.Lex.err_span start c_end "BigInt suffix `n` is not allowed on floating-point literals"
+        else
+          Ok (b.bigint (Fln.Lex.make_span start c_end) (if neg then -int_abs else int_abs), c_end)
+      | Ok (Some suf_str, c_end) ->
+        if is_float then
+          Fln.Lex.err_span
+            start
+            c_end
+            ("integer suffix `" ++ suf_str ++ "` is not allowed on floating-point literals")
+        else
+          check_int_bounds b start c_end (if neg then -int_abs else int_abs) (Some suf_str)
+      | Ok (None, c_end) ->
+        if is_float then
+          let raw = Fln.Lex.strip_underscores (String.slice start.pos c_num.pos start.src)
+          match Float.parse raw with
+          | Some x ->
+            if Float.is_finite x then
+              Ok (b.float (Fln.Lex.make_span start c_end) x None, c_end)
+            else
+              Fln.Lex.err_span start c_end "float literal overflows binary64"
+          | None -> Fln.Lex.err_span start c_end "invalid float literal"
+        else
+          check_int_bounds b start c_end (if neg then -int_abs else int_abs) None
+
+rec {
+  parse_atom : Builders a -> Int -> Fln.Lex.Cursor -> Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+  let parse_atom b depth c =
+    if depth > max_depth then
+      Fln.Lex.err_at c "nesting depth exceeds limit"
+    else
+      let ch = Fln.Lex.peek c
+      if ch == 40 then
+        parse_paren_or_tuple b depth c
+      else if ch == 91 then
+        parse_list b depth c
+      else if ch == 123 then
+        parse_record b depth c
+      else if ch == 34 then
+        let str_res =
+          if Fln.Lex.peek_at 1 c == 34 && Fln.Lex.peek_at 2 c == 34 then
+            Fln.Lex.parse_multiline_string c
+          else
+            Fln.Lex.parse_quoted_string c
+        Result.map (fun (sp, s, next) -> (b.string sp s, next)) str_res
+      else
+        match Fln.Lex.raw_string_hashes c with
+        | Some hashes ->
+          Result.map
+            (fun (sp, s, next) -> (b.string sp s, next))
+            (Fln.Lex.parse_raw_string c hashes)
+        | None ->
+          if Fln.Lex.is_digit ch then
+            parse_number b c
+          else if Fln.Lex.is_upper ch then
+            match Fln.Lex.scan_con_path c with
+            | Ok (path, name, c1) -> Ok (b.con (Fln.Lex.make_span c c1) path name [], c1)
+            | Err e -> Err e
+          else if Fln.Lex.is_lower ch then
+            let (w, c1) = Fln.Lex.scan_ident c
+            if w == "true" then
+              Ok (b.bool (Fln.Lex.make_span c c1) true, c1)
+            else if w == "false" then
+              Ok (b.bool (Fln.Lex.make_span c c1) false, c1)
+            else
+              Fln.Lex.err_span c c1 ("unexpected identifier `" ++ w ++ "`")
+          else if ch < 0 then
+            Fln.Lex.err_at c "unexpected end of input; expected a value"
+          else
+            Fln.Lex.err_span
+              c
+              (Fln.Lex.bump c)
+              ("unexpected character `" ++ String.slice c.pos (c.pos + 1) c.src ++ "`")
+
+  parse_value : Builders a -> Int -> Fln.Lex.Cursor -> Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+  let parse_value b depth c =
+    if depth > max_depth then
+      Fln.Lex.err_at c "nesting depth exceeds limit"
+    else
+      let ch = Fln.Lex.peek c
+      if ch == 45 then
+        parse_number b c
+      else if Fln.Lex.is_upper ch then
+        match Fln.Lex.scan_con_path c with
+        | Err e -> Err e
+        | Ok (path, name, c1) ->
+          collect_args : Fln.Lex.Cursor -> List a -> Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+          let rec collect_args cur rev_args =
+            match Fln.Lex.skip_trivia cur with
+            | Err e -> Err e
+            | Ok (next, _) ->
+              if Fln.Lex.can_start_con_arg next then
+                match parse_atom b (depth + 1) next with
+                | Ok (arg, after) -> collect_args after ([arg] ++ rev_args)
+                | Err e -> Err e
+              else
+                Ok (b.con (Fln.Lex.make_span c cur) path name (List.reverse rev_args), cur)
+          collect_args c1 []
+      else
+        parse_atom b depth c
+
+  parse_paren_or_tuple :
+    Builders a -> Int -> Fln.Lex.Cursor -> Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+  let parse_paren_or_tuple b depth opened =
+    match Fln.Lex.skip_trivia (Fln.Lex.bump opened) with
+    | Err e -> Err e
+    | Ok (c1, _) ->
+      if Fln.Lex.peek c1 == 41 then
+        let closed = Fln.Lex.bump c1
+        Ok (b.unit (Fln.Lex.make_span opened closed), closed)
+      else
+        match parse_value b (depth + 1) c1 with
+        | Err e -> Err e
+        | Ok (first, c2) ->
+          match Fln.Lex.skip_trivia c2 with
+          | Err e -> Err e
+          | Ok (c3, _) ->
+            if Fln.Lex.peek c3 == 41 then
+              Ok (first, Fln.Lex.bump c3)
+            else if Fln.Lex.peek c3 == 44 then
+              read_rest : Fln.Lex.Cursor -> List a -> Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+              let rec read_rest cur rev_items =
+                match Fln.Lex.skip_trivia cur with
+                | Err e -> Err e
+                | Ok (c_next, _) ->
+                  if Fln.Lex.peek c_next == 41 then
+                    let closed = Fln.Lex.bump c_next
+                    Ok (b.tuple (Fln.Lex.make_span opened closed) (List.reverse rev_items), closed)
+                  else
+                    match parse_value b (depth + 1) c_next with
+                    | Err e -> Err e
+                    | Ok (item, after) ->
+                      match Fln.Lex.skip_trivia after with
+                      | Err e -> Err e
+                      | Ok (c_sep, _) ->
+                        if Fln.Lex.peek c_sep == 44 then
+                          read_rest (Fln.Lex.bump c_sep) ([item] ++ rev_items)
+                        else if Fln.Lex.peek c_sep == 41 then
+                          let closed = Fln.Lex.bump c_sep
+                          Ok (
+                            b.tuple
+                              (Fln.Lex.make_span opened closed)
+                              (List.reverse ([item] ++ rev_items)),
+                            closed,
+                          )
+                        else
+                          Fln.Lex.err_at c_sep "expected `,` or `)` in tuple"
+              read_rest (Fln.Lex.bump c3) [first]
+            else
+              Fln.Lex.err_at c3 "expected `,` or `)` after expression"
+
+  parse_list : Builders a -> Int -> Fln.Lex.Cursor -> Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+  let parse_list b depth opened =
+    read_items : Fln.Lex.Cursor -> List a -> Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+    let rec read_items cur rev_items =
+      match Fln.Lex.skip_trivia cur with
+      | Err e -> Err e
+      | Ok (c1, _) ->
+        if Fln.Lex.peek c1 == 93 then
+          let closed = Fln.Lex.bump c1
+          Ok (b.list (Fln.Lex.make_span opened closed) (List.reverse rev_items), closed)
+        else
+          match parse_value b (depth + 1) c1 with
+          | Err e -> Err e
+          | Ok (item, after) ->
+            match Fln.Lex.skip_trivia after with
+            | Err e -> Err e
+            | Ok (c_sep, _) ->
+              if Fln.Lex.peek c_sep == 44 then
+                read_items (Fln.Lex.bump c_sep) ([item] ++ rev_items)
+              else if Fln.Lex.peek c_sep == 93 then
+                let closed = Fln.Lex.bump c_sep
+                Ok (
+                  b.list (Fln.Lex.make_span opened closed) (List.reverse ([item] ++ rev_items)),
+                  closed,
+                )
+              else
+                Fln.Lex.err_at c_sep "expected `,` or `]` in list"
+    read_items (Fln.Lex.bump opened) []
+
+  parse_record : Builders a -> Int -> Fln.Lex.Cursor -> Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+  let parse_record b depth opened =
+    read_fields :
+      Fln.Lex.Cursor ->
+      List (String, Fln.Lex.Span, a) ->
+      Result Fln.Lex.LexError (a, Fln.Lex.Cursor)
+    let rec read_fields cur rev_fields =
+      match Fln.Lex.skip_trivia cur with
+      | Err e -> Err e
+      | Ok (c1, _) ->
+        if Fln.Lex.peek c1 == 125 then
+          let closed = Fln.Lex.bump c1
+          Ok (b.record (Fln.Lex.make_span opened closed) (List.reverse rev_fields), closed)
+        else if not (Fln.Lex.is_ident_start (Fln.Lex.peek c1)) then
+          Fln.Lex.err_at c1 "expected record field name or `}`"
+        else
+          let (key, c_key_end) = Fln.Lex.scan_ident c1
+          if Fln.Lex.is_reserved_keyword key then
+            Fln.Lex.err_span
+              c1
+              c_key_end
+              ("reserved keyword `" ++ key ++ "` cannot be used as a record field name")
+          else if Fln.Lex.any_list (fun (k, _, _) -> k == key) rev_fields then
+            Fln.Lex.err_span c1 c_key_end ("duplicate record field `" ++ key ++ "`")
+          else
+            let key_span = Fln.Lex.make_span c1 c_key_end
+            match Fln.Lex.skip_trivia c_key_end with
+            | Err e -> Err e
+            | Ok (c_eq, _) ->
+              if Fln.Lex.peek c_eq != 61 then
+                Fln.Lex.err_at c_eq ("expected `=` after record field `" ++ key ++ "`")
+              else
+                match Fln.Lex.skip_trivia (Fln.Lex.bump c_eq) with
+                | Err e -> Err e
+                | Ok (c_val, _) ->
+                  match parse_value b (depth + 1) c_val with
+                  | Err e -> Err e
+                  | Ok (val, after) ->
+                    let next_fields = [(key, key_span, val)] ++ rev_fields
+                    match Fln.Lex.skip_trivia after with
+                    | Err e -> Err e
+                    | Ok (c_sep, saw_nl) ->
+                      if Fln.Lex.peek c_sep == 125 then
+                        let closed = Fln.Lex.bump c_sep
+                        Ok (
+                          b.record (Fln.Lex.make_span opened closed) (List.reverse next_fields),
+                          closed,
+                        )
+                      else if Fln.Lex.peek c_sep == 59 then
+                        read_fields (Fln.Lex.bump c_sep) next_fields
+                      else if saw_nl then
+                        read_fields c_sep next_fields
+                      else
+                        Fln.Lex.err_at c_sep "expected `;`, newline, or `}` after record field"
+    read_fields (Fln.Lex.bump opened) []
+}
+
+parse_spanned : Builders a -> String -> Result Fln.Lex.LexError a
+let parse_spanned b text =
+  let init = { src = text; len = String.length text; pos = 0; line = 1; col = 1 }
+  match Fln.Lex.skip_trivia init with
+  | Err e -> Err e
+  | Ok (c0, _) ->
+    if Fln.Lex.peek c0 < 0 then
+      Fln.Lex.err_at c0 "empty FLN input; expected a value"
+    else
+      match parse_value b 0 c0 with
+      | Err e -> Err e
+      | Ok (node, c1) ->
+        match Fln.Lex.skip_trivia c1 with
+        | Err e -> Err e
+        | Ok (c2, _) ->
+          if Fln.Lex.peek c2 < 0 then
+            Ok node
+          else
+            Fln.Lex.err_at c2 "unexpected trailing tokens after FLN value"

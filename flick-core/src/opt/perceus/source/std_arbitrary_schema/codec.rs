@@ -3,10 +3,15 @@
 use super::super::expr_builder::{ExprBuilder, arm};
 use super::super::std_schema_rt::{con_app, rt, str_lit};
 use super::super::{Expr, Pat, Stmt};
+use super::schema::fixed_int_entry;
 use super::{
     arb_err, float_inf, js_int_fn, node_con, push_node, push_simple, raw_entry, wire_finite_fn,
 };
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "closed Codec.$Meta arbitrary dispatch"
+)]
 fn by_meta_expr(b: &ExprBuilder) -> Expr {
     let mc = |c: &str, n: usize| ExprBuilder::con("Codec", "$Meta", c, n);
     let num_entry = raw_entry(
@@ -46,6 +51,46 @@ fn by_meta_expr(b: &ExprBuilder) -> Expr {
         arm(
             Pat::Con(mc("$Int", 0), vec![]),
             push_node(b, b.loc("ctx"), int_entry),
+        ),
+        arm(
+            Pat::Con(mc("$Int8", 0), vec![]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_int_entry(b, -128.0, 127.0, "FixedWidth.ToInt8"),
+            ),
+        ),
+        arm(
+            Pat::Con(mc("$Int16", 0), vec![]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_int_entry(b, -32_768.0, 32_767.0, "FixedWidth.ToInt16"),
+            ),
+        ),
+        arm(
+            Pat::Con(mc("$UInt8", 0), vec![]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_int_entry(b, 0.0, 255.0, "FixedWidth.ToUInt8"),
+            ),
+        ),
+        arm(
+            Pat::Con(mc("$UInt16", 0), vec![]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_int_entry(b, 0.0, 65_535.0, "FixedWidth.ToUInt16"),
+            ),
+        ),
+        arm(
+            Pat::Con(mc("$UInt32", 0), vec![]),
+            push_node(
+                b,
+                b.loc("ctx"),
+                fixed_int_entry(b, 0.0, 4_294_967_295.0, "FixedWidth.ToUInt32"),
+            ),
         ),
         arm(
             Pat::Con(mc("$String", 0), vec![]),
