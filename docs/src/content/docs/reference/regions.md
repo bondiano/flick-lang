@@ -264,6 +264,15 @@ let preserve_shared_record () =
   (base.x, updated.x)
 ```
 
+**Implementation-proof boundary.** The Lean memory modules (`Formal/Memory*.lean`
+and `Formal/MemorySoundness.lean`) prove ownership balance, unboxed-aggregate
+and `CellLayout`-checked reuse rules, source-to-memory semantic equivalence,
+LIFO scope/arena close, and zero-live-object teardown for the **abstract memory
+model**. They do not certify the Rust compiler (`flick-core`), the tier-0
+counted VM (`flick-vm`), or the JS/Effect-TS/Go/future native runtimes, whose
+correspondence is validated independently by executable compiler, model,
+counterexample, and runtime test suites.
+
 ## Holding is not using
 
 A closure, a `task` or a constructor may hold a handle past the end of its

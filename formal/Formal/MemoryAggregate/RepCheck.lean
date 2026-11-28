@@ -133,6 +133,14 @@ theorem unitRepState_toPass (owned defined isAgg : Mask width) :
 def checkRepTokens (block : RepBlock width) (state : RepState width) : Bool :=
   checkTokens (eraseBlock block) state.toPassState && checkRepOk block state.isAgg
 
+/-- Whole-function representation-aware validator mirroring `checkFunction` with
+duplicate-parameter rejection (`parameters.Nodup`) and incoming aggregate mask. -/
+def checkRepFunction (parameters : List (Local width)) (block : RepBlock width)
+    (paramIsAgg : Mask width) : Bool :=
+  match runEvents (parameters.map Event.bind) initial with
+  | none => false
+  | some state => checkRepTokens block ⟨state.tokens, state.defined, paramIsAgg⟩
+
 def checkRepSource (block : RepBlock width) (defined : Mask width) : Bool :=
   checkSource (eraseBlock block) defined
 

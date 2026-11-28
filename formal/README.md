@@ -79,26 +79,55 @@ signature and golden certificates.
   (`drop_unused_reuseToken_clean`), and `cycle_break_vs_teardown` pins prompt
   old-payload release on `Ref` overwrite versus detach-all teardown retention.
   `Formal/MemoryAggregate.lean` (`MemoryAggregate/Heap.lean`,
-  `MemoryAggregate/Pass.lean`) formalizes target-independent unboxed aggregates
-  (`ValueRep`, `CellLayout`, nested aggregate value trees, and `boxedTokens`):
+  `MemoryAggregate/RepCheck.lean`, `MemoryAggregate/RepInsert.lean`,
+  `MemoryAggregate/Pass.lean`, `MemoryAggregate/RepReuse.lean`) formalizes
+  target-independent unboxed aggregates (`ValueRep`, `CellLayout`, nested
+  aggregate value trees, and `boxedTokens`):
   `dupValue_adds_boxedTokens` / `dupValue_immediate_noop` and
   `dropValue_subtracts_boxedTokens` / `dropValue_immediate_noop` prove that
   aggregate `dup`/`drop` add/subtract `boxedTokens` and are exact no-ops on
-  immediate aggregates; `projectAgg_retains_field` and
-  `projectAgg_survives_parent_drop` prove borrowed aggregate projection retains
-  descendant tokens and survives dropping the parent aggregate;
-  `boxAggregate_conserves_tokens`, `unboxBorrow_retains_without_releasing`,
-  `unboxConsume_unique_transfers`, and
+  immediate aggregates; `projectAgg_retains_field`,
+  `projectAgg_survives_parent_drop`, and
+  `projectPath_retains_and_survives_parent_drop` prove single-step and
+  arbitrarily deep inline field projection retain descendant tokens and survive
+  dropping the parent aggregate; `boxAggregate_conserves_tokens`,
+  `boxAggregate_then_drop_releases_descendants`,
+  `boxAggregate_then_unboxConsume_unique_identity`,
+  `unboxBorrow_retains_without_releasing`, `unboxConsume_unique_transfers`, and
   `unboxConsume_shared_retains_preserves_aliases` prove fallback-cell token
-  conservation and alias preservation;
-  `reuseTypedCell_incompatible_layout_fallback` and
-  `reuseTypedCell_compatible_in_place` prove `CellLayout`-checked typed-cell
-  reuse drops incompatible same-capacity candidates and allocates a fresh
-  replacement while preserving all other objects; and
+  conservation, direct-drop descendant release, unique round-trip identity, and
+  shared alias preservation; `reuseTypedCell_incompatible_layout_fallback`,
+  `reuseTypedCell_compatible_in_place`,
+  `reuseTypedCellVal_live_tagged_compatible_in_place`,
+  `dropReuseVal_rejects_aggregate`, and `reuseTypedCellVal_rejects_aggregate`
+  prove `CellLayout`-checked Stage 1 and Stage 2 typed-cell reuse and dynamic
+  aggregate reuse rejection;
   `checkRepTokens_rejects_{explicit_agg_reuse,tracked_agg_reuse,agg_dropReuse}`,
-  `checkRepTokens_{sound,prefix_safe}`, and `annotateRep_{balanced,prefix_safe}`
-  prove representation-aware token checking and whole-block insertion reject
-  aggregate reuse candidates while preserving token balance and prefix safety.
+  `checkRepTokens_{sound,prefix_safe}`, and
+  `annotateRep_{balanced,prefix_safe,function_balanced}` prove
+  representation-aware validation and whole-block/whole-function (`parameters.Nodup`)
+  insertion; and `repPairReuse_preserves_checkRepTokens`,
+  `repDropToReuse_preserves_checkRepTokens`, and `repDropToReuse_prefix_safe`
+  prove Stage 2 `#744`-aware `DropReuse` + `repPairReuse` (never rewriting
+  `.construct .aggregate`) preserve token balance and prefix safety.
+  `Formal/MemorySoundness.lean` (`MemorySoundness/{Sem,HeapInv,Exec,Unwind}.lean`)
+  completes M4 (`#463`) by connecting operational counted execution over
+  `AggHeap` (including recursive rank-bounded `dropValFuel`, unboxed aggregates,
+  nested inline `projectPath`, `BoxAggregate`/`Unbox*`, `DropReuse`, and Stage 1
+  & Stage 2 `CellLayout`-checked `Reuse`) to pure erased source evaluation
+  (`evalSource`) and global reference-count conservation (`HeapBalanced`):
+  `evalMemPrefix_sound` and `evalMem_preserves_balance_and_denote` prove normal
+  execution computes the exact `evalSource` denotation with zero leaked frame
+  locals and untouched external aliases (`DenotesList`);
+  `pipeline_source_equiv_and_balanced` composes Stage 2 representation-aware
+  FBIP reuse with counted execution and source equivalence;
+  `unwind_frame_and_scope_balanced` and `close_owner_with_late_arenas_balanced`
+  connect arbitrary abnormal-exit prefixes (`ExitKind = failure | cancelled | success`)
+  to frame-local draining (`unwindFrame`, covering live `reuseToken`, nested
+  aggregates, and `boxedAgg` cells) and M2 LIFO `MemoryScopes.closeLifecycle`;
+  and `zero_roots_empty_heap` / `teardown_zero_live_objects` prove root
+  `MemoryArena.close` drains all live objects (including cyclic `Ref` handles)
+  to an empty heap (`∀ id, h id = none`).
   `Formal/MemoryArena.lean` additionally proves exact
   per-object owner/slot inventories for root-cell allocation, strong reads,
   replacement and detach-all close, including aliases and independent
@@ -112,15 +141,19 @@ signature and golden certificates.
   `closeLifecycle_selected`), re-closing a closed owner is idempotent
   (`closeLifecycle_idempotent`), and closed owners/arenas reject admission
   (`closed_rejects_make/alloc/get`) across success, failure, and cancellation
-  outcomes. `Formal/Axioms.lean` pins these theorems together with
-  `MemoryArena.close_balance` and the `MemoryReuse` theorems using `#guard_msgs`
-  (standard Lean axioms `propext`, `Quot.sound` only; zero `sorry`). These
-  results do NOT prove source-to-memory lowering equivalence, verified
-  correspondence with the Rust pass or compiler checker, handle
-  freshness/provenance checks, counted heap-graph acyclicity, host-bridge wire
-  marshalling, fuel-cut unwinding, or physical memory reclamation. See the
-  [memory contract](../docs/formal/memory.md) for
-  the M1–M5 boundaries.
+  outcomes. `Formal/Axioms.lean` pins all main `MemoryPass`, `MemoryInsert`,
+  `MemoryReuse`, `MemoryAggregate`, `MemoryArena`, `MemoryScopes`, and
+  `MemorySoundness` theorems using `#guard_msgs` (standard Lean axioms
+  `propext`, `Classical.choice`, `Quot.sound` only; zero `sorry`).
+  **Implementation-proof boundary:** these are abstract model theorems; they do
+  NOT certify the Rust compiler (`flick-core`), the Rust tier-0 VM (`flick-vm`),
+  or the JS/Effect-TS/Go/future native runtimes, nor machine-counter overflow,
+  handle freshness/provenance checks, counted heap-graph acyclicity by
+  construction, multi-frame continuations/fiber interleavings, host-bridge wire
+  marshalling, target-specific physical ABI layout, or physical OS memory
+  reclamation. See the [memory contract](../docs/formal/memory.md) (§6) for the
+  complete theorem-to-scope table, assumption list, and executable
+  counterexample regressions.
 - **The module boundary** (`Formal/Modules.lean`): separate named application
   sites have separate nominal result types, repeated imports preserve identity,
   manifest class/service requirements match exactly, abstract identities cannot

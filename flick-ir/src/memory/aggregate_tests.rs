@@ -294,3 +294,44 @@ fn rejects_explicit_and_observed_aggregate_reuse_candidates() {
         Err(Error::AggregateReuseCandidate(0))
     );
 }
+
+#[test]
+fn rejects_duplicate_parameters_even_with_balanced_body() {
+    let dup_params = Function {
+        params: vec![0, 0],
+        body: Block {
+            instructions: vec![],
+            exit: Exit::Return(0),
+        },
+    };
+    assert_eq!(validate(&dup_params), Err(Error::DuplicateBinding(0)));
+}
+
+#[test]
+fn rejects_aggregate_reuse_in_nested_unselected_branch() {
+    let bind = |binding, value| Instruction::Let { binding, value };
+    let nested_bad = Function {
+        params: vec![0, 1],
+        body: Block {
+            instructions: vec![
+                bind(2, Operation::UnboxBorrow { object: 1 }),
+                Instruction::Drop(1),
+            ],
+            exit: Exit::Branch {
+                condition: 0,
+                then_: Box::new(Block {
+                    instructions: vec![],
+                    exit: Exit::Return(2),
+                }),
+                else_: Box::new(Block {
+                    instructions: vec![bind(3, Operation::DropReuse(2))],
+                    exit: Exit::Return(3),
+                }),
+            },
+        },
+    };
+    assert_eq!(
+        validate(&nested_bad),
+        Err(Error::AggregateReuseCandidate(2))
+    );
+}

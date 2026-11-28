@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: 3aa472861d1b14a6
+source_hash: e668122917bb4b13
 ---
 
 ## Expected errors
@@ -450,4 +450,4 @@ The acyclic reference-counting boundary and the policy for cycles through mutabl
 
 **Diagnostic and runtime reporting policy.** Well-typed `Ref` cycles are accepted with no compile-time diagnostic. Counted execution never disguises leaks at shutdown: `Heap::finish` strictly requires `live_objects == 0` and `allocations == frees` after explicit outcome release and root-arena teardown, and `cells_detached_on_teardown` separately reports `Ref` cells still holding heap objects at root-arena teardown. Acyclic corpus reclamation is measured separately from the `Ref` cycle suite.
 
-The counted reference model and Lean theorems (`Formal/MemoryPass.lean`, `Formal/MemoryInsert.lean`, `Formal/MemoryReuse.lean`, `Formal/MemoryAggregate.lean`, `Formal/MemoryArena.lean`, `Formal/MemoryScopes.lean`) check token balance, aggregate/fallback-cell ownership, uniqueness/alias invariants, and arena ledgers; verified compiler extraction and native/Wasm codegen remain separate M4/W/N obligations (revision 2026-11-13). Exact ownership rules and measurements are recorded in the repository's `docs/formal/memory.md`.
+The counted reference model and Lean theorems (`Formal/MemoryPass.lean`, `Formal/MemoryInsert.lean`, `Formal/MemoryReuse.lean`, `Formal/MemoryAggregate.lean`, `Formal/MemoryArena.lean`, `Formal/MemoryScopes.lean`, `Formal/MemorySoundness.lean`) complete the M1–M4 obligations for the abstract memory model: token balance, unboxed-aggregate and fallback-cell ownership, `CellLayout`-checked Stage 2 FBIP reuse, operational equivalence to erased source evaluation, and frame/arena unwind on failure and cancellation. **Implementation-proof boundary:** these theorems prove properties of the abstract memory model in Lean and do **not** certify the Rust compiler (`flick-core`), the Rust tier-0 VM (`flick-vm`), or the JS/Effect-TS/Go/future native runtimes — implementation correspondence is validated independently by executable test suites and counterexample regressions, while portable memory-IR transport and Wasm/native codegen belong to Phases W/N (revision 2026-11-13). Exact theorem scopes, assumptions, counterexamples, and measurements are recorded in the repository's `docs/formal/memory.md`.
