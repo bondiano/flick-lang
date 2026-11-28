@@ -168,12 +168,12 @@ fn flick_syntax_accepts_fln_edge_cases() {
 #[test]
 fn fln_std_reserved_keywords_match_fln_literals() {
     let fln_src = fs::read_to_string(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std/src/Fln.fl"),
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std/src/Fln/Lex.fl"),
     )
-    .expect("read packages/std/src/Fln.fl");
+    .expect("read packages/std/src/Fln/Lex.fl");
     let start = fln_src
         .find("let reserved_keywords = [")
-        .expect("reserved_keywords list in Fln.fl");
+        .expect("reserved_keywords list in Fln/Lex.fl");
     let rest = &fln_src[start..];
     let end = rest
         .find(']')
