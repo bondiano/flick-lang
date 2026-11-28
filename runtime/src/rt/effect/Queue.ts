@@ -202,6 +202,14 @@ export class Queue {
     }
   }
 
+  /** Takes back an interrupted offer; ends a closing queue it leaves drained. */
+  withdraw(o: Offer): void {
+    if (this.state === DONE) return;
+    const i = this.offers.indexOf(o);
+    if (i >= 0) this.offers.splice(i, 1);
+    if (this.state === CLOSING && this.offers.length === 0 && this.messages.length === 0) this.finalize(this.exit);
+  }
+
   finalize(exit: Cause): void {
     if (this.state === DONE) return;
     this.state = DONE;
@@ -258,17 +266,31 @@ function* awaitTake(q: Queue, ready: () => boolean): Run {
 
 /** Waits for `o` to settle; an interrupted one is withdrawn. */
 function* awaitOffer(q: Queue, o: Offer): Run {
+  // A take or a close may have come since the offer found the queue full:
+  // try again and check the state in the same step as the registration.
+  if (o.single && q.offerNow(o.message)) {
+    o.accepted = true;
+    return undefined;
+  }
+  if (!o.single) {
+    const rest = q.offerAllNow(o.remaining.slice(o.offset));
+    if (rest.length === 0) {
+      o.left = [];
+      return undefined;
+    }
+    o.offset = o.remaining.length - rest.length;
+  }
+  if (q.state !== OPEN) {
+    if (!o.single) o.left = o.remaining.slice(o.offset);
+    return undefined;
+  }
   try {
     yield waiting((wake) => {
       o.wake = wake;
       q.offers.push(o);
     });
   } catch (thrown) {
-    if (q.state !== DONE) {
-      const i = q.offers.indexOf(o);
-      if (i >= 0) q.offers.splice(i, 1);
-      if (q.state === CLOSING && q.offers.length === 0 && q.messages.length === 0) q.finalize(q.exit);
-    }
+    q.withdraw(o);
     throw thrown;
   }
   return undefined;

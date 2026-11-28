@@ -72,6 +72,7 @@ stdlib/effect/platform # no native for `layer_of` (flick:Path flickLayer)
 stdlib/effect/pool_outcomes # no native for `make` (flick:Pool flickMake)
 stdlib/effect/pubsub # no native for `bounded` (flick:PubSub flickBounded)
 stdlib/effect/queue # no native for `bounded` (flick:Queue bounded)
+stdlib/effect/queue_handoff # no native for `bounded` (flick:Queue bounded)
 stdlib/effect/record # the row primitive `Project { admin : Bool; age : Float; name : String } { age : Float; name : String }`
 stdlib/effect/ref # no native for `each_effect` (flick:rt listEachEffect)
 stdlib/effect/request # no native for `of` (flick:Request flickOf)

@@ -240,6 +240,7 @@ stdlib/effect/check
 stdlib/effect/graph
 stdlib/effect/graph_algorithms
 stdlib/effect/queue
+stdlib/effect/queue_handoff
 stdlib/effect/channel_core
 stdlib/effect/stream_core
 stdlib/effect/txref
