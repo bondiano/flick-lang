@@ -1,7 +1,6 @@
 /// Recursive-descent parser and numeric literal decoder for `Fln`.
 module Fln.Parse exposing (..)
 
-import BigInt
 import Float32
 import Fln.Lex
 
