@@ -237,4 +237,23 @@ theorem annotateRep_prefix_safe (block : RepBlock width) (defined owned isAgg : 
   intro before after hsplit
   exact checkRepTokens_prefix_safe output (unitRepState owned defined isAgg) hok choices before after hsplit
 
+/-- Whole-function representation-aware insertion corollary: distinct parameters
+(`parameters.Nodup`) plus source validity entail balanced, aggregate-safe output
+accepted by `checkRepFunction`. -/
+theorem annotateRep_function_balanced (parameters : List (Local width)) (block : RepBlock width)
+    (paramIsAgg : Mask width)
+    (unique : parameters.Nodup)
+    (source : checkRepSource block (parameterMask parameters) = true) :
+    ∃ output, annotateRep block (parameterMask parameters) paramIsAgg = some output ∧
+      checkRepFunction parameters output paramIsAgg = true := by
+  have hlive : ∀ name, liveRep block name = true → parameterMask parameters name = true :=
+    checkSource_live_defined (eraseBlock block) (parameterMask parameters) source
+  obtain ⟨output, hann, hok⟩ :=
+    annotateRep_balanced block (parameterMask parameters) (parameterMask parameters) paramIsAgg
+      source hlive (fun _ h => h)
+  refine ⟨output, hann, ?_⟩
+  unfold checkRepFunction
+  rw [parameter_init_runs parameters unique]
+  exact hok
+
 end Flick.Memory.Aggregate

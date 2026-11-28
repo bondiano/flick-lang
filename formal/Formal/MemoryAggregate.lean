@@ -1,17 +1,21 @@
 import Formal.MemoryAggregate.Heap
 import Formal.MemoryAggregate.Pass
+import Formal.MemoryAggregate.RepReuse
 
 /-!
 # Abstract unboxed aggregate values: memory IR, counted heap, and insertion (#744)
 
 Umbrella module re-exporting:
 - `Formal.MemoryAggregate.Heap`: abstract aggregate value trees, `boxedTokens`,
-  immediate-aggregate no-op `dup`/`drop`, borrowed `project` + parent-drop
-  survival, `boxAggregate`, `unboxBorrow`, `unboxConsume` (unique vs shared),
-  and `CellLayout`-checked typed-cell reuse.
-- `Formal.MemoryAggregate.Pass`: representation-aware `checkRepTokens` and
-  `annotateRep` rejecting aggregate reuse candidates and proving whole-block
-  token balance and prefix safety with aggregates.
+  immediate-aggregate no-op `dup`/`drop`, borrowed `project` + nested inline
+  `projectPath` + parent-drop survival, `boxAggregate`, `unboxBorrow`,
+  `unboxConsume` (unique vs shared), fallback-cell round-trips, aggregate-rejecting
+  `dropReuseVal`/`reuseTypedCellVal`, and `CellLayout`-checked typed-cell reuse.
+- `Formal.MemoryAggregate.Pass`: representation-aware `checkRepTokens`,
+  `checkRepFunction`, `annotateRep`, and `annotateRep_function_balanced`.
+- `Formal.MemoryAggregate.RepReuse`: Stage 2 representation-aware `repDropToReuse`
+  and `repPairReuse` skipping `.construct .aggregate` sites and preserving
+  `checkRepTokens` and prefix safety.
 -/
 
 namespace Flick.Memory.Aggregate
@@ -72,5 +76,20 @@ example :
     (match annotateRep src mask (fun _ => false) with
     | none => false
     | some out => checkRepTokens out (unitRepState mask mask (fun _ => false))) = true := by decide
+
+-- Stage 2 `repPairReuse` skips `.construct .aggregate` and pairs the later `.construct .cell`.
+example :
+    let body : RepBlock 5 :=
+      .seq (.drop 0)
+        (.seq (.let_ 2 (.construct .aggregate [1] []))
+          (.seq (.let_ 3 (.construct .cell [2] [])) (.ret 3)))
+    let rewritten : RepBlock 5 :=
+      .seq (.let_ 4 (.dropReuse 0))
+        (repPairReuse 4
+          (.seq (.let_ 2 (.construct .aggregate [1] []))
+            (.seq (.let_ 3 (.construct .cell [2] [])) (.ret 3))))
+    checkRepFunction [0, 1] body (fun _ => false) = true ∧
+    checkRepFunction [0, 1] rewritten (fun _ => false) = true ∧
+    checkRepFunction (width := 5) [0, 0] (.ret 0) (fun _ => false) = false := by decide
 
 end Flick.Memory.Aggregate

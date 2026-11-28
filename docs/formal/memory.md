@@ -13,7 +13,7 @@ are not evidence for this contract.
 | M1: explicit ownership | Shared memory IR, Perceus insertion, exhaustive source expression lowering (`Destructure`, `let mut`, `loop`/`while`/`for` + labeled exits, `Option?`, strict/lazy comprehensions and `Seq.*`, `Record.*`, `Lazy`, `Scope`/`Resource` LIFO finalizers, one-shot `control` handlers with tail-resume and discontinuation, TCO, O(1) `ListSlice`/`ListRange`, generational counted heap, inline locals), Stage 3 pure/pure-effect stdlib counted lowering/primitives, Stage 4 cooperative single-threaded async/fiber/layer/STM/observability/config/arbitrary/streaming runtime (`Fiber`, `Deferred`, `FiberGroup`, `Layer` dynamic/memo/merge, `Context.Reference`, `Clock`/`TestClock`, `Schedule`/`ExecutionPlan`, `Latch`/`Semaphore`/`PartitionedSemaphore`, `Queue`/`PubSub`/`SynchronizedRef`/`SubscriptionRef`, `Cache`/`ScopedCache`/`Pool`/`RcRef`/`RcMap`/`LayerMap`/`LayerRef`, `Tx` STM, `Events`/`ErrorReporter`/`Tracer`/`Logger`/`Metric`/`Request`/`Crypto`, `Config`/`ConfigProvider`, `Arbitrary`, `Channel`/`Sink`/`Stream`), Stage 5 `HostMode::LiveOs`, pure `flick:sql`, and explicit opt-in counted Host/FFI bridge (`lower_roots_with_foreign_bridge`, `Operation::ForeignCall`, persistent Node `HostBridge` with 1-to-1 handle refcount symmetry and zero-live-handle teardown), owned outcomes, explicit source runners and live corpus inventory (`memory_inventory.rs` `--release` gate: **1,064/1,064** clean profiles across `tests/run`, `tests/rt`, `docs`, `tests/language`, and runnable `examples/`, plus generated `flick_model::generate` programs, with zero live Rust heap slots and zero live host handles) | M1 reference-model corpus gate complete; production backend RC codegen and physical reclamation remain in M2–M5 / Phase N |
 | M2: `Arena s` | Public `Arena.make/alloc/get`, by-use checker rules (`T4'`/`SafeUse` retention vs post-close `FLICK-G002`/`G003`), full counted C0–C6 owner close (children -> hooks -> C4 mirrored foreign settle -> LIFO C5 finalizers with late arena allocation -> exact-once detach-all retirement) across success, failure/recovery, cancellation/interruption, nested scopes, persistent contexts (`Context`, `Context.Reference`, dynamic/memo `Layer`), Signals (`tail` failure, `abort`, `control` resume & discontinue, partial layer build abort/discontinue), and HostBridge late async callbacks (`Js.promise_callback`, C4 callbacks); JS/Effect-TS/Go storage retirement after finalizers; Lean multi-phase lifecycle ledger (`Formal/MemoryScopes.lean` pinned in `Formal/Axioms.lean`); independent source (`arena_holding_contexts.fl`, `arena_after_close_captures.fl`), language (`Language.Arenas`), counted fuel-prefix (`memory_m2_arenas.rs`, `memory_m2_host_bridge.rs`, `memory_m2_signals.rs`), and JS/Effect-TS/Go runtime regressions; paired EN/RU user docs (`regions.md`) | M2 reference-model, checker, runtime, Lean ledger, and doc contract complete; production backend RC/arena codegen and physical native reclamation remain in M3–M5 / Phase N |
 | M3: FBIP and cycles | Two-stage Perceus FBIP reuse (`DropReuse`, `Reuse`, `ReuseWithDicts`, `ReuseRecord`, in-place unique `Update`), abstract unboxed aggregate values (`ValueRep::{Cell, Aggregate}`, immediate aggregates with zero heap allocs/dups/drops, `BoxAggregate` / `UnboxBorrow` / `UnboxConsume` fallback cells, static + runtime `CellLayout`-checked typed-cell `Reuse` compatibility, automatic `#742`/`#743` integration via `flick_backend_support::{layout::memory, specialize}` and `perceus::{lower_specialized, lower_roots_specialized}` deriving `ValueRep`/`CellLayout` and emitting fallback `BoxAggregate`/`UnboxBorrow`/`UnboxConsume` boundaries without hand-maintained type lists, static + runtime `Error::AggregateReuseCandidate` rejection), saturated constructor uncurrying, tail-branch lowering, `Error::ReuseTokenEscape` enforcement (program VM, standalone `execute(Function)`, and `Heap::dup`), measured 4-class baseline-vs-FBIP allocation/reuse/peak-object/cycle counts (`memory_m3_reuse/measurements.rs`), end-to-end `specialize -> LayoutEngine -> Perceus -> tier0` source & fuel-prefix tests (`memory_aggregates.rs`, `memory_specialize.rs`), explicit `Ref` reference-cycle policy and `cells_detached_on_teardown` accounting (`memory_m3_cycles.rs`, `memory_inventory.rs`), Lean whole-block token-preservation, dynamic alias/cycle-break, and aggregate/fallback-cell proofs (`Formal/MemoryReuse.lean`, `Formal/MemoryAggregate.lean`, pinned in `Formal/Axioms.lean`), and paired EN/RU docs (`spec/05-errors-and-concurrency.md`, `reference/codegen.md`, `reference/regions.md`) | M3 reference-model, Perceus specialization/layout integration, Lean proof, and doc contract complete; production native/Wasm RC/FBIP backend codegen and physical native reclamation remain in M4–M5 / Phase N |
-| M4: Lean | `Formal/MemoryInsert.lean`: whole-function token balance for the executable cached insertion projection, before output validation, with distinct parameters and every selected-path prefix; `Formal/MemoryReuse.lean`: whole-block token preservation and prefix safety of frame-limited `DropReuse`/`pairReuse` plus abstract counted-heap uniqueness, alias preservation, unused-token cleanup, and `Ref` cycle-break vs teardown theorems; `Formal/MemoryAggregate.lean` (`MemoryAggregate/{Heap,RepCheck,RepInsert,Pass}.lean`): aggregate heap ownership (immediate-aggregate 0-alloc/0-dup/0-drop, recursive descendant retain/drop, `boxAggregate` reference transfer, `unboxBorrow` retain, unique vs shared `unboxConsume`, `CellLayout`-checked `reuseTypedCell` fallback, `dropReuse`/`reuse` rejection of aggregates) plus representation-aware static validation and Perceus insertion rejecting aggregate reuse candidates; `Formal/MemoryPass.lean`: independent token checking and computed live-in availability; `Formal/Memory.lean`: local arithmetic; `Formal/MemoryArena.lean` and `MemoryScopes.lean`: root inventories and selected-owner storage retirement (all pinned in `Formal/Axioms.lean`, zero `sorry`, standard axioms only) | Verified Rust correspondence, machine bounds, full VM operation/exception-unwind semantics, target-specific physical layout, and physical reclamation remain outside these proofs |
+| M4: Lean | Complete for abstract memory model & Lean obligations (`#463`, closing epic `#383`): `Formal/Memory.lean` (local `dup`/`drop` arithmetic), `Formal/MemoryPass.lean` (`checkTokens_sound`, `checkFunction_sound`, `checkFunction_prefix_safe`, `checkSource_live_defined`), `Formal/MemoryInsert.lean` (`annotate_balanced`, `annotate_function_balanced`), `Formal/MemoryReuse.lean` (Stage 2 untyped `pairReuse`/`dropToReuse` + single-step heap/alias/cycle-break lemmas), `Formal/MemoryAggregate.lean` (`MemoryAggregate/{Heap,RepCheck,RepInsert,Pass,RepReuse}.lean`: `#744` immediate-aggregate no-op, nested inline `projectPath` + parent-drop survival, `boxAggregate` transfer/drop/unique-`unboxConsume` round-trips, shared `unboxConsume`, `CellLayout`-checked Stage 1 & Stage 2 typed-cell reuse, static & dynamic aggregate reuse rejection, `annotateRep_function_balanced`, and `#744`-aware Stage 2 `repPairReuse`/`repDropToReuse`), `Formal/MemoryArena.lean` & `Formal/MemoryScopes.lean` (root `Ref` cell arena + M2 C0–C6 LIFO close ledger), and `Formal/MemorySoundness.lean` (`MemorySoundness/{Sem,HeapInv,Exec,Unwind}.lean`: operational counted execution over `AggHeap` with recursive drop, `evalMemPrefix_sound`, `evalMem_preserves_balance_and_denote`, `pipeline_source_equiv_and_balanced`, `unwind_frame_and_scope_balanced`, `close_owner_with_late_arenas_balanced`, and `teardown_zero_live_objects`), all pinned in `Formal/Axioms.lean` with zero `sorry` and standard Lean axioms only, alongside consolidated counterexample regressions (`flick-ir/src/memory/aggregate_tests.rs`, `flick-model/tests/model/memory_m4_counterexamples.rs`) | Model and Lean obligations complete; verified Rust compiler/VM extraction, machine-counter bounds, cooperative fiber interleavings, target-specific physical ABI layout, portable IR carrier, and native/Wasm codegen remain outside these proofs (see §6) |
 | M5: Native split (2026-11-13) | Backend boundary below | Implementation belongs to phase N, not a replacement for M1–M4 |
 
 `run::run_main` and the existing `tests/run/model.txt` harness still use the
@@ -666,12 +666,14 @@ payloads remain unsupported. Primitive identity equality recognizes a
 payload-free constructor by its ordinary arity, even when it owns evidence.
 This does not add Show or Ord instances for constrained data.
 
-Option's nonlocal `?`, local mutation, generators,
-one-shot control/resume, nonconstant Layer constructors and memoization,
-scoped finalizers/owned work and most host bindings still need their real memory
-semantics. Lowering reports the unsupported form and original source span;
-it never replaces a task with an ordinary lambda or a nonlocal return with
-a helper return. No corpus-gap manifest has been loosened.
+Stages 2–5 (summarized in §1 above) subsequently lowered `Option?`, local
+mutation (`let mut`), strict/lazy comprehensions and `Seq.*`, one-shot
+`control`/`resume` handlers, dynamic/memoized `Layer`s, scoped LIFO finalizers
+and owned work, and opt-in bridged host bindings (`lower_roots_with_foreign_bridge`).
+Closed-world lowering (`allow_foreign_bridge == false`) still reports unknown
+foreign bindings with their original source spans instead of silently erasing
+them, never replaces a task with an ordinary lambda or a nonlocal return with
+a helper return, and leaves no corpus-gap manifest weakened.
 
 ### Typed failure and exceptional roots
 
@@ -688,8 +690,8 @@ The known `fromResult` adapter is checked in full. `Ok` and `Err` must be the
 nominal Prelude Result constructors with exactly one ordinary field and no
 evidence. The payload is retained before releasing its wrapper. Malformed
 Results, evaluator faults and fuel exhaustion are not typed failures and
-cannot be caught by an ordinary try. Result's `?` already lowers through
-`from_result`; Option's source-function early return remains unsupported.
+cannot be caught by an ordinary try. Result's `?` lowers through `from_result`,
+and `Option?` early return lowers via Stage 2 counted lowering (§1).
 
 The VM roots the raised value and any pending handler before fallible entry
 or frame-pop transitions. Abandoned frame locals and catch-owned handlers
@@ -986,8 +988,8 @@ above (24 measured profile rows total).
 - **Explicitly `unmeasured` metrics:** Physical `Peak live bytes`, target-native
   Wasm/LLVM/Native heap allocation and RSS, wall-clock throughput/latency, and
   JS/Go host-GC runtime comparisons are explicitly `unmeasured` here (JS/Go
-  runtime performance and comparison belong under `#503`; formal Lean proof
-  obligations belong under `#463`).
+  runtime performance and comparison belong under `#503`; formal Lean model
+  obligations and their boundaries are summarized in §6 below).
 - **Provenance and reproduction method:** Recorded on target
   `aarch64-apple-darwin` (`Darwin arm64`) with `rustc 1.95.0 (59807616e 2026-04-14)`,
   `cargo 1.95.0 (f2d3ce0bd 2026-03-21)`, `Lean 4.29.1` (`formal/lean-toolchain`),
@@ -1079,21 +1081,39 @@ without committing to a target-specific physical ABI layout:
   `perceus::lower*` callers unchanged and independent of automatic polymorphic
   specialization (`#743`).
 
-`Formal/MemoryAggregate.lean` (`Formal/MemoryAggregate/{Heap,RepCheck,RepInsert,Pass}.lean`)
-proves the abstract aggregate heap and representation-aware token-balance
-contract: immediate-aggregate zero-heap `dup`/`drop`
-(`dupVal_immediate_noop`, `dropVal_immediate_noop`), boxed-descendant retain and
-release (`dupVal_aggregate_retains_boxed`, `dropVal_aggregate_releases_boxed`),
-`boxAggregate` reference transfer (`boxAggregate_transfers_without_extra_dups`),
-`unboxBorrow` retain (`unboxBorrow_retains_descendants`), unique vs shared
-`unboxConsume` (`unboxConsume_unique_moves_without_extra_ops`,
-`unboxConsume_shared_preserves_aliases`), incompatible-layout `Reuse` fallback
-(`reuseTypedCell_incompatible_layout_falls_back`), aggregate reuse rejection
-(`dropReuse_rejects_aggregate`, `reuseTypedCell_rejects_aggregate`), and
-representation-aware Perceus insertion and validator soundness
-(`insert_aggregate_sound`, `checkRep_rejects_aggregate_reuse`,
-`insert_preserves_no_aggregate_reuse`), all pinned in `Formal/Axioms.lean` with
-zero `sorry` and standard Lean axioms only. Target-specific physical struct
+`Formal/MemoryAggregate.lean` (`Formal/MemoryAggregate/{Heap,RepCheck,RepInsert,Pass,RepReuse}.lean`)
+proves the abstract aggregate heap, representation-aware insertion, and Stage 2
+FBIP reuse contract: immediate-aggregate zero-heap `dup`/`drop`
+(`dupValue_immediate_noop`, `dropValue_immediate_noop`), boxed-descendant
+retain and release (`dupValue_adds_boxedTokens`,
+`dropValue_subtracts_boxedTokens`), single-step and arbitrarily nested inline
+field projection surviving parent drop (`projectAgg_retains_field`,
+`projectAgg_survives_parent_drop`, `projectPath_retains_and_survives_parent_drop`),
+`boxAggregate` reference conservation and fallback-cell round-trips
+(`boxAggregate_conserves_tokens`, `boxAggregate_then_drop_releases_descendants`,
+`boxAggregate_then_unboxConsume_unique_identity`), `unboxBorrow` retain
+(`unboxBorrow_retains_without_releasing`), unique vs shared `unboxConsume`
+(`unboxConsume_unique_transfers`,
+`unboxConsume_shared_retains_preserves_aliases`), `CellLayout`-checked typed-cell
+reuse for both Stage 2 `reuseToken` and Stage 1 live `tagged` cells
+(`reuseTypedCell_incompatible_layout_fallback`,
+`reuseTypedCell_compatible_in_place`,
+`reuseTypedCellVal_live_tagged_compatible_in_place`), dynamic and static
+aggregate reuse rejection (`dropReuseVal_rejects_aggregate`,
+`reuseTypedCellVal_rejects_aggregate`,
+`checkRepTokens_rejects_explicit_agg_reuse`,
+`checkRepTokens_rejects_tracked_agg_reuse`,
+`checkRepTokens_rejects_agg_dropReuse`), representation-aware validation and
+whole-block/whole-function Perceus insertion (`checkRepTokens_sound`,
+`checkRepTokens_prefix_safe`, `annotateRep_balanced`, `annotateRep_prefix_safe`,
+`annotateRep_function_balanced`), and Stage 2 `#744`-aware `DropReuse` +
+`repPairReuse` skipping `.construct .aggregate`
+(`repPairReuse_preserves_checkRepTokens`,
+`repDropToReuse_preserves_checkRepTokens`, `repDropToReuse_prefix_safe`), all
+pinned in `Formal/Axioms.lean` with zero `sorry` and standard Lean axioms only.
+`Formal/MemorySoundness.lean` (`Formal/MemorySoundness/{Sem,HeapInv,Exec,Unwind}.lean`)
+lifts these rules into operational counted execution, source equivalence, and
+abnormal-exit/scope/arena unwinding (see §6). Target-specific physical struct
 layout, polymorphic specialization (`#743`), backend codegen, and physical
 reclamation remain outside these abstract proofs.
 
@@ -1303,7 +1323,53 @@ acyclicity, physical reclamation, fresh identities, stale-handle rejection or
 the Rust implementation. Arbitrary counted scope work, persistent host ownership
 and verified compiler extraction remain separate obligations.
 
-## 6. Platform and completion gates
+## 6. M4 proof summary, assumptions, unsupported constructs, and implementation-proof boundary
+
+> **Explicit implementation-proof boundary:** The Lean theorems below prove
+> properties of the **abstract memory model**, ownership-insertion and reuse
+> projections, aggregate heap rules, operational counted execution, and
+> scope/arena/unwind ledgers in `formal/Formal/Memory*.lean`. A Lean model
+> theorem is **NOT** a formal certification of the Rust compiler (`flick-core`),
+> the Rust tier-0 VM (`flick-vm`), the JS / Effect-TS / Go runtimes, or future
+> Wasm/native backends. Correspondence between the Rust implementation and this
+> abstract contract is validated independently by the executable test suites
+> (`flick-ir`, `flick-vm`, `flick-model`, `tests/language`, and `runtime*`).
+
+### 6.1 Pinned Lean theorems and exact quantified scope
+
+Every theorem below is pinned in `formal/Formal/Axioms.lean` via `#guard_msgs`
+and checked by `just lean` (`lake build --wfail`, zero `sorry`, standard Lean
+axioms `propext`, `Classical.choice`, `Quot.sound` only):
+
+| Module | Pinned theorems (`Formal/Axioms.lean`) | Exact quantified scope & premises |
+| - | - | - |
+| `Formal/MemoryPass.lean` | `checkFunction_sound`, `checkFunction_prefix_safe` | Arbitrary finite `width`, arbitrary branch nesting, repeated/evidence operands; any `checkFunction`-accepted block executes every selected branch path and every event prefix from fresh `parameters` without underflow and ends with zero local tokens after `Return`. |
+| `Formal/MemoryInsert.lean` | `annotate_function_balanced` | Arbitrary finite `width`, unique `parameters` (`parameters.Nodup`), and source-valid `Block`; Stage 1 cached insertion produces output accepted by `checkFunction` (without assuming output validation). |
+| `Formal/MemoryReuse.lean` | `pairReuse_preserves_checkTokens`, `dropToReuse_preserves_checkTokens`, `dropToReuse_prefix_safe`, `dropReuseHeap_unique_tagged`, `dropReuseHeap_shared_preserves_aliases`, `reuseTaggedHeap_unique_in_place`, `reuseTaggedHeap_null_preserves_aliases`, `updateRecordHeap_shared_preserves_aliases`, `drop_unused_reuseToken_clean`, `cycle_break_vs_teardown` | Arbitrary finite `width` and branch nesting for Stage 2 frame-limited `DropReuse` + `pairReuse` on untyped `Pass.Block` (requiring fresh unused reuse local `r`); single-step untyped heap uniqueness, alias preservation, unused-token release, and `Ref` overwrite vs detach-all teardown. |
+| `Formal/MemoryAggregate.lean` (`Heap`, `RepCheck`, `RepInsert`, `Pass`, `RepReuse`) | `dupValue_adds_boxedTokens`, `dupValue_immediate_noop`, `dropValue_subtracts_boxedTokens`, `dropValue_immediate_noop`, `projectAgg_retains_field`, `projectAgg_survives_parent_drop`, `projectPath_retains_and_survives_parent_drop`, `boxAggregate_conserves_tokens`, `boxAggregate_then_drop_releases_descendants`, `boxAggregate_then_unboxConsume_unique_identity`, `unboxBorrow_retains_without_releasing`, `unboxConsume_unique_transfers`, `unboxConsume_shared_retains_preserves_aliases`, `reuseTypedCell_incompatible_layout_fallback`, `reuseTypedCell_compatible_in_place`, `reuseTypedCellVal_live_tagged_compatible_in_place`, `dropReuseVal_rejects_aggregate`, `reuseTypedCellVal_rejects_aggregate`, `checkRepTokens_rejects_{explicit_agg_reuse,tracked_agg_reuse,agg_dropReuse}`, `checkRepTokens_{sound,prefix_safe}`, `annotateRep_{balanced,prefix_safe,function_balanced}`, `repPairReuse_preserves_checkRepTokens`, `repDropToReuse_preserves_checkRepTokens`, `repDropToReuse_prefix_safe` | Target-independent `ValueRep` / `CellLayout` and arbitrarily nested `Value` trees: immediate-aggregate zero-heap `dup`/`drop`, arbitrarily deep inline field projection (`projectPath`) surviving parent drop, fallback-cell `boxAggregate`/`unboxBorrow`/`unboxConsume` conservation & round-trips, Stage 1 & Stage 2 `CellLayout`-checked typed-cell reuse, static + dynamic aggregate reuse rejection, `parameters.Nodup` function-entry balance, and Stage 2 `#744`-aware `DropReuse` + `repPairReuse` skipping `.construct .aggregate` over arbitrary finite `width` and branches. |
+| `Formal/MemoryArena.lean` & `Formal/MemoryScopes.lean` | `MemoryArena.close_balance`, `MemoryScopes.close_selected`, `MemoryScopes.closeLifecycle_lifo_order`, `MemoryScopes.closeLifecycle_selected`, `MemoryScopes.closeLifecycle_idempotent` | Arbitrary-size root `Ref` arenas (including self/mutual nonowning handle cycles) and multi-owner `Arena s` C0–C6 lifecycle (`open_` -> `closing` -> `finalizing` -> `closed`) across `success`/`failure`/`cancelled` exits: exact per-object multiplicity, LIFO finalizer ordering with late-C5 arenas, idempotent re-close, and closed-owner refusal. |
+| `Formal/MemorySoundness.lean` (`Sem`, `HeapInv`, `Exec`, `Unwind`) | `zero_roots_empty_heap`, `evalMemPrefix_sound`, `evalMem_preserves_balance_and_denote`, `pipeline_source_equiv_and_balanced`, `unwind_frame_and_scope_balanced`, `close_owner_with_late_arenas_balanced`, `teardown_zero_live_objects` | Operational `MemBlock` execution (`lit`, `project` cell/agg, nested inline `projectPath`, `construct .cell`/`.aggregate`, `boxAggregate`, `unboxBorrow`, `unboxConsume`, `dropReuse`, Stage 1 & Stage 2 `CellLayout`-checked `reuse`, `dup`, recursive rank-bounded `drop`, `branch`, `ret`) over `AggHeap` under `HeapBalanced` (bounded live IDs, positive RCs, acyclicity rank, exact global RC conservation across frame + heap internal edges + external roots + `LifecycleOwner`s + root `Ref` arena): proves normal-return semantic equivalence to erased `evalSource`, zero leaked frame locals, external-alias `DenotesList` preservation, Stage 2 reuse pipeline equivalence, abnormal-exit unwind at ANY step prefix `steps` + `ExitKind` composed with M2 LIFO `closeLifecycle`, and zero live objects (`∀ id, h id = none`) after `MemoryArena.close`. |
+
+### 6.2 Translation & implementation assumptions, unsupported constructs, and executable counterexample regressions
+
+The table below lists every boundary assumption and construct outside the Lean
+quantification alongside the executable counterexample and regression tests
+that guard it in Rust (`flick-ir/src/memory/aggregate_tests.rs`,
+`flick-model/tests/model/memory_m4_counterexamples.rs`, and the M2/M3 suites):
+
+| Assumption / unproved gap | Why outside the Lean theorem | Executable regression / counterexample anchor |
+| - | - | - |
+| **Rust compiler & VM correspondence** (`flick-core::opt::perceus`, `flick-ir::memory::validate`, `flick-vm::tier0`) | No verified extraction from Lean to Rust; Lean models projections of the IR, passes, and counted heap. | `flick-ir/src/memory/aggregate_tests.rs`, `memory_aggregates.rs`, `memory_specialize.rs`, `memory_m3_reuse.rs`, `memory_inventory.rs` (1,064/1,064 profiles). |
+| **Premise violations (`parameters.Nodup`, token balance, reuse-token isolation, aggregate reuse rejection, `CellLayout` mismatch)** | Theorems quantify over `checkRepTokens`-accepted inputs with distinct parameters and valid operations; broken premises must fail loudly. | `memory_m4_counterexamples::m4_counterexample_{duplicate_param_unbalanced_dup_and_stale_read_rejected,reuse_token_escape_rejected,runtime_aggregate_rejected_in_reuse_ops,equal_capacity_incompatible_cell_layout_forces_fallback}`; `flick-ir` `rejects_duplicate_parameters_even_with_balanced_body` & `rejects_aggregate_reuse_in_nested_unselected_branch`. |
+| **Dynamic runtime type soundness inside `evalMemPrefix`** | `evalMemPrefix_sound` is a partial-correctness/preservation theorem (`evalMemPrefix = some out → ...`); dynamic type-tag errors (`project` on `.imm`, `unbox*` on non-`boxedAgg`) return `none` rather than being ruled out by a full λFlick-to-`MemBlock` type-preserving compiler proof. | `memory_aggregates.rs`, `memory_m4_counterexamples::m4_aggregate_*`, `memory_m3_reuse.rs`. |
+| **Counted heap acyclicity outside `Ref` / `Arena` handles** | `HeapBalanced` assumes an acyclicity `rank` over counted heap edges; Rust lowering must never construct strong self-owning closure/dictionary cycles, and `Ref` cycles rely on root-arena detach-all teardown. | `memory_m3_cycles.rs`, `memory_m4_counterexamples::m4_boundary_ref_cycle_root_arena_retention_vs_prompt_acyclic_release`. |
+| **Non-reusable storage kinds (`Closure`, `Task`, `String`, `BigInt`, `Dictionary`, `ListSlice`, `Arena`, `Cell`)** | Modeled uniformly as `AggSlot.opaque` fallback in Lean; exact per-kind runtime checks live in `flick-vm/src/tier0/reuse.rs`. | `memory_m4_counterexamples::m4_boundary_non_reusable_storage_kinds_fall_back_cleanly`, `memory_m3_reuse.rs`. |
+| **Full multi-frame calls, closures, `control` continuations, cooperative fibers, STM, and async interleavings** | `Formal/MemorySoundness.lean` models single-frame `MemBlock` execution and arbitrary prefix aborts + scope/arena unwind, not multi-frame call stacks, one-shot continuation capture/discontinuation, or concurrent fiber scheduling. | `memory_m4_counterexamples::m4_unwind_live_reuse_token_nested_aggregate_and_arena_lifo_on_failure_and_abort`, `memory_m2_signals.rs`, `memory_stage4*.rs`, `tests/language`. |
+| **Generational handle provenance, stale-handle rejection, and machine integer / refcount overflow** | Lean uses unbounded `Nat` IDs and refcounts (`ObjId := Nat`) and does not model `usize` saturation or execution/generation tags on `Arena`/`Ref` handles. | `memory_arena_defects.rs`, `memory_retired_owner.rs`, `memory_m2_arenas.rs`, `flick-ir` `validation_tests.rs`. |
+| **Host/FFI `HostBridge` wire marshalling & cross-heap handle symmetry** | Foreign calls and localhost-TCP Node worker handle tables are outside Lean. | `memory_stage5_ffi.rs`, `memory_stage5_host.rs`, `memory_m2_host_bridge.rs`. |
+| **Target-specific physical ABI layout, niche packing, native/Wasm codegen, and OS allocator reclamation** | `CellLayout` is target-independent (`{ capacity, align, ownership }`); physical byte offsets, LLVM/Wasm lowering, and OS heap freeing belong to Phase W/N. | `flick-backend-support::layout` unit tests; Wasm/native codegen remains Phase W/N. |
+
+## 7. Platform and completion gates
 
 M owns the common RC/arena contract and its model/Lean obligations.
 Platform-independent portions of W2/W3 reuse this machinery. LLVM IR
