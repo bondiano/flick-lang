@@ -11,8 +11,9 @@ site, its doctest markers and its locales.
   under `ru/`.
 - `src/widgets/`, `src/playground/` — interactive parts, as Flick
   programs; `tour/`, `course/`, `exercises/` — lesson indexes and programs.
-- `agents/` (agent guidance), `formal/`, `backends/` (contracts) — English
-  only, not site pages.
+- `agents/` (agent guidance), `architecture/` (architecture decisions and
+  measurements), `formal/`, `backends/` (contracts) — English only, not site
+  pages.
 - `scripts/` — locale parity, generated API and error pages, link and
   chunk checks.
 

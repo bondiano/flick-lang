@@ -2,29 +2,39 @@
 #![allow(dead_code)]
 
 use std::env;
+#[cfg(feature = "embedded-std")]
 use std::fmt::Write as _;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+#[cfg(not(feature = "native-project"))]
 #[path = "../flick-diagnostics/src/diagnostics/codes.rs"]
 mod codes;
+#[cfg(not(feature = "native-project"))]
 use codes::Code;
+#[cfg(not(feature = "native-project"))]
 #[path = "../flick-diagnostics/src/diagnostics/model.rs"]
 mod model;
+#[cfg(not(feature = "native-project"))]
 mod diagnostics {
     pub(crate) use crate::codes::{self, Code};
     pub(crate) use crate::model::*;
 }
+#[cfg(not(feature = "native-project"))]
 #[path = "../flick-syntax/src/syntax/kind.rs"]
 mod kind;
+#[cfg(not(feature = "native-project"))]
 #[path = "../flick-syntax/src/syntax/lexer/mod.rs"]
 mod lexer;
+#[cfg(not(feature = "native-project"))]
 #[path = "../flick-diagnostics/src/source.rs"]
 mod source;
+#[cfg(not(feature = "native-project"))]
 mod syntax {
     pub(crate) use crate::{kind, lexer};
 }
+#[cfg(not(feature = "native-project"))]
 #[path = "src/builtin_source.rs"]
 mod builtin_source;
 #[path = "src/implicit_packages.rs"]
@@ -35,35 +45,73 @@ use implicit_packages::IMPLICIT_PACKAGES;
 fn main() -> io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo supplies OUT_DIR"));
-    let native = cfg!(feature = "native-project");
-    if !native {
-        for package in ["core"].iter().chain(IMPLICIT_PACKAGES) {
+
+    #[cfg(not(feature = "native-project"))]
+    {
+        strip_tree(Path::new("../packages/core/src"), &output.join("core"))?;
+        #[cfg(feature = "embedded-std")]
+        for package in IMPLICIT_PACKAGES {
             let sources = Path::new("../packages").join(package).join("src");
             strip_tree(&sources, &output.join(package))?;
         }
     }
-    implicit_sources(&output, native)
+
+    #[cfg(feature = "embedded-std")]
+    implicit_sources(&output)?;
+
+    #[cfg(not(feature = "embedded-std"))]
+    remove_stale_implicit_outputs(&output)?;
+
+    Ok(())
+}
+
+/// Removes outputs left behind by an earlier `build.rs` when `embedded-std` is
+/// disabled, so incremental upgrades without `cargo clean` keep `OUT_DIR` clean.
+#[cfg(not(feature = "embedded-std"))]
+fn remove_stale_implicit_outputs(output: &Path) -> io::Result<()> {
+    let generated = output.join("implicit_sources.rs");
+    if generated.exists() {
+        fs::remove_file(&generated)?;
+    }
+    for package in IMPLICIT_PACKAGES {
+        let dir = output.join(package);
+        if dir.is_dir() {
+            fs::remove_dir_all(&dir)?;
+        }
+    }
+    Ok(())
+}
+
+/// Writes `contents` to `path` only when the bytes on disk differ, preserving
+/// output mtimes across doc-only edits or unchanged generated inventories.
+#[cfg(any(not(feature = "native-project"), feature = "embedded-std"))]
+fn write_if_changed(path: &Path, contents: &str) -> io::Result<()> {
+    if fs::read(path).ok().as_deref() == Some(contents.as_bytes()) {
+        return Ok(());
+    }
+    fs::write(path, contents)
 }
 
 /// `implicit_sources.rs`: `IMPLICIT`, each implicit package with its modules
 /// and, with `native-project`, the tables of its `src/go`.
-fn implicit_sources(output: &Path, native: bool) -> io::Result<()> {
+#[cfg(feature = "embedded-std")]
+fn implicit_sources(output: &Path) -> io::Result<()> {
     let mut out = String::from("pub(super) const IMPLICIT: &[Embedded] = &[\n");
     for package in IMPLICIT_PACKAGES {
-        let modules = package_modules(package, output, native)?;
-        let go = if native {
-            package_go_tables(package)?
-        } else {
-            String::new()
-        };
+        let modules = package_modules(package, output)?;
+        #[cfg(feature = "native-project")]
+        let go = package_go_tables(package)?;
+        #[cfg(not(feature = "native-project"))]
+        let go = String::new();
         let _ = writeln!(out, "    ({package:?}, &[\n{modules}    ], &[\n{go}    ]),");
     }
     out.push_str("];\n");
-    fs::write(output.join("implicit_sources.rs"), out)
+    write_if_changed(&output.join("implicit_sources.rs"), &out)
 }
 
 /// The tables of `packages/<package>/src/go`, by file name, as array items; a
 /// package without them has none.
+#[cfg(all(feature = "embedded-std", feature = "native-project"))]
 fn package_go_tables(package: &str) -> io::Result<String> {
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("Cargo supplies it"));
     let dir = manifest.join("../packages").join(package).join("src/go");
@@ -99,7 +147,8 @@ fn package_go_tables(package: &str) -> io::Result<String> {
 
 /// The modules of `packages/<package>` in the order of its `modules.txt`, each
 /// its file as written, or without its docs, as array items.
-fn package_modules(package: &str, output: &Path, docs: bool) -> io::Result<String> {
+#[cfg(feature = "embedded-std")]
+fn package_modules(package: &str, output: &Path) -> io::Result<String> {
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("Cargo supplies it"));
     let sources = manifest.join("../packages").join(package).join("src");
     let order = sources.join("modules.txt");
@@ -111,7 +160,7 @@ fn package_modules(package: &str, output: &Path, docs: bool) -> io::Result<Strin
         .filter(|l| !l.is_empty() && !l.starts_with('#'))
     {
         let file = format!("{}.fl", module.replace('.', "/"));
-        let path = if docs {
+        let path = if cfg!(feature = "native-project") {
             sources.join(&file)
         } else {
             output.join(package).join(&file)
@@ -125,6 +174,7 @@ fn package_modules(package: &str, output: &Path, docs: bool) -> io::Result<Strin
     Ok(out)
 }
 
+#[cfg(not(feature = "native-project"))]
 fn strip_tree(input: &Path, output: &Path) -> io::Result<()> {
     println!("cargo:rerun-if-changed={}", input.display());
     fs::create_dir_all(output)?;
@@ -143,9 +193,9 @@ fn strip_tree(input: &Path, output: &Path) -> io::Result<()> {
             let text = fs::read_to_string(&path)?;
             let stripped = builtin_source::without_docs(&text)
                 .map_err(|problem| io::Error::other(format!("{}: {problem}", path.display())))?;
-            fs::write(
-                output.join(path.file_name().expect("directory entry has a name")),
-                stripped,
+            write_if_changed(
+                &output.join(path.file_name().expect("directory entry has a name")),
+                &stripped,
             )?;
         }
     }

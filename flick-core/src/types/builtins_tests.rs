@@ -373,3 +373,26 @@ fn core_inventory_rejects_omitted_duplicate_and_unknown_sources() {
         "{duplicate_path:?}"
     );
 }
+
+#[test]
+fn build_script_generates_only_feature_required_outputs() {
+    let out_dir = Path::new(env!("OUT_DIR"));
+    assert_eq!(
+        out_dir.join("implicit_sources.rs").exists(),
+        cfg!(feature = "embedded-std"),
+        "implicit_sources.rs must only be generated when embedded-std is enabled"
+    );
+    assert_eq!(
+        out_dir.join("core/Prelude.fl").exists(),
+        !cfg!(feature = "native-project"),
+        "stripped core sources must only be generated when native-project is disabled"
+    );
+    assert_eq!(
+        out_dir.join("std").exists(),
+        cfg!(all(
+            not(feature = "native-project"),
+            feature = "embedded-std"
+        )),
+        "stripped implicit packages must only be generated when native-project is off and embedded-std is on"
+    );
+}
