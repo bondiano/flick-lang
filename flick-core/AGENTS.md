@@ -21,10 +21,11 @@ queries. `flick`, `flick-wasm`, `flick-model` and `flick-backend` link it.
   only from its layer or lower ones. Outside `ts`, `src/codegen/` reads
   only the IR and build input: no `types`, `iface`, `opt`, `project`,
   `build`, `syntax` or `std::fs`.
-- `build.rs` compiles `builtin_source.rs`, `implicit_packages.rs`,
-  `source.rs` and `diagnostics/{codes,model}.rs` of `flick-diagnostics`
-  and `syntax/{kind.rs,lexer/}` of `flick-syntax` on their own: keep
-  their `crate::` imports within that set.
+- Without `native-project`, `build.rs` compiles `builtin_source.rs`,
+  `source.rs` and `diagnostics/{codes,model}.rs` of `flick-diagnostics`, and
+  `syntax/{kind.rs,lexer/}` of `flick-syntax` on their own (it also reads
+  `implicit_packages.rs` and emits/watches `packages/<pkg>/` only when
+  `embedded-std` is enabled): keep their `crate::` imports within that set.
 - A new code needs a `codes!` entry, `explain/<CODE>.md`, its Russian
   `docs/src/error-translations/<CODE>.md`, then
   `node docs/scripts/errors.mjs --write`. Never reuse a number; mark a

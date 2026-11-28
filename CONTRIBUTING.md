@@ -56,6 +56,9 @@ errors and time-zone names differently.
 | [`flick-model`](./flick-model/) | Reference checker and interpreter of the core calculus in [`docs/formal/core.md`](./docs/formal/core.md) |
 | [`flick-pretty`](./flick-pretty/) | The pretty printer of the formatter and the code generators |
 
+Crate extraction decisions and rebuild measurements live in
+[docs/architecture/crate-splits.md](./docs/architecture/crate-splits.md).
+
 The integration tests of `flick`, `flick-core` and `flick-model` are one test
 binary per crate (`tests/cli/`, `tests/compiler/`, `tests/model/`), so the
 compiler is linked once: a new suite is a file there and a `pub mod` line in
