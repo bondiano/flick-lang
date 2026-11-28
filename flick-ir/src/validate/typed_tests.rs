@@ -71,6 +71,7 @@ fn rejects_constructor_pattern_type_mismatch() {
                 result_args: None,
             }],
             alias: None,
+            foreign_forms: Vec::new(),
         },
         TypeDecl {
             name: "Box".into(),
@@ -87,6 +88,7 @@ fn rejects_constructor_pattern_type_mismatch() {
                 result_args: None,
             }],
             alias: None,
+            foreign_forms: Vec::new(),
         },
     ];
 

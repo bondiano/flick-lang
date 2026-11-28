@@ -18,8 +18,8 @@ use flick_core::source::{FileId, SourceMap, Span};
 use super::Contributor;
 use super::inputs::expand;
 use super::projection::Projections;
-use super::validate::PreparedStep;
 pub(super) use super::validate::validate_plan;
+use super::validate::{PreparedStep, is_step_scratch};
 use crate::args::GlobalArguments;
 use crate::artifact::{Artifact, validate_destination_paths};
 use crate::backends::{Reads, Tool, run_steps};
@@ -354,6 +354,7 @@ fn run_in_place(
 fn plan_files(plan: &Plan) -> (Vec<Artifact>, BTreeMap<String, Artifact>) {
     let mut produced = BTreeMap::new();
     let mut artifacts = Vec::with_capacity(plan.files.len());
+    let resuming = plan.resume.is_some();
     for f in &plan.files {
         let artifact = Artifact {
             path: f.path.clone(),
@@ -365,7 +366,9 @@ fn plan_files(plan: &Plan) -> (Vec<Artifact>, BTreeMap<String, Artifact>) {
             },
         };
         produced.insert(artifact.path.clone(), artifact.clone());
-        artifacts.push(artifact);
+        if !(resuming && is_step_scratch(&f.path)) {
+            artifacts.push(artifact);
+        }
     }
     (artifacts, produced)
 }

@@ -504,3 +504,82 @@ fn validate_plan_enforces_in_place_step_contract() {
     .expect("missing tool rejected");
     assert!(err.contains("not on PATH"), "{err}");
 }
+
+#[test]
+fn validate_plan_enforces_step_scratch_file_contract() {
+    use flick_backend::command::{Tool, ToolStep};
+
+    let pinned = Tool {
+        id: "go".into(),
+        version: "1.24.0".into(),
+        sha256: "b".repeat(64),
+    };
+    let mut inv = sample_invocation();
+    inv.tools.push(pinned.clone());
+
+    let scratch_file = File {
+        path: ".flick-step/inspect.go".into(),
+        bytes: b"package main\n".to_vec(),
+        executable: false,
+    };
+    let step = |inputs: Vec<String>| ToolStep {
+        id: "inspect".into(),
+        tool: pinned.clone(),
+        arguments: vec!["run".into(), "./.flick-step/inspect.go".into()],
+        environment: vec![],
+        inputs,
+        reads: vec![],
+        outputs: vec!["surface-0.json".into()],
+        in_place: false,
+    };
+
+    // Accepted on a resuming plan even when writes is empty, if consumed by step.inputs.
+    let mut ok_plan = Plan::empty();
+    ok_plan.files.push(scratch_file.clone());
+    ok_plan
+        .steps
+        .push(Step::Tool(step(vec![".flick-step/inspect.go".into()])));
+    ok_plan.resume = Some(b"state".to_vec());
+    assert!(validate_plan(&ok_plan, &inv, &[], &[], Path::new("."), true).is_ok());
+
+    // Rejected when unused by any step.
+    let mut unused_plan = Plan::empty();
+    unused_plan.files.push(scratch_file.clone());
+    unused_plan.steps.push(Step::Tool(step(vec![])));
+    unused_plan.resume = Some(b"state".to_vec());
+    let err = validate_plan(&unused_plan, &inv, &[], &[], Path::new("."), true)
+        .err()
+        .expect("unused scratch rejected");
+    assert!(err.contains("not used by any step"), "{err}");
+
+    // Rejected on non-resuming plans even if declared in writes.
+    let mut non_resuming = Plan::empty();
+    non_resuming.files.push(scratch_file);
+    non_resuming
+        .steps
+        .push(Step::Tool(step(vec![".flick-step/inspect.go".into()])));
+    let err = validate_plan(
+        &non_resuming,
+        &inv,
+        &[".flick-step".into(), "surface-0.json".into()],
+        &[],
+        Path::new("."),
+        true,
+    )
+    .err()
+    .expect("non-resuming scratch rejected");
+    assert!(err.contains("resuming plan"), "{err}");
+
+    // Path traversal inside .flick-step/ is still refused by validate_output_paths.
+    let mut escape = Plan::empty();
+    escape.files.push(File {
+        path: ".flick-step/../escape.go".into(),
+        bytes: b"package main\n".to_vec(),
+        executable: false,
+    });
+    escape
+        .steps
+        .push(Step::Tool(step(vec![".flick-step/../escape.go".into()])));
+    escape.resume = Some(b"state".to_vec());
+    assert!(validate_plan(&escape, &inv, &[], &[], Path::new("."), true).is_err());
+}

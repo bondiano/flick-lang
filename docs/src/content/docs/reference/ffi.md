@@ -650,3 +650,80 @@ new import (`FLICK-F006`), a reviewed binding whose declaration changed or
 disappeared, or that lacks what its shape needs — `catch` for a Promise,
 `nullable` for an empty result, `retention` for a callback (`FLICK-F007`)
 — and a policy for an export the package does not have (`FLICK-F008`).
+
+## Importing a Go package (`go:ffi`)
+
+In a Go project (`[build] target = "go"`), `flick ffi import <package> --out <dir>`
+(or qualified `flick go:ffi import <package> --out <dir>`) inspects a Go package
+through `go/types` and writes `<dir>/<Pkg>/Generated.fl`, module
+`<Dir>.<Pkg>.Generated` (`strings` → `Strings`, `example.com/foo/v2` → `Foo`),
+alongside a coverage report for every selected export.
+
+The importer runs an embedded stdlib-only Go inspector using the pinned `go`
+host tool allowed in `flick.toml`:
+
+```toml
+[tools]
+"flick/go" = ["go"]
+```
+
+It works offline for Go standard library packages (`strings`, `math`, …),
+third-party modules declared in `[target.go.dependencies]` or `go.mod`, and
+local Go modules passed with `--dir <module-dir>`. `--select a,b` imports only
+the named exports (`Replacer.Replace` selects a method on `Replacer`).
+
+| Go (`go/types`) | Flick |
+| - | - |
+| `bool`, `int32` / `rune`, `float64`, `string` | `Bool`, `Int`, `Float`, `String` |
+| `[]byte` | `Bytes` |
+| `[]T` | `List T` |
+| `*T` parameter (supported scalar, `[]byte`, `[]U`) | `Option T` |
+| `*T` result (supported scalar, `[]byte`, `[]U`) | `Option T` with `nullable`; needs `nullable = true` (or `undefined = "none"`) in `policy.toml` |
+| `(T, bool)` comma-ok result | `Option T` |
+| trailing `error` result (`(T, error)` or bare `error`) | error row with `GoError` and `catch from_go_error` (or custom `catch`/`error` in `policy.toml`) |
+| leading `context.Context` parameter | `Async` row with `cancel context` |
+| exported struct, interface, or pointer to struct (`*T`, `I`) | opaque `type Name` annotated with `@go from "<pkg>" "<form>"`, unless `[types.<Name>]` sets `convert` |
+| method on exported named type `T` / `*T` | `type_method` taking the receiver first with `this` |
+| typed variadic `...T` | `List T` with `variadic` |
+| scalar constants (`float64`, `bool`, `string`, in-range `int32`) | `foreign pure` constant |
+
+Generic functions and methods on generic types, instantiated generic types
+(such as `iter.Seq[string]`), channels (`chan`, `<-chan`, `chan<-`), variadic
+`any` / `interface{}`, unexported types, non-ABI numeric widths (`int`,
+`int64`, `uint*`, `float32`, …), maps, fixed-size arrays, function types,
+unnamed structs/interfaces, `unsafe.Pointer`, out-of-range integer constants,
+multi-value returns other than `(T, bool)` + trailing `error`, and package
+variables are emitted as `foreign blocked` with status `unsupported` and their
+reason. Using a blocked binding, or requesting one with `--select`, reports
+`FLICK-F005`.
+
+Policies live in `<dir>/<Pkg>/policy.toml`, which the importer reads and never
+overwrites:
+
+```toml
+[exports.Add]
+mode = "pure"              # trust the Go call to be pure
+
+[exports.MaybeDouble]
+nullable = true            # treat nil pointer/interface result as None
+
+[exports.Divide]
+catch = "AppErr.from_go"   # custom String -> E converter for trailing error
+error = "AppErr"
+
+[types."*Counter"]
+convert = "Int"            # override opaque handle with an explicit Flick type
+```
+
+### Checking generated and reviewed Go bindings (`go:ffi check`)
+
+`flick go:ffi check [paths] [--dir <module-dir>]` (or `flick ffi check` in a
+Go project) re-inspects each referenced Go package and reports:
+
+- `FLICK-F006` when a `Generated.fl` differs from what `go:ffi import` writes now.
+- `FLICK-F007` at a reviewed binding's `reviewed "<pkg>[@<ver>] sha256:…"` line
+  when the export disappeared, its signature fingerprint changed, or required Go
+  metadata is missing (`catch` for trailing `error`, `cancel` for leading
+  `context.Context`, `this` for a Go method, `variadic` for variadic parameters).
+- `FLICK-F008` for invalid policies, policies naming non-existent exports, or
+  Go package load errors.

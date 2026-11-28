@@ -3,6 +3,7 @@
 mod data;
 mod doctor;
 mod emit;
+mod ffi;
 #[cfg(feature = "guest")]
 mod guest;
 mod optimize;
@@ -64,18 +65,31 @@ fn go_options() -> Vec<OptionDescriptor> {
 
 impl Backend for Go {
     fn commands(&self) -> Vec<command::Descriptor> {
-        vec![doctor::descriptor()]
+        let mut commands = ffi::descriptors();
+        commands.push(doctor::descriptor());
+        commands
     }
 
     fn run(
         &self,
         invocation: &command::Invocation,
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
-        if invocation.name == "doctor" {
+        if ffi::descriptors().iter().any(|d| d.name == invocation.name) {
+            ffi::run(invocation)
+        } else if invocation.name == "doctor" {
             doctor::run(invocation)
         } else {
             Err(command::unknown(&invocation.name))
         }
+    }
+
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+        _answers: Vec<command::Answer>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        ffi::resume(&state, &outputs)
     }
 
     fn templates(&self) -> Vec<command::TemplateDescriptor> {

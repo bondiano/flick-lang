@@ -4,6 +4,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Constraint, TypeRef};
 
+/// A backend type-form attribute declared on a [`TypeDecl`] (for example
+/// `@go from "strings" "*Replacer"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ForeignTypeForm {
+    pub attr: String,
+    pub form: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+}
+
 /// A data, error or nominal type declared by a module, with its
 /// layout-relevant type parameters and constructors.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -24,6 +34,9 @@ pub struct TypeDecl {
     /// of `params` (so layout-aware backends can lay out opaque aliases).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alias: Option<TypeRef>,
+    /// Backend type-form attributes (`@go`, etc.) declared on this type.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub foreign_forms: Vec<ForeignTypeForm>,
 }
 
 /// One constructor of a [`TypeDecl`], with its field types, record layout,

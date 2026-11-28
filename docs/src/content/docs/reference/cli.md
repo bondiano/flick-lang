@@ -361,6 +361,11 @@ Removed legacy flags (`FLICK-P057`) for `flick/js`:
 
 Selected by `--target go` or `[build] target = "go"`.
 
+| Command | What it does |
+| - | - |
+| `ffi import <pkg> --out <dir> [--select a,b] [--dir <mod>]` | a command of the Go backend (`go:ffi import`): inspects a Go package via `go/types` using pinned `go` and writes `<dir>/<Pkg>/Generated.fl` with a coverage report; `--select` imports only the named exports and `--dir` points at a local Go module directory (see [Importing a Go package](../ffi/#importing-a-go-package-goffi)) |
+| `ffi check [paths] [--dir <mod>]` | a command of the Go backend (`go:ffi check`): checks generated and reviewed Go bindings and their policies against their Go packages; without paths checks the source root |
+
 - **Options (`[target.go]`)**: `--cgo` (`build`, `run`, `dev`, `test`; enables
   `CGO_ENABLED=1`, default `false`).
 - **Project templates**: `app`, `cli`, `lib`, and `plugin` (with

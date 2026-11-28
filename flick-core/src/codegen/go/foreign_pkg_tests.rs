@@ -6,7 +6,7 @@ use super::{Input, Output, go};
 use crate::build::builtin_modules;
 use crate::build::go::bindings;
 use crate::codegen::Known;
-use crate::diagnostics::Severity;
+use crate::diagnostics::{Severity, codes};
 use crate::ir::{Module, lang_items};
 use crate::plugin::derive::builtin_expansion;
 use crate::resolve;
@@ -281,4 +281,202 @@ let main () =
         go.contains("flickrt.StructToOptRef[flickrt.Value]("),
         "{go}"
     );
+}
+
+#[test]
+fn direct_go_typed_opaque_assertions_and_this_methods() {
+    let (out, go) = emit_go(
+        r#"module App exposing (main)
+
+type error GoErr = GoErr String
+
+from_err : String -> GoErr
+let from_err msg = GoErr msg
+
+@go from "strings" "*Replacer"
+type Replacer
+
+@go from "io" "Reader"
+type Reader
+
+new_replacer : List String ->{} Replacer
+foreign new_replacer from "strings" "NewReplacer"
+  arity 1
+  variadic
+
+replacer_replace : Replacer -> String ->{} String
+foreign replacer_replace from "strings" "Replacer.Replace"
+  arity 2
+  this
+
+reset_reader : Reader ->{} Unit
+foreign reset_reader from "example.com/pkg/wrap" "Wrap.Reset"
+  arity 1
+  this
+
+fetch_with : Replacer -> String ->{Async; GoErr} String
+foreign fetch_with from "example.com/pkg/wrap" "Client.Fetch"
+  arity 2
+  this
+  catch from_err
+  cancel context
+
+main : Unit ->{Async; GoErr} String
+let main () =
+  let r = new_replacer ["a", "b"]
+  let _ = replacer_replace r "aba"
+  fetch_with r "x"
+"#,
+    );
+    assert!(out.go_imports.contains("strings"), "{:?}", out.go_imports);
+    assert!(
+        !out.go_imports.contains("example.com/pkg/wrap"),
+        "this method on typed receiver must not emit unused import of method's package: {:?}",
+        out.go_imports
+    );
+    assert!(
+        go.contains("a0.(*strings.Replacer).Replace(a1)"),
+        "expected typed Go method call on *strings.Replacer:\n{go}"
+    );
+    assert!(
+        go.contains("p0 := a0.(*strings.Replacer)") && go.contains("p0.Fetch(ctx, p1)"),
+        "expected async typed Go method call with ctx:\n{go}"
+    );
+    assert!(
+        !go.contains("\"example.com/pkg/wrap\""),
+        "unused package import must not appear in Go file:\n{go}"
+    );
+    // Keep reset_reader referenced in a separate test to verify void this method on interface.
+    let (out2, go2) = emit_go(
+        r#"module App exposing (main)
+
+@go from "io" "Reader"
+type Reader
+
+@go from "example.com/pkg/wrap" "*Holder"
+type Holder
+
+make_holder : Unit ->{} Holder
+foreign make_holder from "example.com/pkg/wrap" "NewHolder"
+  arity 0
+
+pass_readers : Holder -> List Reader ->{} Unit
+foreign pass_readers from "example.com/pkg/wrap" "Holder.Use"
+  arity 2
+  this
+
+main : Unit ->{} Unit
+let main () =
+  let h = make_holder ()
+  pass_readers h []
+"#,
+    );
+    assert!(out2.go_imports.contains("io"), "{:?}", out2.go_imports);
+    assert!(
+        go2.contains("a0.(*wrap.Holder).Use(")
+            && go2.contains(
+                "flickrt.ListToGo(a1, func(v flickrt.Value) io.Reader { return v.(io.Reader) })"
+            ),
+        "expected typed opaque List conversion and typed method call:\n{go2}"
+    );
+}
+
+#[test]
+fn direct_go_this_method_requires_go_type_form_on_receiver() {
+    for src in [
+        r#"module App exposing (main)
+
+type Replacer
+
+replacer_replace : Replacer -> String ->{} String
+foreign replacer_replace from "strings" "Replacer.Replace"
+  arity 2
+  this
+
+main : Replacer ->{} String
+let main r = replacer_replace r "aba"
+"#,
+        r#"module App exposing (main)
+
+type Client
+
+fetch : Client -> String ->{Async} String
+foreign fetch from "example.com/pkg/wrap" "Client.Fetch"
+  arity 2
+  this
+  cancel context
+
+main : Client ->{Async} String
+let main c = fetch c "x"
+"#,
+    ] {
+        let ir = lower_go(src);
+        let builtins: Vec<&Module> = builtin_modules().iter().collect();
+        let out = go(&Input {
+            own: &[&ir],
+            builtins: &builtins,
+            entry: &ir.name,
+            suites: &[],
+            test: false,
+            paths: &BTreeMap::new(),
+            lines: &[],
+            sources: &[],
+            foreign: &BTreeMap::new(),
+            bindings: bindings(),
+            lang: &Known::of(&lang_items()),
+        });
+        assert!(
+            out.diagnostics.iter().any(|d| d
+                .message
+                .contains("without a `@go` type form on its receiver")),
+            "expected missing @go receiver diagnostic, got: {:?}",
+            out.diagnostics
+        );
+    }
+}
+
+#[test]
+fn malformed_go_type_form_with_numeric_args_is_rejected_with_s014() {
+    for src in [
+        "module App\n\n@go \"string\" 42\ntype Bad1\n",
+        "module App\n\n@go -1 \"string\"\ntype Bad2\n",
+    ] {
+        let mut sources = SourceMap::default();
+        let file = sources.add("App.fl", src);
+        let parse = syntax::parse(src, file);
+        let mod_syntax = resolve::module_syntax(&parse.tree, src, file);
+        let module = resolve::Module {
+            name: "App",
+            file,
+            text: src,
+            tree: &parse.tree,
+            syntax: &mod_syntax,
+            generated: resolve::NO_GENERATED,
+        };
+        let builtins = types::builtins();
+        let builtin = |name: &str| builtins.iter().find(|i| i.module == name).cloned();
+        let (mut interface, mut diagnostics) = resolve::resolve(&module, &builtin);
+        let local = |n: &str| n == "App";
+        let go_spec = ForeignBackendSpec::go();
+        let options = types::Options {
+            local: &local,
+            limits: types::Limits::default(),
+            no_let_assert: false,
+            thresholds: types::Thresholds::default(),
+            watched: Watched::none(),
+            stages_by_class: false,
+            foreign_backend: &go_spec,
+            validate_foreign_metadata: true,
+            native_overrides: None,
+        };
+        let (more, _) = types::check_typed(&module, &builtin, builtins, options, &mut interface);
+        diagnostics.extend(parse.diagnostics);
+        diagnostics.extend(more);
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.code == codes::S014 && d.message.contains("`@go`")),
+            "expected FLICK-S014 for `{src}`, got: {diagnostics:?}"
+        );
+    }
 }

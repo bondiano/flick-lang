@@ -21,12 +21,26 @@ backend-api = { minimum = "0.1.0", maximum-exclusive = "0.2.0" }
 ir = { minimum = "0.19.0", maximum-exclusive = "0.20.0" }
 
 [features]
-component = ["dep:flick-backend", "dep:ciborium", "flick-ir/cbor"]
+component = [
+    "dep:flick-backend",
+    "dep:ciborium",
+    "dep:flick-diagnostics",
+    "dep:flick-ffi",
+    "dep:serde",
+    "dep:serde_json",
+    "dep:toml",
+    "flick-ir/cbor",
+]
 guest = ["component"]
 
 [dependencies]
 flick-backend = { path = "../../flick-backend", optional = true }
+flick-diagnostics = { path = "../../flick-diagnostics", optional = true }
+flick-ffi = { path = "../../flick-ffi", optional = true }
 ciborium = { version = "0.2.2", optional = true }
 flick-backend-support = { path = "../../flick-backend-support", features = ["native-project"] }
 flick-ir = { path = "../../flick-ir" }
 flick-pretty = { path = "../../flick-pretty" }
+serde = { version = "1.0.229", features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
+toml = { version = "1.1.8", optional = true }

@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 use std::mem;
 
-use flick_ir::{ConstructorDecl, IrType, Rep, TypeDecl, TypeRef};
+use flick_ir::{ConstructorDecl, ForeignTypeForm, IrType, Rep, TypeDecl, TypeRef};
 
 use super::Checker;
 use super::env::Form;
@@ -18,6 +18,7 @@ use super::variance::decl_param_names;
 use crate::iface::Namespace;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::literal::string_value;
 
 impl Checker<'_> {
     /// Populates the IR type tables on `typing` once the module is fully solved.
@@ -179,7 +180,13 @@ impl Checker<'_> {
         let Some(root) = self.root else { return };
         let module = &self.env.module;
         let mut seen = BTreeSet::new();
+        let mut pending_attrs: Vec<&Node> = Vec::new();
         for decl in root.nodes() {
+            if decl.kind == K::Attribute {
+                pending_attrs.push(decl);
+                continue;
+            }
+            let attrs = mem::take(&mut pending_attrs);
             if !matches!(decl.kind, K::TypeDecl | K::ErrorDecl) {
                 continue;
             }
@@ -196,6 +203,7 @@ impl Checker<'_> {
             if matches!(def.form, Form::Alias { opaque: false, .. }) {
                 continue;
             }
+            let foreign_forms = self.collect_foreign_type_forms(&attrs);
             let kinds = kind_params(&def.kind);
             let written_names = decl_param_names(root, self.text, &name);
             let params: Vec<String> = kinds
@@ -250,8 +258,50 @@ impl Checker<'_> {
                 error,
                 constructors,
                 alias,
+                foreign_forms,
             });
         }
+    }
+
+    fn collect_foreign_type_forms(&self, attrs: &[&Node]) -> Vec<ForeignTypeForm> {
+        let mut forms = Vec::new();
+        for attr in attrs {
+            let mut tokens = attr
+                .child_tokens()
+                .filter(|t| matches!(t.kind, K::Ident | K::String))
+                .map(|t| (t.kind, t.text(self.text)));
+            let Some((K::Ident, name)) = tokens.next() else {
+                continue;
+            };
+            if name == "ts"
+                || self
+                    .options
+                    .foreign_backend
+                    .type_form_attribute(name)
+                    .is_none()
+            {
+                continue;
+            }
+            let rest: Vec<(K, &str)> = tokens.collect();
+            match rest.as_slice() {
+                [(K::String, form)] => forms.push(ForeignTypeForm {
+                    attr: name.to_owned(),
+                    form: string_value(form),
+                    from: None,
+                }),
+                [
+                    (K::Ident, "from" | "import"),
+                    (K::String, pkg),
+                    (K::String, form),
+                ] => forms.push(ForeignTypeForm {
+                    attr: name.to_owned(),
+                    form: string_value(form),
+                    from: Some(string_value(pkg)),
+                }),
+                _ => {}
+            }
+        }
+        forms
     }
 
     #[allow(clippy::too_many_arguments)]

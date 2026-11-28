@@ -97,6 +97,7 @@ pub(super) fn base_program(modules: Vec<Module>) -> Program {
                 error: false,
                 constructors: Vec::new(),
                 alias: None,
+                foreign_forms: Vec::new(),
             },
             TypeDecl {
                 name: "Bool".into(),
@@ -104,6 +105,7 @@ pub(super) fn base_program(modules: Vec<Module>) -> Program {
                 error: false,
                 constructors: Vec::new(),
                 alias: None,
+                foreign_forms: Vec::new(),
             },
             TypeDecl {
                 name: "Int".into(),
@@ -111,6 +113,7 @@ pub(super) fn base_program(modules: Vec<Module>) -> Program {
                 error: false,
                 constructors: Vec::new(),
                 alias: None,
+                foreign_forms: Vec::new(),
             },
             TypeDecl {
                 name: "Float".into(),
@@ -118,6 +121,7 @@ pub(super) fn base_program(modules: Vec<Module>) -> Program {
                 error: false,
                 constructors: Vec::new(),
                 alias: None,
+                foreign_forms: Vec::new(),
             },
             TypeDecl {
                 name: "String".into(),
@@ -125,6 +129,7 @@ pub(super) fn base_program(modules: Vec<Module>) -> Program {
                 error: false,
                 constructors: Vec::new(),
                 alias: None,
+                foreign_forms: Vec::new(),
             },
             TypeDecl {
                 name: "List".into(),
@@ -132,6 +137,7 @@ pub(super) fn base_program(modules: Vec<Module>) -> Program {
                 error: false,
                 constructors: Vec::new(),
                 alias: None,
+                foreign_forms: Vec::new(),
             },
             TypeDecl {
                 name: "Option".into(),
@@ -160,6 +166,7 @@ pub(super) fn base_program(modules: Vec<Module>) -> Program {
                     },
                 ],
                 alias: None,
+                foreign_forms: Vec::new(),
             },
             TypeDecl {
                 name: "Module".into(),
@@ -167,6 +174,7 @@ pub(super) fn base_program(modules: Vec<Module>) -> Program {
                 error: false,
                 constructors: Vec::new(),
                 alias: None,
+                foreign_forms: Vec::new(),
             },
         ],
     );

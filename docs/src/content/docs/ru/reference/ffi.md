@@ -1,6 +1,6 @@
 ---
 title: "Внешние функции"
-source_hash: 81cafd519591ba95
+source_hash: c57966f09227d4dc
 ---
 
 Объявление `foreign` связывает функцию JS с сигнатурой Flick
@@ -675,3 +675,84 @@ foreign lookup from "lookup-lib" "lookup"
   `nullable` для пустого результата, `retention` для функции обратного вызова —
   `FLICK-F007`.
 - Политика ссылается на экспорт, которого нет в пакете, — `FLICK-F008`.
+
+## Импорт пакета Go (`go:ffi`)
+
+В проекте Go (`[build] target = "go"`) команда `flick ffi import <package> --out <dir>`
+(или полная форма `flick go:ffi import <package> --out <dir>`) читает пакет Go
+через `go/types` и записывает `<dir>/<Pkg>/Generated.fl` с модулем
+`<Dir>.<Pkg>.Generated` (`strings` → `Strings`, `example.com/foo/v2` → `Foo`),
+а также выводит отчёт о покрытии по каждому выбранному экспорту.
+
+Импортёр запускает встроенный инспектор на стандартной библиотеке Go с помощью
+закреплённого инструмента `go`, разрешённого в `flick.toml`:
+
+```toml
+[tools]
+"flick/go" = ["go"]
+```
+
+Команда работает автономно для пакетов стандартной библиотеки Go (`strings`,
+`math`, …), сторонних модулей из `[target.go.dependencies]` или `go.mod`, а
+также локальных модулей Go, переданных через `--dir <module-dir>`. Опция
+`--select a,b` импортирует только перечисленные экспорты (`Replacer.Replace`
+выбирает метод типа `Replacer`).
+
+| Go (`go/types`) | Flick |
+| - | - |
+| `bool`, `int32` / `rune`, `float64`, `string` | `Bool`, `Int`, `Float`, `String` |
+| `[]byte` | `Bytes` |
+| `[]T` | `List T` |
+| параметр `*T` (поддерживаемый скаляр, `[]byte`, `[]U`) | `Option T` |
+| результат `*T` (поддерживаемый скаляр, `[]byte`, `[]U`) | `Option T` с `nullable`; требуется `nullable = true` (или `undefined = "none"`) в `policy.toml` |
+| результат `(T, bool)` с проверкой `ok` | `Option T` |
+| завершающий результат `error` (`(T, error)` или одиночный `error`) | строка ошибок с `GoError` и `catch from_go_error` (либо пользовательские `catch`/`error` в `policy.toml`) |
+| первый параметр `context.Context` | строка с `Async` и `cancel context` |
+| экспортируемая структура, интерфейс или указатель на структуру (`*T`, `I`) | непрозрачный `type Name` с атрибутом `@go from "<pkg>" "<form>"`, если `[types.<Name>]` не задаёт `convert` |
+| метод экспортируемого именованного типа `T` / `*T` | `type_method` с получателем в первом параметре и метаданными `this` |
+| типизированный вариативный параметр `...T` | `List T` с `variadic` |
+| скалярные константы (`float64`, `bool`, `string`, `int32` в диапазоне) | константа `foreign pure` |
+
+Обобщённые функции и методы обобщённых типов, инстанцированные обобщённые типы
+(например, `iter.Seq[string]`), каналы (`chan`, `<-chan`, `chan<-`), вариативный
+`any` / `interface{}`, неэкспортированные типы, числовые разрядности вне ABI
+(`int`, `int64`, `uint*`, `float32`, …), отображения (`map`), массивы
+фиксированного размера, функциональные типы, безымянные структуры и интерфейсы,
+`unsafe.Pointer`, переполняющие `int32` целочисленные константы, возврат
+нескольких значений кроме `(T, bool)` и завершающего `error`, а также переменные
+пакета порождают `foreign blocked` со статусом `unsupported` и указанием
+причины. Использование заблокированной привязки или её явный запрос через
+`--select` завершаются с `FLICK-F005`.
+
+Политики хранятся в `<dir>/<Pkg>/policy.toml`; команда импорта читает этот файл
+и никогда его не перезаписывает:
+
+```toml
+[exports.Add]
+mode = "pure"              # trust the Go call to be pure
+
+[exports.MaybeDouble]
+nullable = true            # treat nil pointer/interface result as None
+
+[exports.Divide]
+catch = "AppErr.from_go"   # custom String -> E converter for trailing error
+error = "AppErr"
+
+[types."*Counter"]
+convert = "Int"            # override opaque handle with an explicit Flick type
+```
+
+### Проверка сгенерированных и проверенных Go-привязок (`go:ffi check`)
+
+`flick go:ffi check [paths] [--dir <module-dir>]` (или `flick ffi check` в
+проекте Go) заново читает каждый упомянутый пакет Go и сообщает об ошибках:
+
+- `FLICK-F006`, если `Generated.fl` отличается от того, что сейчас записывает
+  `go:ffi import`.
+- `FLICK-F007` на строке `reviewed "<pkg>[@<ver>] sha256:…"` проверенной
+  привязки, если экспорт исчез, изменился отпечаток его сигнатуры или отсутствуют
+  обязательные метаданные Go (`catch` для завершающего `error`, `cancel` для
+  первого `context.Context`, `this` для метода Go, `variadic` для вариативного
+  параметра).
+- `FLICK-F008` при некорректной политике, политике для несуществующего экспорта
+  или ошибке загрузки пакета Go.

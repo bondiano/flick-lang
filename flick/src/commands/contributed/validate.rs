@@ -16,6 +16,14 @@ use flick_core::project;
 use super::inputs::{normal, under};
 use crate::backends::authorize;
 
+/// Path prefix for plan files staged only for steps of a resuming round and
+/// never published to the project root.
+pub(super) const STEP_SCRATCH_PREFIX: &str = ".flick-step/";
+
+pub(super) fn is_step_scratch(path: &str) -> bool {
+    path.starts_with(STEP_SCRATCH_PREFIX)
+}
+
 /// Validated metadata for one staged step in a plan, ready for sequential execution.
 pub(super) enum PreparedStep<'a> {
     Tool {
@@ -105,16 +113,42 @@ pub(super) fn validate_plan<'a>(
     }
 
     validate_output_paths(all_paths.iter().copied(), limits)?;
-    // What `resume` gets is never written, so step outputs need not be declared in `writes`.
-    let written = if plan.resume.is_some() {
-        plan.files.len()
+    let used_inputs: BTreeSet<&str> = plan
+        .steps
+        .iter()
+        .filter_map(|step| match step {
+            Step::Tool(t) if !t.in_place => Some(t.inputs.iter().map(String::as_str)),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    if plan.resume.is_some() {
+        for file in &plan.files {
+            if is_step_scratch(&file.path) {
+                if !used_inputs.contains(file.path.as_str()) {
+                    return Err(format!(
+                        "step scratch file `{}` is not used by any step",
+                        file.path
+                    ));
+                }
+            } else if !under(&file.path, writes) {
+                return Err(format!(
+                    "it writes `{}`, which the command does not declare",
+                    file.path
+                ));
+            }
+        }
     } else {
-        all_paths.len()
-    };
-    if let Some(path) = all_paths.iter().take(written).find(|p| !under(p, writes)) {
-        return Err(format!(
-            "it writes `{path}`, which the command does not declare"
-        ));
+        if let Some(path) = all_paths.iter().find(|p| is_step_scratch(p)) {
+            return Err(format!(
+                "step scratch file `{path}` is only allowed in a resuming plan"
+            ));
+        }
+        if let Some(path) = all_paths.iter().find(|p| !under(p, writes)) {
+            return Err(format!(
+                "it writes `{path}`, which the command does not declare"
+            ));
+        }
     }
 
     Ok(ValidatedPlan { regular, in_place })

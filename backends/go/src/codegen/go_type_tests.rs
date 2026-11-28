@@ -57,6 +57,7 @@ fn unconstrained_forall_errors_service_impl_and_opaque_alias_stay_erased() {
             args: vec![],
         })),
         constructors: vec![],
+        foreign_forms: vec![],
     };
     let mut decls = TypeDecls::new();
     decls.insert(("App".into(), "UserId".into()), own_decl(&alias_decl));
@@ -203,6 +204,7 @@ fn record_shape_canonical_order_and_substitution_invariance() {
             args: vec![],
         })),
         constructors: vec![],
+        foreign_forms: vec![],
     };
     let mut decls = TypeDecls::new();
     decls.insert(("App".into(), "UserId".into()), own_decl(&alias_decl));
@@ -354,6 +356,7 @@ fn adt_shape_slot_pooling_and_ineligible_shapes() {
             tagged_ctor("Circle", vec![float_ty.clone()]),
             tagged_ctor("Rect", vec![float_ty.clone(), float_ty]),
         ],
+        foreign_forms: vec![],
     };
     let chain_decl = TypeDecl {
         name: "Chain".into(),
@@ -367,6 +370,7 @@ fn adt_shape_slot_pooling_and_ineligible_shapes() {
                 vec![int_ty.clone(), named_ir("App", "Chain", vec![])],
             ),
         ],
+        foreign_forms: vec![],
     };
     let huge_decl = TypeDecl {
         name: "Huge".into(),
@@ -386,6 +390,7 @@ fn adt_shape_slot_pooling_and_ineligible_shapes() {
                 ],
             ),
         ],
+        foreign_forms: vec![],
     };
 
     let mut decls = TypeDecls::new();
@@ -429,6 +434,7 @@ fn concrete_result_and_record_substitution_invariance() {
             tagged_ctor("Err", vec![IrType::Var("e".into())]),
             tagged_ctor("Ok", vec![IrType::Var("a".into())]),
         ],
+        foreign_forms: vec![],
     };
     let mut decls = TypeDecls::new();
     decls.insert(
@@ -483,6 +489,7 @@ fn adt_show_strips_flattened_submodule_prefix() {
         error: false,
         alias: None,
         constructors: vec![tagged_ctor("Points$Pair", vec![int_ty.clone(), int_ty])],
+        foreign_forms: vec![],
     };
     let mut decls = TypeDecls::new();
     decls.insert(("App".into(), "Points$Pair".into()), own_decl(&pair_decl));

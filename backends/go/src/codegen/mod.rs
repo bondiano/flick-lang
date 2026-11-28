@@ -26,6 +26,7 @@ mod foreign;
 mod foreign_global;
 mod foreign_inline;
 mod foreign_pkg;
+mod foreign_pkg_abi;
 mod foreign_pkg_conv;
 mod foreign_pkg_spec;
 mod generate;

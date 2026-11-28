@@ -24,6 +24,14 @@ enum ReturnShape<'t> {
     CommaOk(&'t GoAbiType),
 }
 
+#[derive(Clone, Copy)]
+enum DirectTarget<'a> {
+    /// Package function call: `pkg.Export(args...)`.
+    Func(&'a str),
+    /// Method call on a typed `@go` opaque receiver: `recv.Method(args[1..]...)`.
+    TypedMethod(&'a str),
+}
+
 impl<'a> Gen<'a> {
     /// Emits a direct Go package binding (`foreign f from "pkg" "Sym"`).
     pub(super) fn package_foreign(
@@ -69,16 +77,38 @@ impl<'a> Gen<'a> {
         let decls = self.decls.unwrap_or(&empty);
         let taken = parameters(f);
 
-        let pkg = self.add_go_import_with_alias(import_path, default_pkg, force_alias);
-        let target = a.alloc_str(&format!("{pkg}.{export}"));
-
         // Zero-parameter constant (`foreign pure pi from "math" "Pi"`).
         if f.dicts == 0 && taken == 0 {
+            let pkg = self.add_go_import_with_alias(import_path, default_pkg, force_alias);
+            let target = a.alloc_str(&format!("{pkg}.{export}"));
             return Some(self.emit_direct_constant(f, decls, target));
         }
-        let (param_abis, result_abi) =
+        let (mut param_abis, mut result_abi) =
             self.classify_direct_sig(f, decls, import_path, export, taken, span)?;
+        for abi in &mut param_abis {
+            self.resolve_opaque_abi(abi);
+        }
+        self.resolve_result_opaque_abi(&mut result_abi, f.adapter.result.nullable);
         let return_shape = self.classify_return_shape(f, &result_abi, span)?;
+
+        let target = if f.adapter.has_word("this") {
+            let method = a.alloc_str(export.rsplit('.').next().unwrap_or(export));
+            if matches!(param_abis.first(), Some(GoAbiType::Opaque(Some(_)))) {
+                DirectTarget::TypedMethod(method)
+            } else {
+                self.errors.push((
+                    format!(
+                        "`{}.{}` uses `this` on a direct Go binding without a `@go` type form on its receiver",
+                        self.module, f.name
+                    ),
+                    Some(span),
+                ));
+                return None;
+            }
+        } else {
+            let pkg = self.add_go_import_with_alias(import_path, default_pkg, force_alias);
+            DirectTarget::Func(a.alloc_str(&format!("{pkg}.{export}")))
+        };
 
         let types = direct_go_types(self.input.lang, decls, f, taken);
         let heads: Vec<String> = (0..f.dicts)
@@ -116,6 +146,36 @@ impl<'a> Gen<'a> {
             " ",
             body
         ])
+    }
+
+    fn resolve_opaque_abi(&mut self, abi: &mut GoAbiType) {
+        abi.resolve_imports(&mut |pkg| {
+            if let Some(parsed) = parse_go_package(pkg, "X") {
+                self.add_go_import_with_alias(
+                    parsed.import_path,
+                    &parsed.default_pkg,
+                    parsed.force_alias,
+                )
+                .to_owned()
+            } else {
+                let default = pkg.rsplit('/').next().unwrap_or(pkg);
+                self.add_go_import_with_alias(pkg, default, false)
+                    .to_owned()
+            }
+        });
+    }
+
+    /// Resolves `@go` opaque type imports in a result ABI only where the
+    /// emitted Go code actually spells the opaque Go type (e.g. `List`,
+    /// comma-ok, or nested `Option`), avoiding unused Go imports on plain
+    /// opaque or `nullable` opaque returns.
+    fn resolve_result_opaque_abi(&mut self, abi: &mut GoAbiType, nullable: bool) {
+        match abi {
+            GoAbiType::Opaque(_) => {}
+            GoAbiType::OptionFlag(inner)
+                if nullable && matches!(inner.as_ref(), GoAbiType::Opaque(_)) => {}
+            other => self.resolve_opaque_abi(other),
+        }
     }
 
     fn emit_direct_constant(
@@ -215,7 +275,7 @@ impl<'a> Gen<'a> {
                 if !f.adapter.result.nullable {
                     return Some(ReturnShape::CommaOk(inner));
                 }
-                if matches!(inner.as_ref(), GoAbiType::Opaque) {
+                if matches!(inner.as_ref(), GoAbiType::Opaque(_)) {
                     Some(ReturnShape::NullableOpaque)
                 } else {
                     self.errors.push((
@@ -235,7 +295,7 @@ impl<'a> Gen<'a> {
     fn direct_go_body(
         &mut self,
         f: &Foreign,
-        target: &'a str,
+        target: DirectTarget<'a>,
         args: &[Document<'a>],
         return_shape: &ReturnShape<'_>,
         want_result: Option<&GoType>,
@@ -265,7 +325,7 @@ impl<'a> Gen<'a> {
 
     fn direct_go_sync_body(
         &self,
-        target: &'a str,
+        target: DirectTarget<'a>,
         args: &[Document<'a>],
         variadic: bool,
         catch_parts: Option<(Vec<Document<'a>>, Document<'a>)>,
@@ -273,18 +333,29 @@ impl<'a> Gen<'a> {
         want_result: Option<&GoType>,
     ) -> Document<'a> {
         let a = self.a;
-        let sync_args: Vec<Document<'a>> = args
-            .iter()
-            .enumerate()
-            .map(|(i, &arg)| {
-                if variadic && i + 1 == args.len() {
-                    docvec![a, arg, "..."]
-                } else {
-                    arg
-                }
-            })
-            .collect();
-        let go_call = call(a, target, sync_args);
+        let spread = |slice: &[Document<'a>]| -> Vec<Document<'a>> {
+            slice
+                .iter()
+                .enumerate()
+                .map(|(i, &arg)| {
+                    if variadic && i + 1 == slice.len() {
+                        docvec![a, arg, "..."]
+                    } else {
+                        arg
+                    }
+                })
+                .collect()
+        };
+        let go_call = match target {
+            DirectTarget::Func(func) => call(a, func, spread(args)),
+            DirectTarget::TypedMethod(method) => {
+                let [recv, rest @ ..] = args else {
+                    unreachable!("TypedMethod requires a receiver argument")
+                };
+                let call_args = spread(rest);
+                call(a, docvec![a, *recv, ".", method], call_args)
+            }
+        };
         if let Some((mut stmts, catch_doc)) = catch_parts {
             let inner = emit_catch_body(a, go_call, return_shape);
             let run = closure(a, "func() (flickrt.Value, error)", inner);
@@ -329,7 +400,7 @@ impl<'a> Gen<'a> {
 
     fn direct_go_async_body(
         &self,
-        target: &'a str,
+        target: DirectTarget<'a>,
         args: &[Document<'a>],
         variadic: bool,
         catch_parts: Option<(Vec<Document<'a>>, Document<'a>)>,
@@ -337,18 +408,41 @@ impl<'a> Gen<'a> {
     ) -> Document<'a> {
         let a = self.a;
         let mut stmts = Vec::new();
-        let mut async_args = Vec::with_capacity(args.len() + 1);
-        async_args.push(a.text("ctx"));
+        let mut locals = Vec::with_capacity(args.len());
         for (i, &arg) in args.iter().enumerate() {
             let local = a.alloc_str(&format!("p{i}"));
             stmts.push(statement(a, docvec![a, local, " := ", arg]));
-            if variadic && i + 1 == args.len() {
-                async_args.push(docvec![a, local, "..."]);
-            } else {
-                async_args.push(a.text(local));
-            }
+            locals.push(local);
         }
-        let go_call = call(a, target, async_args);
+        let go_call = match target {
+            DirectTarget::Func(func) => {
+                let mut async_args = Vec::with_capacity(locals.len() + 1);
+                async_args.push(a.text("ctx"));
+                for (i, &local) in locals.iter().enumerate() {
+                    if variadic && i + 1 == locals.len() {
+                        async_args.push(docvec![a, local, "..."]);
+                    } else {
+                        async_args.push(a.text(local));
+                    }
+                }
+                call(a, func, async_args)
+            }
+            DirectTarget::TypedMethod(method) => {
+                let [recv, rest @ ..] = locals.as_slice() else {
+                    unreachable!("TypedMethod requires a receiver argument")
+                };
+                let mut async_args = Vec::with_capacity(rest.len() + 1);
+                async_args.push(a.text("ctx"));
+                for (i, &local) in rest.iter().enumerate() {
+                    if variadic && i + 1 == rest.len() {
+                        async_args.push(docvec![a, local, "..."]);
+                    } else {
+                        async_args.push(a.text(local));
+                    }
+                }
+                call(a, docvec![a, *recv, ".", method], async_args)
+            }
+        };
         if let Some((catch_stmts, catch_doc)) = catch_parts {
             stmts.extend(catch_stmts);
             let inner = emit_catch_body(a, go_call, return_shape);
