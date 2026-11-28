@@ -1,0 +1,346 @@
+// Partially applied `Layer.run` enforces `FLICK-G003` provider-lifetime soundness
+// through local aliases, pipes, holes, compositions, and higher-order wrappers (#1178).
+module App.LayerRunAliasSoundness exposing (..)
+
+service Greeter =
+  greet : String ->{} String
+
+service Other =
+  ping : Unit ->{} Unit
+
+service Store a =
+  get : Unit ->{} a
+
+type File (s : Region)
+
+service Files =
+  open_scoped : forall s. String ->{Scope s} File s
+  use : forall s. File s ->{} Unit
+
+service Within (s : Region) =
+  get : Unit ->{} File s
+
+report : Failure e ->{} Unit
+let report _ = ()
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> name }
+
+decorate : Layer {Greeter} none {Greeter}
+let decorate = Layer.effect Greeter (task {
+  let prefix = Greeter.greet "p"
+  { greet = fun name -> prefix ++ name }
+})
+
+touched : Unit ->{Files, Within s} Unit
+let touched _ = Files.use (Within.get ())
+
+apply : (a ->{r; e} b) -> a ->{r; e} b
+let apply f x = f x
+
+flip_apply : a -> (a ->{r; e} b) ->{r; e} b
+let flip_apply x f = f x
+
+with_runner : ((Unit ->{Greeter | r; e} a) ->{r; e} a) -> (Unit ->{Greeter | r; e} a) ->{r; e} a
+let with_runner run_with body = run_with body
+
+with_greeter : (Unit ->{Greeter | r} a) ->{r} a
+let with_greeter = Layer.run greeter
+
+run_with : Layer none none o -> (Unit ->{o + r} a) ->{r} a
+let run_with l = Layer.run l
+
+// 1. Local alias inside `scope outer`
+leaked_alias : Unit ->{} Unit
+let leaked_alias () = scope outer {
+  let run_g = Layer.run greeter
+  run_g (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 2. Local alias created outside `scope outer`, invoked inside
+leaked_alias_outside : Unit ->{} Unit
+let leaked_alias_outside () =
+  let run_g = Layer.run greeter
+  scope outer {
+    run_g (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+  }
+
+// 3. Local alias with `Scope.add_finalizer`
+leaked_finalizer_alias : Unit ->{} Unit
+let leaked_finalizer_alias () = scope {
+  let run_g = Layer.run greeter
+  run_g (fun () -> Scope.add_finalizer (task { ignore (Greeter.greet "x") }))
+}
+
+// 4. Local alias invoked on pre-bound function variable
+leaked_fn_alias : Unit ->{} Unit
+let leaked_fn_alias () = scope outer {
+  let run_g = Layer.run greeter
+  let start () = ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") }))
+  run_g start
+}
+
+// 5. Local alias invoked via pipe
+leaked_pipe_alias : Unit ->{} Unit
+let leaked_pipe_alias () = scope outer {
+  let run_g = Layer.run greeter
+  (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") }))) |> run_g
+}
+
+// 6. Local alias shadowing an outer `Fiber.Provided` given
+leaked_shadowed_alias : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{} Unit
+let leaked_shadowed_alias owner =
+  let run_g = Layer.run greeter
+  run_g (fun () -> ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "x") })))
+
+// 7. Local alias shadowing an outer `provide greeter` around `scope outer`
+leaked_nested_provide_alias : Unit ->{} Unit
+let leaked_nested_provide_alias () = provide greeter {
+  scope outer {
+    let run_g = Layer.run greeter
+    run_g (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+  }
+}
+
+// 8. Higher-order `apply` forwarding `Layer.run greeter`
+leaked_ho_apply : Unit ->{} Unit
+let leaked_ho_apply () = scope outer {
+  apply (Layer.run greeter) (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 9. Higher-order `with_runner` forwarding `Layer.run greeter`
+leaked_ho_with_runner : Unit ->{} Unit
+let leaked_ho_with_runner () = scope outer {
+  with_runner (Layer.run greeter) (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 10. Higher-order `apply` shadowing an outer `Fiber.Provided` given
+leaked_ho_shadowed : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{} Unit
+let leaked_ho_shadowed owner =
+  apply (Layer.run greeter) (fun () -> ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "x") })))
+
+// 11. Composed `Layer.run greeter`
+leaked_compose_alias : Unit ->{} Unit
+let leaked_compose_alias () = scope outer {
+  let run_g = (fun x -> x) >> Layer.run greeter
+  run_g (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 12. Hole-applied `Layer.run greeter _`
+leaked_hole_alias : Unit ->{} Unit
+let leaked_hole_alias () = scope outer {
+  let run_g = Layer.run greeter _
+  run_g (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 13. Local wrapper forwarding `Layer.run greeter`
+leaked_wrap_alias : Unit ->{} Unit
+let leaked_wrap_alias () = scope outer {
+  let run_g = Layer.run greeter
+  let wrap body = run_g body
+  wrap (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 14. Record field holding `Layer.run greeter`
+leaked_record_alias : Unit ->{} Unit
+let leaked_record_alias () = scope outer {
+  let runner = { run = Layer.run greeter }
+  runner.run (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 15. Factory helper returning `Layer.run l`
+leaked_mk_alias : Unit ->{} Unit
+let leaked_mk_alias () =
+  let mk l = Layer.run l
+  scope outer {
+    let run_g = mk greeter
+    run_g (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+  }
+
+// 16. Generic layer output row `Layer none none o` via local alias
+leaked_generic_alias : forall o. Layer none none o -> Unit ->{} Unit
+let leaked_generic_alias layer () = provide greeter {
+  scope outer {
+    let run_l = Layer.run layer
+    run_l (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+  }
+}
+
+// 17. Generic layer output row `Layer none none o` via higher-order `apply`
+leaked_generic_ho : forall o. Layer none none o -> Unit ->{} Unit
+let leaked_generic_ho layer () = provide greeter {
+  scope outer {
+    apply (Layer.run layer) (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+  }
+}
+
+// 18. Pipe-applied `greeter |> Layer.run` alias
+leaked_pipe_layer_alias : Unit ->{} Unit
+let leaked_pipe_layer_alias () = scope outer {
+  let run_g = greeter |> Layer.run
+  run_g (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 19. Unapplied `Layer.run` alias (`FLICK-G003`)
+leaked_unapplied_alias : Unit ->{} Unit
+let leaked_unapplied_alias () = scope outer {
+  let f = Layer.run
+  f greeter (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 20. Unapplied `Layer.run` alias parameterized overlap (`FLICK-E019`)
+leaked_unapplied_e019 : Layer none none {Store Int} -> (Unit ->{s} a) ->{s} a
+let leaked_unapplied_e019 layer body =
+  let f = Layer.run
+  f layer body
+
+// 21. Unapplied `Layer.run` alias region-indexed install (`FLICK-G002`)
+leaked_unapplied_g002 : (forall s. File s ->{} Layer none none {Within s}) -> String ->{Files} (Unit ->{Files} Unit)
+let leaked_unapplied_g002 make_within path = scope {
+  let layer = make_within (Files.open_scoped path)
+  let f = Layer.run
+  let run_w = f layer
+  fun () -> run_w (fun () -> touched ())
+}
+
+// 22. Higher-order `with_runner` shadowing outer `Fiber.Provided` given
+leaked_ho_with_runner_shadowed : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{} Unit
+let leaked_ho_with_runner_shadowed owner =
+  with_runner (Layer.run greeter) (fun () -> ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "x") })))
+
+// 23. Higher-order `with_runner` shadowing outer `provide greeter`
+leaked_ho_with_runner_nested : Unit ->{} Unit
+let leaked_ho_with_runner_nested () = provide greeter {
+  scope outer {
+    with_runner (Layer.run greeter) (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+  }
+}
+
+// 24. Annotated top-level alias `with_greeter`
+leaked_annotated_wrapper : Unit ->{} Unit
+let leaked_annotated_wrapper () = scope outer {
+  with_greeter (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 25. Annotated generic wrapper `run_with`
+leaked_annotated_generic : Unit ->{} Unit
+let leaked_annotated_generic () = scope outer {
+  run_with greeter (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 26. Higher-order `flip_apply` with callback before `Layer.run greeter`
+leaked_flip_apply : Unit ->{} Unit
+let leaked_flip_apply () = scope outer {
+  flip_apply (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") }))) (Layer.run greeter)
+}
+
+// 27. `Ref` holding `Layer.run greeter`
+leaked_ref_alias : Unit ->{} Unit
+let leaked_ref_alias () = scope outer {
+  let cell = Ref.make (Layer.run greeter)
+  let r = Ref.get cell
+  r (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 28. Decorating layer (`Layer {Greeter} none {Greeter}`) via alias inside `provide greeter`
+leaked_decorate_alias : Unit ->{} Unit
+let leaked_decorate_alias () = provide greeter {
+  scope outer {
+    let run_d = Layer.run decorate
+    run_d (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+  }
+}
+
+// 29. Reverse composition `Layer.run greeter << (fun x -> x)`
+leaked_reverse_compose : Unit ->{} Unit
+let leaked_reverse_compose () = scope outer {
+  let run_g = Layer.run greeter << (fun x -> x)
+  run_g (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 30. Pre-bound `Scope.add_finalizer` via alias
+leaked_fn_finalizer_alias : Unit ->{} Unit
+let leaked_fn_finalizer_alias () = scope {
+  let run_g = Layer.run greeter
+  let start () = Scope.add_finalizer (task { ignore (Greeter.greet "x") })
+  run_g start
+}
+
+type alias RunnerRec r a = { run : (Unit ->{Greeter | r} a) ->{r} a }
+
+mk_runner_rec : Unit -> RunnerRec r a
+let mk_runner_rec () = { run = Layer.run greeter }
+
+// 31. Annotated runner returned inside a record, invoked via field projection
+leaked_record_field : Unit ->{} Unit
+let leaked_record_field () = scope outer {
+  let box = mk_runner_rec ()
+  box.run (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 32. Annotated runner record field invoked via pipe
+leaked_record_field_pipe : Unit ->{} Unit
+let leaked_record_field_pipe () = scope outer {
+  let box = mk_runner_rec ()
+  (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") }))) |> box.run
+}
+
+// 33. Annotated runner record field shadowing outer `provide greeter`
+leaked_record_field_nested : Unit ->{} Unit
+let leaked_record_field_nested () = provide greeter {
+  scope outer {
+    let box = mk_runner_rec ()
+    box.run (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+  }
+}
+
+// 34. Annotated runner record field passed to higher-order `apply`
+leaked_record_field_ho : Unit ->{} Unit
+let leaked_record_field_ho () = scope outer {
+  let box = mk_runner_rec ()
+  apply box.run (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 35. Annotated runner record field composed with `>>`
+leaked_record_field_compose : Unit ->{} Unit
+let leaked_record_field_compose () = scope outer {
+  let box = mk_runner_rec ()
+  let run_g = (fun x -> x) >> box.run
+  run_g (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+//~ FLICK-G003 @57:28-57:39 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @65:30-65:41 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @72:20-72:39 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @80:3-80:14 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @87:3-87:95 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @94:28-94:39 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @101:30-101:41 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @108:48-108:59 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @114:54-114:65 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @120:48-120:59 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @126:28-126:39 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @133:28-133:39 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @141:27-141:38 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @148:33-148:44 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @157:30-157:41 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @165:30-165:41 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @173:48-173:59 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @181:28-181:39 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @188:32-188:43 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-E019 @195:11-195:15 `s` may hold `Store` at other arguments
+//~ FLICK-G002 @203:13-203:41 this uses region `s`
+//~ FLICK-G003 @209:54-209:65 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @215:56-215:67 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @222:35-222:46 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @228:39-228:50 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @234:99-234:116 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @242:24-242:35 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @250:30-250:41 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @258:28-258:39 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @266:3-266:14 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @278:30-278:41 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @285:3-285:97 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @293:32-293:43 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @301:36-301:47 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @309:28-309:39 the `provide` that builds `Greeter` releases it earlier

@@ -421,6 +421,7 @@ impl Checker<'_> {
                     errors,
                     sync: a.sync && b.sync,
                     direct: a.direct && b.direct,
+                    provides: None,
                     written: Written::default(),
                 })))
             }
@@ -461,6 +462,7 @@ impl Checker<'_> {
                     .into_type(),
                 sync: a.sync || b.sync,
                 direct: a.direct || b.direct,
+                provides: None,
                 written: Written::default(),
             })),
         }

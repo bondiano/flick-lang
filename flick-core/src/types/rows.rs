@@ -275,7 +275,10 @@ fn left_out(
     gone: &[Elem],
     left: bool,
 ) -> Result<Type, Mismatch> {
-    match entries.iter().find(|(label, _)| gone.contains(label)) {
+    match entries
+        .iter()
+        .find(|(label, _)| super::elem::gone_excludes(gone, label))
+    {
         Some((label, _)) => Err(Mismatch::Label {
             label: label.clone(),
             left,

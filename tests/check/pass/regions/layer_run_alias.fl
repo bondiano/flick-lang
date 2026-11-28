@@ -1,0 +1,323 @@
+// Valid partially applied `Layer.run` usages through aliases, pipes, holes,
+// compositions, and higher-order combinators (must produce no false positives, #1178).
+module App.LayerRunAlias exposing (..)
+
+service Greeter =
+  greet : String ->{} String
+
+service Other =
+  ping : Unit ->{} Unit
+
+service Box =
+  value : Unit ->{} String
+
+report : Failure e ->{} Unit
+let report _ = ()
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> name }
+
+other : Layer none none {Other}
+let other = Layer.succeed Other { ping = fun () -> () }
+
+box_layer : Layer {Greeter} none {Box}
+let box_layer =
+  Layer.effect
+    Box
+    (task {
+      let msg = Greeter.greet "init"
+      { value = fun () -> msg }
+    })
+
+apply : (a ->{r; e} b) -> a ->{r; e} b
+let apply f x = f x
+
+with_runner : ((Unit ->{Greeter | r; e} a) ->{r; e} a) -> (Unit ->{Greeter | r; e} a) ->{r; e} a
+let with_runner run_with body = run_with body
+
+with_greeter : (Unit ->{Greeter | r} a) ->{r} a
+let with_greeter = Layer.run greeter
+
+run_with : Layer none none o -> (Unit ->{o + r} a) ->{r} a
+let run_with l = Layer.run l
+
+noop_runner : (Unit ->{Greeter | r; e} a) ->{Greeter | r; e} a
+let noop_runner body = body ()
+
+decorate : Layer {Greeter} none {Greeter}
+let decorate =
+  Layer.effect
+    Greeter
+    (task {
+      let prefix = Greeter.greet "p"
+      { greet = fun name -> prefix ++ name }
+    })
+
+alias_basic : Unit ->{} String
+let alias_basic () =
+  let run_g = Layer.run greeter
+  run_g (fun () -> Greeter.greet "ok")
+
+alias_outer_service_child : Unit ->{} Unit
+let alias_outer_service_child () = provide greeter {
+  scope outer {
+    let run_o = Layer.run other
+    run_o (fun () ->
+      Other.ping ()
+      ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "outer") }))
+    )
+  }
+}
+
+alias_outer_service_finalizer : Unit ->{} Unit
+let alias_outer_service_finalizer () = provide greeter {
+  scope {
+    let run_o = Layer.run other
+    run_o (fun () ->
+      Other.ping ()
+      Scope.add_finalizer (task { ignore (Greeter.greet "outer") })
+    )
+  }
+}
+
+alias_inner_scope_child : Unit ->{} Unit
+let alias_inner_scope_child () =
+  let run_g = Layer.run greeter
+  run_g (fun () -> scope inner {
+    ignore (Fiber.spawn inner report (task { ignore (Greeter.greet "inner") }))
+  })
+
+alias_given_other : Fiber.Provided {Greeter} s => Fiber.Owner s ->{Greeter} Unit
+let alias_given_other owner =
+  let run_o = Layer.run other
+  run_o (fun () ->
+    Other.ping ()
+    ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "outer") }))
+  )
+
+alias_ho_apply_valid : Unit ->{} String
+let alias_ho_apply_valid () = apply (Layer.run greeter) (fun () -> Greeter.greet "ok")
+
+alias_ho_apply_outer_service : Unit ->{} Unit
+let alias_ho_apply_outer_service () = provide greeter {
+  scope outer {
+    apply (Layer.run other) (fun () ->
+      Other.ping ()
+      ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "outer") }))
+    )
+  }
+}
+
+alias_ho_with_runner_valid : Unit ->{} String
+let alias_ho_with_runner_valid () = with_runner (Layer.run greeter) (fun () -> Greeter.greet "ok")
+
+alias_ho_with_runner_outer_service : Unit ->{} Unit
+let alias_ho_with_runner_outer_service () = provide other {
+  scope outer {
+    with_runner (Layer.run greeter) (fun () ->
+      ignore (Greeter.greet "ok")
+      ignore (Fiber.spawn outer report (task { Other.ping () }))
+    )
+  }
+}
+
+alias_pipe_valid : Unit ->{} String
+let alias_pipe_valid () =
+  let run_g = Layer.run greeter
+  (fun () -> Greeter.greet "ok") |> run_g
+
+alias_compose_valid : Unit ->{} String
+let alias_compose_valid () =
+  let run_g = (fun x -> x) >> Layer.run greeter
+  run_g (fun () -> Greeter.greet "ok")
+
+alias_hole_valid : Unit ->{} String
+let alias_hole_valid () =
+  let run_g = Layer.run greeter _
+  run_g (fun () -> Greeter.greet "ok")
+
+alias_mk_outer_service : Unit ->{} Unit
+let alias_mk_outer_service () =
+  let mk l = Layer.run l
+  provide greeter {
+    scope outer {
+      let run_o = mk other
+      run_o (fun () ->
+        Other.ping ()
+        ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "outer") }))
+      )
+    }
+  }
+
+alias_generic_eff : Layer none none o -> Eff (o + r) none a ->{r} a
+let alias_generic_eff layer t =
+  let run_l = Layer.run layer
+  run_l (fun () -> await t)
+
+alias_generic_inner_scope : Layer none none o -> Unit ->{} Unit
+let alias_generic_inner_scope layer () = provide greeter {
+  let run_l = Layer.run layer
+  run_l (fun () -> scope inner {
+    ignore (Fiber.spawn inner report (task { ignore (Greeter.greet "inner") }))
+  })
+}
+
+alias_sequential_after_layer_run : Unit ->{} Unit
+let alias_sequential_after_layer_run () = provide greeter {
+  scope outer {
+    let run_g = Layer.run greeter
+    let f () =
+      ignore (run_g (fun () -> Greeter.greet "inner"))
+      ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "outer") }))
+    f ()
+  }
+}
+
+alias_pipe_layer_valid : Unit ->{} String
+let alias_pipe_layer_valid () =
+  let run_g = greeter |> Layer.run
+  run_g (fun () -> Greeter.greet "ok")
+
+alias_layer_with_inputs : Unit ->{} Unit
+let alias_layer_with_inputs () = provide greeter {
+  scope outer {
+    let run_b = Layer.run box_layer
+    run_b (fun () ->
+      ignore (Box.value ())
+      ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "outer") }))
+    )
+  }
+}
+
+alias_unapplied_greeter : Unit ->{} String
+let alias_unapplied_greeter () =
+  let f = Layer.run
+  let msg = f greeter (fun () -> Greeter.greet "ok")
+  let _ = f greeter (fun () -> String.length msg)
+  msg
+
+alias_unapplied_other : Unit ->{} Unit
+let alias_unapplied_other () = provide greeter {
+  scope outer {
+    let f = Layer.run
+    f other (fun () ->
+      Other.ping ()
+      ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "outer") }))
+    )
+  }
+}
+
+alias_annotated_wrapper_valid : Unit ->{} String
+let alias_annotated_wrapper_valid () = provide other {
+  scope outer {
+    with_greeter (fun () ->
+      ignore (Fiber.spawn outer report (task { Other.ping () }))
+      scope inner {
+        ignore (Fiber.spawn inner report (task { ignore (Greeter.greet "inner") }))
+        Greeter.greet "ok"
+      }
+    )
+  }
+}
+
+alias_annotated_generic_valid : Unit ->{} Unit
+let alias_annotated_generic_valid () = provide greeter {
+  scope outer {
+    run_with other (fun () ->
+      Other.ping ()
+      ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "outer") }))
+    )
+  }
+}
+
+alias_non_provider_combinator : Unit ->{} Unit
+let alias_non_provider_combinator () = provide greeter {
+  scope outer {
+    apply noop_runner (fun () ->
+      ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "outer") }))
+    )
+  }
+}
+
+alias_decorate_valid : Unit ->{} String
+let alias_decorate_valid () = provide greeter {
+  let run_d = Layer.run decorate
+  run_d (fun () -> Greeter.greet "ok")
+}
+
+// Non-providing higher-order functions whose callback row has an open tail not
+// shared with the outer row must NOT be treated as providers (regression).
+service Log =
+  info : String ->{} Unit
+
+log_layer : Layer none none {Log}
+let log_layer = Layer.succeed Log { info = fun _ -> () }
+
+wrap_cb : (Unit ->{Greeter | r} a) ->{Log} (Unit ->{Greeter | r} a)
+let wrap_cb f =
+  Log.info "wrap"
+  f
+
+memoize_cb : (Unit ->{Greeter | r} Unit) ->{} (Unit ->{Greeter | r} Unit)
+let memoize_cb f = f
+
+stash_cb : Ref (Unit ->{Greeter | r} Unit) -> (Unit ->{Greeter | r} Unit) ->{} Unit
+let stash_cb cell f = Ref.set cell f
+
+defer_to_eff : (Unit ->{Greeter | r} a) ->{} Eff {Greeter | r} none a
+let defer_to_eff f = task { f () }
+
+non_provider_wrap_thunk : Unit ->{} Unit
+let non_provider_wrap_thunk () = provide greeter {
+  provide log_layer {
+    scope outer {
+      let wrapped =
+        wrap_cb (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "ok") })))
+      wrapped ()
+    }
+  }
+}
+
+non_provider_wrap_prebound : Unit ->{} Unit
+let non_provider_wrap_prebound () = provide greeter {
+  provide log_layer {
+    scope outer {
+      let g () = ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "ok") }))
+      let wrapped = wrap_cb g
+      wrapped ()
+    }
+  }
+}
+
+non_provider_memoize : Unit ->{} Unit
+let non_provider_memoize () = provide greeter {
+  scope outer {
+    let f =
+      memoize_cb (fun () ->
+        ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "ok") }))
+      )
+    f ()
+  }
+}
+
+non_provider_stash : Unit ->{} Unit
+let non_provider_stash () = provide greeter {
+  scope outer {
+    let cell = Ref.make (fun () -> ignore (Greeter.greet "init"))
+    stash_cb cell (fun () ->
+      ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "ok") }))
+    )
+    (Ref.get cell) ()
+  }
+}
+
+non_provider_defer_to_eff : Unit ->{} Unit
+let non_provider_defer_to_eff () = provide greeter {
+  scope outer {
+    let t =
+      defer_to_eff (fun () ->
+        ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "ok") }))
+      )
+    await t
+  }
+}

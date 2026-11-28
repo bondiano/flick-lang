@@ -108,6 +108,7 @@ impl Checker<'_> {
                     errors: clear_written(&e.errors),
                     sync: true,
                     direct: e.direct,
+                    provides: e.provides.as_ref().map(clear_written),
                     written: Written::default(),
                 })
             }),
@@ -124,6 +125,7 @@ impl Checker<'_> {
                         errors: errors.unwrap_or_else(|| clear_written(&e.errors)),
                         sync: false,
                         direct: false,
+                        provides: e.provides.as_ref().map(clear_written),
                         written: Written::default(),
                     }))
                 } else {
@@ -314,6 +316,7 @@ pub(in crate::types) fn clear_written(t: &Type) -> Type {
                     errors: clear_written(&e.errors),
                     sync: e.sync,
                     direct: e.direct,
+                    provides: e.provides.as_ref().map(clear_written),
                     written: Written::default(),
                 })
             }),

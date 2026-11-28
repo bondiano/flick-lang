@@ -439,7 +439,7 @@ fn relabel(label: &Elem, names: &[(String, String)]) -> Elem {
         Elem::Capture(atom) => fresh(atom).map(Elem::Capture),
         Elem::Error(atom) => fresh(atom).map(Elem::Error),
         Elem::Service(atom) => fresh(atom).map(Elem::Service),
-        Elem::Named(_) | Elem::Live | Elem::Provided(_) => None,
+        Elem::Named(_) | Elem::Live | Elem::Provided(_) | Elem::ProvidedAny => None,
     };
     renamed.unwrap_or_else(|| label.clone())
 }

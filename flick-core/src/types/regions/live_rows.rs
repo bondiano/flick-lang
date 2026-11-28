@@ -79,7 +79,12 @@ impl Checker<'_> {
         for entry in entries {
             merge(&mut atoms, self.indexed_live(entry));
         }
-        if atoms.entries.is_empty() {
+        let existing = self.live_in(&self.store.normalize(services));
+        atoms
+            .entries
+            .retain(|(label, _)| existing.get(label).is_none());
+        atoms.tails.retain(|tail| !existing.tails.contains(tail));
+        if atoms.entries.is_empty() && atoms.tails.is_empty() {
             services.clone()
         } else {
             add_live(services, atoms)

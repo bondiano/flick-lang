@@ -21,6 +21,7 @@ impl Type {
                         errors: f(&e.errors),
                         sync: e.sync,
                         direct: e.direct,
+                        provides: e.provides.as_ref().map(&mut *f),
                         written: e.written,
                     })
                 }),
@@ -98,6 +99,9 @@ impl Type {
                 if let Some(e) = effects {
                     f(&e.services);
                     f(&e.errors);
+                    if let Some(provides) = &e.provides {
+                        f(provides);
+                    }
                 }
                 f(result);
             }

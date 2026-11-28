@@ -278,6 +278,7 @@ class ShowFn a =
             errors: Type::empty_row(),
             direct: false,
             sync: false,
+            provides: None,
             written: Written::default(),
         })),
         result: Box::new(unit),

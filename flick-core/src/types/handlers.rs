@@ -14,7 +14,7 @@ use super::handle::{Handled, arm_pattern, failed_pattern, operation_path};
 use super::infer::eff;
 use super::patterns::is_pattern;
 use super::services::Operation;
-use super::ty::{Row, Type, Written, without};
+use super::ty::{Effects, Norm, Row, Type, Written, without};
 use super::typing::Ref;
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::iface::{Entity, Namespace};
@@ -308,6 +308,7 @@ impl Checker<'_> {
 }
 
 include!("handlers/catch.rs");
+include!("handlers/layer_run.rs");
 include!("handlers/providing.rs");
 include!("handlers/result.rs");
 

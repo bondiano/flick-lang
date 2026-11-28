@@ -28,6 +28,27 @@ fn direct_changes_the_stage_and_not_the_type() {
 }
 
 #[test]
+fn provides_does_not_affect_effects_equality_and_serializes_when_present() {
+    let plain = Effects::new(Type::empty_row(), Type::empty_row());
+    let providing = Effects {
+        provides: Some(Type::con("App", "Greeter")),
+        ..plain.clone()
+    };
+    let hash = |e: &Effects| {
+        let mut hasher = DefaultHasher::new();
+        e.hash(&mut hasher);
+        hasher.finish()
+    };
+    assert_eq!(plain, providing);
+    assert_eq!(hash(&plain), hash(&providing));
+    let json = |e: &Effects| serde_json::to_string(e).expect("serializes");
+    assert!(!json(&plain).contains("provides"));
+    assert!(json(&providing).contains("\"provides\""));
+    let read: Effects = serde_json::from_str(&json(&providing)).expect("reads");
+    assert_eq!(read.provides, Some(Type::con("App", "Greeter")));
+}
+
+#[test]
 fn substitution_preserves_capture_qualification_kind() {
     for value in [false, true] {
         let ty = Type::Captured {

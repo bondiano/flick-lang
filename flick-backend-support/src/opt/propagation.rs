@@ -138,11 +138,17 @@ fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr, arity: Arity) -> bool {
             (
                 Stmt::Let {
                     pat: Pat::Bind(name),
+                    binder_types,
                     value,
-                    ..
                 },
                 Some((all, _)),
             ) if all != 0
+                // A polymorphic local `let` (`Forall`) is instantiated at each
+                // use site; substituting its uninstantiated initializer directly
+                // would leave bound type variables uninstantiated in typed IR.
+                && !binder_types
+                    .iter()
+                    .any(|(_, ty)| matches!(**ty, IrType::Forall { .. }))
                 && (!evaluated.contains(&name)
                     || matches!(value.kind, ExprKind::Local(_) | ExprKind::Lit(_)))
                 && (!metadata.contains(&name) || matches!(value.kind, ExprKind::Local(_)))

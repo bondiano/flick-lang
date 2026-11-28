@@ -10,7 +10,7 @@ pub(in crate::types) fn relabel_contract_elem(elem: &Elem, value: &Type) -> Elem
                 _ => unreachable!(),
             },
         },
-        Elem::Named(_) | Elem::Live => elem.clone(),
+        Elem::Named(_) | Elem::Live | Elem::ProvidedAny => elem.clone(),
     }
 }
 

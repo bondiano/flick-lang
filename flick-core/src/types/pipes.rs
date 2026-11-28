@@ -170,14 +170,17 @@ impl Checker<'_> {
             self.piped_late = Some(Vec::new());
         }
         let function = self.infer(rhs);
+        let layer_run_ro = self.layer_run_outputs(rhs, &function);
         let late = self.piped_late.take().unwrap_or_default();
         let call = (lhs.range().0, rhs.range().1);
         let ty = match self.ui_callable(&function, call, self.span(rhs)) {
             Type::Fun {
-                param,
-                effects,
+                mut param,
+                mut effects,
                 result,
             } => {
+                self.attach_discharged_arrow(&mut param, &mut effects, &result);
+                let subrow_mark = self.cx.subrows.len();
                 if !early {
                     self.meeting_parameter(rhs, 0, &param, |c| c.expect(&arg, &param, c.span(lhs)));
                 }
@@ -186,15 +189,30 @@ impl Checker<'_> {
                     let (_, end) = rhs.range();
                     let call_span = Span::new(self.file, start, end);
                     let e = self.live_call(&function, &e);
-                    if let Some((callee, ro)) = self.layer_run_pipe_outputs(rhs, &param) {
-                        self.layer_run_call_effects(callee, &ro, &e, call_span, false);
+                    if let Some(ro) = e.provides.clone() {
+                        self.settle_provided_since(provided, provided_late);
+                        self.layer_run_call_effects(
+                            rhs,
+                            &ro,
+                            &e,
+                            call_span,
+                            false,
+                            Some((subrow_mark, &param)),
+                        );
                     } else {
                         self.call_effects(&e, call_span);
                     }
                 }
+                let is_layer_arg = self.layer_parts(&param).is_some();
                 let span = Span::new(self.file, lhs.range().0, rhs.range().1);
                 let result = self.instantiate(&result, span);
-                self.application_result(result, &function, &arg, false)
+                let mut result = self.application_result(result, &function, &arg, false);
+                if let Some(ro) = layer_run_ro.as_ref() {
+                    self.refine_layer_run_after_layer(ro, &mut result);
+                } else {
+                    self.refine_provides_arrow(&mut result, is_layer_arg);
+                }
+                result
             }
             Type::Error => Type::Error,
             meta @ Type::Meta(_) => {
@@ -314,10 +332,11 @@ impl Checker<'_> {
         let function = self.value_bound(function);
         let shape = match self.ui_callable(&function, key, operand) {
             Type::Fun {
-                param,
-                effects,
+                mut param,
+                mut effects,
                 result,
             } => {
+                self.attach_discharged_arrow(&mut param, &mut effects, &result);
                 let since = self.diagnostics.len();
                 let eff = self.eff_parts(&param).is_some();
                 let defer = eff || self.arrow_stages(&param).contains(&super::Stage::Runtime);

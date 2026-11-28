@@ -28,7 +28,9 @@ pub(super) fn owed(declared: &Norm, tail: &Type) -> Option<Vec<Elem>> {
         .filter(|(held, _)| *held == variable)
         .map(|(_, taken)| {
             (taken.iter())
-                .filter(|l| !gone.contains(l) && !gives_back(declared, l))
+                .filter(|l| {
+                    !l.is_provided_exclusion() && !gone.contains(l) && !gives_back(declared, l)
+                })
                 .cloned()
                 .collect::<Vec<_>>()
         })
@@ -47,5 +49,5 @@ fn gives_back(declared: &Norm, l: &Elem) -> bool {
 /// back stay owed.
 pub(super) fn growth_allows(declared: &Norm, tail: &Type, never: &[Elem]) -> bool {
     let gone = less(tail).1;
-    (never.iter()).all(|l| gone.contains(l) || gives_back(declared, l))
+    (never.iter()).all(|l| l.is_provided_exclusion() || gone.contains(l) || gives_back(declared, l))
 }

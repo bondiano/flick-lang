@@ -57,7 +57,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::{mem, ptr};
 
-use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Module, Pat, Stmt};
+use crate::ir::{Expr, ExprKind, IrType, Item, ItemKind, Lit, Module, Pat, Stmt};
 pub use fold::{js_number, json_string};
 pub use js_math::js_log;
 pub use specialize::{Generic, names_only};

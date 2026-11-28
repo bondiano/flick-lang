@@ -90,7 +90,10 @@ fn labels(rows: &[Norm]) -> Vec<Option<Elem>> {
     let mut found = vec![None];
     for row in rows {
         for (label, _) in &row.entries {
-            if matches!(label, Elem::Named(_) | Elem::Live | Elem::Provided(_)) {
+            if matches!(
+                label,
+                Elem::Named(_) | Elem::Live | Elem::Provided(_) | Elem::ProvidedAny
+            ) {
                 let label = Some(label.clone());
                 if !found.contains(&label) {
                     found.push(label);

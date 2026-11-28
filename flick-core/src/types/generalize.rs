@@ -385,6 +385,9 @@ fn kinds_of(ty: &Type, params: &dyn Fn(&Type) -> Vec<Kind>) -> HashMap<u32, Kind
             // At this arrow a root shared by both rows is a service root.
             remember(&e.errors, Kind::ErrorRow);
             remember(&e.services, Kind::ServiceRow);
+            if let Some(provides) = &e.provides {
+                remember(provides, Kind::ServiceRow);
+            }
         }
         Type::App { .. } => {
             let (head, args) = t.spine();

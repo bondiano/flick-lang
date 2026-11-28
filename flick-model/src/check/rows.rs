@@ -133,9 +133,9 @@ impl Checker<'_> {
         }
     }
 
-    /// Solves the waiting inclusions; a meta nothing put a row into is
-    /// `none`.
-    pub(super) fn settle(&mut self) -> Check<()> {
+    /// Advances waiting row inclusions whose left-hand side has already grown,
+    /// without closing remaining unsolved row metas.
+    pub(super) fn grow_pending(&mut self) -> Check<()> {
         loop {
             let pending = mem::take(&mut self.pending);
             if pending.is_empty() {
@@ -154,16 +154,29 @@ impl Checker<'_> {
                     self.under_givens(&facts, |c| c.within(&z, &b))?;
                 }
             }
+            self.pending.extend(waiting);
             if !progressed {
-                for (a, _, _) in &waiting {
-                    for v in &self.zonk_row(a).vars {
-                        if let Var::Meta(m) = v {
-                            self.bind_row(*m, Row::none())?;
-                        }
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    /// Solves the waiting inclusions; a meta nothing put a row into is
+    /// `none`.
+    pub(super) fn settle(&mut self) -> Check<()> {
+        loop {
+            self.grow_pending()?;
+            if self.pending.is_empty() {
+                break;
+            }
+            for (a, _, _) in self.pending.clone() {
+                for v in &self.zonk_row(&a).vars {
+                    if let Var::Meta(m) = v {
+                        self.bind_row(*m, Row::none())?;
                     }
                 }
             }
-            self.pending.extend(waiting);
         }
         Ok(())
     }

@@ -50,12 +50,28 @@ pub enum Elem {
     Live,
     /// The obligation to provide the service the element names.
     Provided(Box<Elem>),
+    /// Excludes every `Provided` obligation in a `Type::Without` tail when a
+    /// `Layer.run` output row is open/polymorphic.
+    ProvidedAny,
 }
 
 const LIVE: &str = "Fiber.Live ";
 const PROVIDED: &str = "Fiber.Provided ";
+const PROVIDED_ANY: &str = "Fiber.Provided *";
+
+/// Whether a `Type::Without` exclusion list `gone` excludes `label`.
+pub(in crate::types) fn gone_excludes(gone: &[Elem], label: &Elem) -> bool {
+    gone.contains(label)
+        || (matches!(label, Elem::Provided(_)) && gone.contains(&Elem::ProvidedAny))
+}
 
 impl Elem {
+    /// Whether this label is an internal `Provided` exclusion carried in
+    /// `Type::Without` for `Layer.run` provider-lifetime enforcement.
+    pub fn is_provided_exclusion(&self) -> bool {
+        matches!(self, Elem::Provided(_) | Elem::ProvidedAny)
+    }
+
     pub fn has_meta_view(&self) -> bool {
         match self {
             Elem::Capture(Atom::Meta(meta))
@@ -108,6 +124,8 @@ impl Elem {
         };
         if text == LIVE {
             Elem::Live
+        } else if text == PROVIDED_ANY {
+            Elem::ProvidedAny
         } else if let Some(rest) = text.strip_prefix(PROVIDED) {
             Elem::Provided(Box::new(Elem::read(rest)))
         } else if let Some(rest) = text.strip_prefix('^') {
@@ -202,6 +220,7 @@ impl fmt::Display for Elem {
             Elem::Service(atom) => write!(f, "@{atom}"),
             Elem::Live => f.write_str(LIVE),
             Elem::Provided(of) => write!(f, "{PROVIDED}{of}"),
+            Elem::ProvidedAny => f.write_str(PROVIDED_ANY),
         }
     }
 }
@@ -218,6 +237,7 @@ impl Ord for Elem {
                     Elem::Service(_) => 3,
                     Elem::Live => 4,
                     Elem::Provided(_) => 5,
+                    Elem::ProvidedAny => 6,
                 };
                 rank(self)
                     .cmp(&rank(other))
@@ -272,6 +292,7 @@ mod tests {
             Elem::Live,
             Elem::Provided(Box::new(Elem::named("App.Main.Db"))),
             Elem::Provided(Box::new(Elem::Service(Atom::Var("r".into())))),
+            Elem::ProvidedAny,
         ];
         for elem in elems {
             assert_eq!(Elem::read(&elem.to_string()), elem);
