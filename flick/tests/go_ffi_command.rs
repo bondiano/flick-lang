@@ -106,12 +106,12 @@ fn import_and_run_stdlib_strings() {
             "missing `{expected}` in:\n{report}"
         );
     }
-    // Independently expected unsupported statuses with clear reasons.
+    // Independently expected unsupported statuses with clear reasons (present in Go 1.23+).
     for (name, reason_fragment) in [
         ("count", "Go `int` is outside `flick.go-ffi`"),
         ("repeat", "Go `int` is outside `flick.go-ffi`"),
+        ("builder_write_byte", "Go `byte` is outside `flick.go-ffi`"),
         ("contains_func", "Go function type"),
-        ("lines", "generic Go type"),
         ("cut", "returns 3 values"),
     ] {
         assert!(
