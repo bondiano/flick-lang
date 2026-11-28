@@ -6,7 +6,10 @@ use std::fmt::Write as _;
 use super::{Ide, documentation, tree};
 use crate::doc;
 use crate::source::FileId;
+use crate::syntax::attr::attr_parts;
+use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::describe_targets;
 use crate::types::lang::{self, Lang};
 
 const LANG: &str = "Marks a declaration as a lang item: a built-in entity the compiler refers to by its role rather than its module and name. Used in built-in modules only; user modules cannot register lang items. Takes one item name, for example `@lang action`.";
@@ -23,6 +26,51 @@ const EXPORT: &str = "Exports a top-level function to the host under an explicit
 const NATIVE: &str = "Attaches a target-specific native binding override to a top-level Flick function while keeping the Flick body as its reference semantics and fallback. When multiple `@native` clauses match the active environment, the one whose `when` condition implies every other matching clause wins; incomparable or equivalent matching pairs report `FLICK-F012`.";
 
 impl Ide<'_> {
+    fn native_override_hover(ov: &Node, text: &str, offset: u32) -> Option<(String, (u32, u32))> {
+        let at = ov.child_tokens().find(|t| t.kind == K::At)?;
+        let name = ov.child_tokens().find(|t| t.kind == K::Ident)?;
+        if offset >= at.start && offset < name.end {
+            let end = ov
+                .nodes()
+                .find(|n| n.kind == K::WhenCond)
+                .map_or_else(|| ov.range().1, |w| w.range().1);
+            let header = text[at.start as usize..end as usize].trim();
+            return Some((
+                format!("```flick\n{header}\n```\n\n{NATIVE}"),
+                (at.start, name.end),
+            ));
+        }
+        None
+    }
+
+    fn custom_attribute_description(&self, attr_name: &str, namespaced: bool) -> Option<String> {
+        if !namespaced
+            && let Some(spec) = self.analysis.foreign_backend.type_form_attribute(attr_name)
+        {
+            return Some(format!(
+                "{}\n\nBackend type-form attribute (`{}`).",
+                spec.doc, self.analysis.foreign_backend.backend_id
+            ));
+        }
+        let pa = self
+            .analysis
+            .plugin_attributes
+            .iter()
+            .find(|a| a.spec.name == attr_name)?;
+        let allowed = describe_targets(&pa.spec.targets);
+        Some(if pa.spec.doc.is_empty() {
+            format!(
+                "Plugin attribute from `{}` (allowed on {allowed}).",
+                pa.package
+            )
+        } else {
+            format!(
+                "{}\n\nPlugin attribute from `{}` (allowed on {allowed}).",
+                pa.spec.doc, pa.package
+            )
+        })
+    }
+
     pub(super) fn attribute_hover(
         &self,
         file: FileId,
@@ -32,62 +80,61 @@ impl Ide<'_> {
         let text = self.text(file);
         let path = tree::path_to(&m.tree, offset);
         if let Some(ov) = path.iter().rev().find(|n| n.kind == K::NativeOverride) {
-            let at = ov.child_tokens().find(|t| t.kind == K::At)?;
-            let name = ov.child_tokens().find(|t| t.kind == K::Ident)?;
-            if offset >= at.start && offset < name.end {
-                let end = ov
-                    .nodes()
-                    .find(|n| n.kind == K::WhenCond)
-                    .map_or_else(|| ov.range().1, |w| w.range().1);
-                let header = text[at.start as usize..end as usize].trim();
-                return Some((
-                    format!("```flick\n{header}\n```\n\n{NATIVE}"),
-                    (at.start, name.end),
-                ));
-            }
-            return None;
+            return Self::native_override_hover(ov, text, offset);
         }
         let attribute = path.iter().find(|n| n.kind == K::Attribute)?;
         let token = attribute
             .child_tokens()
             .find(|t| t.start <= offset && offset < t.end)?;
-        let at = attribute.child_tokens().find(|t| t.kind == K::At)?;
+        let parts = attr_parts(attribute, text)?;
         let mut words = attribute.child_tokens().filter(|t| t.kind == K::Ident);
         let name = words.next()?;
-        let argument = words.next();
-        let on_name = token.start <= name.start;
+        let argument = if parts.namespaced {
+            words.nth(1)
+        } else {
+            words.next()
+        };
+        let on_name = offset >= parts.name_span.0 && offset < parts.name_span.1;
         let range = if on_name {
-            (at.start, name.end)
+            parts.name_span
         } else {
             (token.start, token.end)
         };
-        let attr_name = name.text(text);
-        let backend_attr = self.analysis.foreign_backend.type_form_attribute(attr_name);
+        let attr_name = parts.name;
+        let backend_attr = (!parts.namespaced)
+            .then(|| self.analysis.foreign_backend.type_form_attribute(attr_name))
+            .flatten();
+        let plugin_attr = self
+            .analysis
+            .plugin_attributes
+            .iter()
+            .any(|a| a.spec.name == attr_name);
         let owned_desc;
         let description = match attr_name {
-            "maker" if on_name => MAKER,
-            "cell" if on_name => CELL,
-            "implicit" if on_name => IMPLICIT,
-            "derive" => DERIVE,
-            "label" => LABEL,
-            "owner" if on_name => OWNER,
-            "sync" => SYNC,
-            "when" => WHEN,
-            "export" => EXPORT,
-            "lang" if on_name || Lang::from_name(token.text(text)).is_some() => LANG,
+            "maker" if !parts.namespaced && on_name => MAKER,
+            "cell" if !parts.namespaced && on_name => CELL,
+            "implicit" if !parts.namespaced && on_name => IMPLICIT,
+            "derive" if !parts.namespaced => DERIVE,
+            "label" if !parts.namespaced => LABEL,
+            "owner" if !parts.namespaced && on_name => OWNER,
+            "sync" if !parts.namespaced => SYNC,
+            "when" if !parts.namespaced => WHEN,
+            "export" if !parts.namespaced => EXPORT,
+            "lang"
+                if !parts.namespaced
+                    && (on_name || Lang::from_name(token.text(text)).is_some()) =>
+            {
+                LANG
+            }
             "ts" if backend_attr.is_some() => TS,
             _ => {
-                let spec = backend_attr?;
-                owned_desc = format!(
-                    "{}\n\nBackend type-form attribute (`{}`).",
-                    spec.doc, self.analysis.foreign_backend.backend_id
-                );
+                owned_desc = self.custom_attribute_description(attr_name, parts.namespaced)?;
                 owned_desc.as_str()
             }
         };
         let mut code = format!("@{attr_name}");
-        if attr_name == "when" || attr_name == "export" || backend_attr.is_some() {
-            // its arguments are strings too: the attribute as written
+        if attr_name == "when" || attr_name == "export" || backend_attr.is_some() || plugin_attr {
+            // its arguments are strings/numbers too: the attribute as written
             let (start, end) = attribute.range();
             text[start as usize..end as usize]
                 .trim()
@@ -96,22 +143,24 @@ impl Ide<'_> {
             let _ = write!(code, " {}", argument.text(text));
         }
         let mut markdown = format!("```flick\n{code}\n```\n\n{description}");
-        match name.text(text) {
-            "derive" => {
-                if let Some(package) = argument {
-                    let _ = write!(
-                        markdown,
-                        "\n\nThe plugin of `{}` supplies this class's `deriving` implementation.",
-                        package.text(text),
-                    );
+        if !parts.namespaced {
+            match name.text(text) {
+                "derive" => {
+                    if let Some(package) = argument {
+                        let _ = write!(
+                            markdown,
+                            "\n\nThe plugin of `{}` supplies this class's `deriving` implementation.",
+                            package.text(text),
+                        );
+                    }
                 }
-            }
-            "lang" => {
-                if let Some(item) = argument.and_then(|t| Lang::from_name(t.text(text))) {
-                    self.lang_item_documentation(item, &mut markdown);
+                "lang" => {
+                    if let Some(item) = argument.and_then(|t| Lang::from_name(t.text(text))) {
+                        self.lang_item_documentation(item, &mut markdown);
+                    }
                 }
+                _ => {}
             }
-            _ => {}
         }
         Some((markdown, range))
     }

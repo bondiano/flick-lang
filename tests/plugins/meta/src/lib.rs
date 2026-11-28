@@ -1,18 +1,21 @@
-//! External plugin fixture exercising `flick:plugin@0.5.0` declaration metadata,
-//! plugin-declared `heads` and `watch`, and two realistic external derives:
-//! - `Meta.Codec`: configurable-field encode/decode with `rename`, `skip`,
-//!   `default`, exact field-span diagnostics on unsupported types, and
-//!   refusal to leak opaque/private types.
+//! External plugin fixture exercising `flick:plugin@0.6.0` declaration metadata,
+//! plugin-declared `heads`, `watch`, and custom `@attributes`, and two realistic
+//! external derives:
+//! - `Meta.Codec`: configurable-field encode/decode with `@tag`, `@meta.prefix`,
+//!   `@rename`, `@skip`, `@default` (plus `deriving Meta.Codec { ... }`), exact
+//!   field/attribute-span diagnostics, and refusal to leak opaque/private types.
 //! - `Meta.CliForm`: CLI/form help and argument parser driven by `///` doc
 //!   comments on types, variants, and record fields, preserving declaration
-//!   order via `source_index` and inspecting variant attributes/constraints.
+//!   order via `source_index` and reading variant `@alias` and field `@rename`
+//!   attributes.
 
 mod cli_form;
 mod codec;
+mod codec_emit;
 
 use flick_plugin::{
-    Arena, Block, Builder, CallSite, Compiler, Constant, DeriveTarget, Diagnostic, Expr, HeadSpec,
-    Plugin, PluginMetadata, TokenKind, flick,
+    Arena, AttributeSpec, AttributeTarget, Block, Builder, CallSite, Compiler, Constant,
+    DeriveTarget, Diagnostic, Expr, HeadSpec, Plugin, PluginMetadata, TokenKind, flick,
 };
 
 pub struct Meta;
@@ -46,6 +49,38 @@ impl Plugin for Meta {
             watch: vec!["Meta.guarded".into()],
             derives: vec!["Meta.Codec".into(), "Meta.CliForm".into()],
             own_codes: Vec::new(),
+            attributes: vec![
+                AttributeSpec {
+                    name: "tag".into(),
+                    targets: vec![AttributeTarget::Declaration],
+                    doc: "Prefixes encoded wire values with a type tag.".into(),
+                },
+                AttributeSpec {
+                    name: "meta.prefix".into(),
+                    targets: vec![AttributeTarget::Declaration],
+                    doc: "Namespaced prefix for encoded wire values.".into(),
+                },
+                AttributeSpec {
+                    name: "rename".into(),
+                    targets: vec![AttributeTarget::RecordField],
+                    doc: "Overrides the wire key or CLI flag name of a record field.".into(),
+                },
+                AttributeSpec {
+                    name: "skip".into(),
+                    targets: vec![AttributeTarget::RecordField],
+                    doc: "Omits a record field from encoded wire output.".into(),
+                },
+                AttributeSpec {
+                    name: "default".into(),
+                    targets: vec![AttributeTarget::RecordField],
+                    doc: "Provides a fallback value when a record field is omitted.".into(),
+                },
+                AttributeSpec {
+                    name: "alias".into(),
+                    targets: vec![AttributeTarget::Variant],
+                    doc: "Adds a short command alias for a CLI subcommand variant.".into(),
+                },
+            ],
         }
     }
 

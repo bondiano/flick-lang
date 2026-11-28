@@ -244,6 +244,7 @@ fn invalid_and_conflicting_external_plugin_metadata_is_diagnosed() {
             watch: vec!["invalid_watch".into()],
             derives: Vec::new(),
             own_codes: vec!["U001".into()],
+            attributes: Vec::new(),
         },
     });
     let host = MetaHost {

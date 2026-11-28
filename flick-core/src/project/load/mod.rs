@@ -61,7 +61,6 @@ use crate::plugin::{EditorBlock, Expander};
 use crate::resolve::{Interface, ModuleSyntax};
 use crate::source::{FileId, SourceMap, Span};
 use crate::syntax::{HeadCatalog, Parse, std_head_catalog_arc};
-#[cfg(feature = "ide")]
 use crate::types;
 use files::expected_name;
 use precompiled::Precompiled;
@@ -142,6 +141,8 @@ struct Output {
     analyzed: Vec<Analyzed>,
     #[cfg(feature = "ide")]
     foreign_backend: types::ForeignBackendSpec,
+    #[cfg(feature = "ide")]
+    plugin_attributes: Arc<[types::PluginAttribute]>,
 }
 
 struct Loader<'a> {
@@ -185,6 +186,8 @@ struct Loader<'a> {
     preloaded_plugins: HashMap<String, Arc<dyn Expander>>,
     /// Validated static metadata of loaded external plugins, by package name.
     plugin_metadata: HashMap<String, PluginMetadata>,
+    /// Active validated plugin-declared custom `@attributes`, sorted deterministically.
+    plugin_attributes: Arc<[types::PluginAttribute]>,
     /// What a test companion sees of its module, by the module's name: all
     /// it declares. Only a run that loads the companion makes one.
     privates: BTreeMap<String, Interface>,
@@ -327,6 +330,7 @@ fn run_in(
         head_catalog: Arc::clone(std_head_catalog_arc()),
         preloaded_plugins: HashMap::new(),
         plugin_metadata: HashMap::new(),
+        plugin_attributes: Arc::from([]),
         privates: BTreeMap::new(),
         prove_contracts: mode == Mode::Prove,
         selected_roots: HashSet::new(),
@@ -353,7 +357,7 @@ fn run_in(
     loader.expand_plugins();
     #[cfg(not(target_arch = "wasm32"))]
     if (loader.lowered.is_none() || loader.lower_packages_only)
-        && has_own_export_attrs(&loader.modules, loader.sources)
+        && target::has_own_export_attrs(&loader.modules, loader.sources)
     {
         loader.lowered.get_or_insert_with(Vec::new);
         loader.lower_packages_only = false;
@@ -456,6 +460,8 @@ fn run_in(
     let mut diagnostics = loader.reported();
     #[cfg(feature = "ide")]
     let analyzed = loader.ide.take().unwrap_or_default();
+    #[cfg(feature = "ide")]
+    let ide_plugin_attributes = Arc::clone(&loader.plugin_attributes);
     drop(loader);
     #[cfg(not(target_arch = "wasm32"))]
     let fallback_backend_id = env_ctx.foreign_backend.backend_id.clone();
@@ -507,25 +513,7 @@ fn run_in(
         analyzed,
         #[cfg(feature = "ide")]
         foreign_backend: ide_foreign_backend,
+        #[cfg(feature = "ide")]
+        plugin_attributes: ide_plugin_attributes,
     }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn has_own_export_attrs(modules: &[Loaded], sources: &SourceMap) -> bool {
-    use crate::syntax::{cst::Node, export_attr, kind::SyntaxKind as K};
-    modules.iter().any(|m| {
-        if !matches!(m.root, Root::Source | Root::Other(_)) {
-            return false;
-        }
-        let text = &sources.get(m.file).text;
-        m.parse.tree.nodes().any(|n| match n.kind {
-            K::Attribute => export_attr::is_export(n, text),
-            K::RecGroup => n
-                .nodes()
-                .filter(|c| c.kind == K::Members)
-                .flat_map(Node::nodes)
-                .any(|c| c.kind == K::Attribute && export_attr::is_export(c, text)),
-            _ => false,
-        })
-    })
 }

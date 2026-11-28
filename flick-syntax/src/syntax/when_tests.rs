@@ -110,3 +110,41 @@ fn subspan_falls_back_for_triple_quoted_toml_strings() {
         assert_eq!(subspan(src, literal, range), literal);
     }
 }
+
+#[test]
+fn namespaced_when_attribute_is_ignored_and_does_not_duplicate_when() {
+    use crate::syntax::parse as parse_flick;
+
+    let src = "@when.tag\n@when \"js\"\nmodule M exposing ()\n";
+    let parsed = parse_flick(src, FileId::new(0));
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+
+    let attrs: Vec<_> = parsed
+        .tree
+        .nodes()
+        .filter(|n| n.kind == K::Attribute)
+        .collect();
+    assert_eq!(attrs.len(), 2);
+    assert!(!is_when(attrs[0], src));
+    assert_eq!(read(attrs[0], src), None);
+    assert!(is_when(attrs[1], src));
+    assert_eq!(
+        read(attrs[1], src).expect("when").expect("valid").condition,
+        "js"
+    );
+
+    let with_arg = "@when.tag \"js\"\nmodule M exposing ()\n";
+    let parsed_arg = parse_flick(with_arg, FileId::new(0));
+    assert!(
+        parsed_arg.diagnostics.is_empty(),
+        "{:?}",
+        parsed_arg.diagnostics
+    );
+    let attr = parsed_arg
+        .tree
+        .nodes()
+        .find(|n| n.kind == K::Attribute)
+        .expect("attribute");
+    assert!(!is_when(attr, with_arg));
+    assert_eq!(read(attr, with_arg), None);
+}

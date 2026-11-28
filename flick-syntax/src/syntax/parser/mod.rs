@@ -553,6 +553,8 @@ mod accessor_tests;
 #[cfg(test)]
 mod arrow_tests;
 #[cfg(test)]
+mod attr_tests;
+#[cfg(test)]
 mod branch_tests;
 #[cfg(test)]
 mod contract_tests;

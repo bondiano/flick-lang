@@ -62,3 +62,12 @@ type Bare = Bare
 //~ FLICK-S014 @53:1-53:17 `{a}` is no place of an argument: `{0}` or `{0:row}`
 //~ FLICK-S014 @56:1-56:24 `react` is no module: name one by its specifier, as `"dayjs"`
 //~ FLICK-S014 @59:1-59:4 `@ts` takes a form, `"…"`, or `none`, or `import "module" "Export"`
+
+type FieldAttrs = FieldAttrs {
+  @unknown_field "x"
+  a : String
+  @cell
+  b : Int
+}
+//~ FLICK-S014 @67:3-67:21 unknown attribute `@unknown_field`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`, `@sync`, `@ts`, `@stores`, `@implicit`, `@when` and `@export`
+//~ FLICK-S014 @69:3-69:8 `@cell` belongs before a type declaration

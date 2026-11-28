@@ -12,7 +12,7 @@ use tracing::debug;
 use crate::clock::{micros, timed};
 use crate::iface::{Entity, Namespace};
 use crate::source::SourceMap;
-use crate::syntax::{self, cst::Node, kind::SyntaxKind as K};
+use crate::syntax::{self, attr::attr_parts, cst::Node, kind::SyntaxKind as K};
 
 pub use crate::syntax::lang::Lang;
 
@@ -201,9 +201,15 @@ fn sync_services(tree: &Node, text: &str, module: &str) -> Vec<Sync> {
     let mut pending = None;
     for child in tree.nodes() {
         if child.kind == K::Attribute {
-            let mut words = (child.child_tokens()).filter(|t| t.kind == K::Ident);
-            if words.next().is_some_and(|w| w.text(text) == "sync") {
-                pending = Some(words.next().is_some_and(|w| w.text(text) == "reader"));
+            if let Some(parts) = attr_parts(child, text)
+                && !parts.namespaced
+                && parts.name == "sync"
+            {
+                let reader = child
+                    .child_tokens()
+                    .find(|t| t.start >= parts.name_end)
+                    .is_some_and(|w| w.kind == K::Ident && w.text(text) == "reader");
+                pending = Some(reader);
             }
             continue;
         }
@@ -239,8 +245,11 @@ fn collect(node: &Node, text: &str, found: &mut Vec<(Lang, Namespace, Option<Str
             K::Members => collect(child, text, found),
             K::TypeDecl => {
                 for variant in child.nodes().filter(|n| n.kind == K::Variant) {
-                    let marked = variant.nodes().find(|n| n.kind == K::Attribute);
-                    if let Some(lang) = marked.and_then(|a| lang_of(a, text)) {
+                    if let Some(lang) = variant
+                        .nodes()
+                        .filter(|n| n.kind == K::Attribute)
+                        .find_map(|a| lang_of(a, text))
+                    {
                         let name = first(variant, K::Con, text);
                         found.push((lang, Namespace::Constructor, name));
                     }
@@ -296,13 +305,17 @@ pub fn attributes(tree: &Node) -> Vec<&Node> {
 
 /// The lang item an attribute names, if it is `@lang item`.
 pub fn lang_of(attribute: &Node, text: &str) -> Option<Lang> {
-    let words: Vec<&str> = attribute
+    let parts = attr_parts(attribute, text)?;
+    if parts.namespaced || parts.name != "lang" {
+        return None;
+    }
+    let args: Vec<(K, &str)> = attribute
         .child_tokens()
-        .filter(|t| t.kind == K::Ident)
-        .map(|t| t.text(text))
+        .filter(|t| t.start >= parts.name_end)
+        .map(|t| (t.kind, t.text(text)))
         .collect();
-    match words[..] {
-        ["lang", item] => Lang::from_name(item),
+    match args[..] {
+        [(K::Ident, item)] => Lang::from_name(item),
         _ => None,
     }
 }
@@ -410,5 +423,33 @@ mod tests {
         assert_eq!(table.get(Lang::Some).name, "Some");
         assert_eq!(table.get(Lang::FlatMap).module, "Prelude");
         assert_eq!(table.get(Lang::Instances).name, "Instances");
+    }
+
+    #[test]
+    fn namespaced_sync_and_lang_attributes_are_ignored_and_stacked_variant_lang_is_found() {
+        use crate::iface::Namespace;
+        use crate::source::FileId;
+        use crate::syntax::parse;
+
+        let text = "module M exposing (..)\n\n@sync.reader\nservice NotSync =\n  ping : Unit ->{} Int\n\n@lang.owner\ntype FakeOwner = FakeOwner\n\ntype Opt a =\n  | @alias \"n\"\n    @lang none\n    MyNone\n  | @lang.some\n    MySome a\n";
+        let table = Table::of(&[("M", text)]);
+        assert!(table.sync.is_empty(), "{:?}", table.sync);
+        assert_eq!(table.find(Lang::Owner), None);
+        assert_eq!(table.find(Lang::Some), None);
+        assert_eq!(
+            table.find(Lang::None).map(|item| item.name.as_str()),
+            Some("MyNone")
+        );
+
+        let parsed = parse(text, FileId::default());
+        let found = super::declared(&parsed.tree, text);
+        assert_eq!(
+            found,
+            vec![(
+                Lang::None,
+                Namespace::Constructor,
+                Some("MyNone".to_owned()),
+            )]
+        );
     }
 }

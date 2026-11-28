@@ -148,7 +148,11 @@ impl Validator<'_> {
                 .nodes()
                 .take(index)
                 .any(|n| n.kind == K::Attribute && when::is_when(n, self.src));
-            let placement = if self.top_level {
+            let placement = if node.kind == K::RecordTypeField {
+                super::validate_attrs::Placement::RecordField
+            } else if node.kind == K::Variant {
+                super::validate_attrs::Placement::Variant
+            } else if self.top_level {
                 super::validate_attrs::Placement::TopLevel {
                     before_module_header,
                     duplicate_when,

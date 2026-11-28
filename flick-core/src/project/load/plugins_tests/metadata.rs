@@ -1,6 +1,8 @@
 //! Declaration metadata, external plugin-declared `heads`/`watch`,
 //! metadata validation, cache hit/invalidation, and native/IDE agreement.
 
+mod attributes;
+mod attributes_ns;
 mod cases;
 
 use std::cell::RefCell;

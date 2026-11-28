@@ -27,6 +27,7 @@ pub fn std_metadata() -> &'static PluginMetadata {
             combined.watch.extend(part.watch);
             combined.derives.extend(part.derives);
             combined.own_codes.extend(part.own_codes);
+            combined.attributes.extend(part.attributes);
         }
         combined
     })

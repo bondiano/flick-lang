@@ -9,6 +9,7 @@ use super::ty::Type;
 use super::ui::members;
 use super::{Checker, let_parts};
 use crate::iface::{self, Namespace};
+use crate::syntax::attr::attr_parts;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -71,9 +72,14 @@ fn kinds(decls: &[&Node], text: &str, module: &str) -> Vec<(String, String, Stri
     let mut pending = None;
     for decl in decls {
         if decl.kind == K::Attribute {
-            let mut words = (decl.child_tokens()).filter(|t| t.kind == K::Ident);
-            if words.next().is_some_and(|w| w.text(text) == iface::LABEL) {
-                pending = words.next().map(|kind| kind.text(text).to_owned());
+            if let Some(parts) = attr_parts(decl, text)
+                && !parts.namespaced
+                && parts.name == iface::LABEL
+            {
+                pending = decl
+                    .child_tokens()
+                    .find(|t| t.start >= parts.name_end && t.kind == K::Ident)
+                    .map(|kind| kind.text(text).to_owned());
             }
             continue;
         }

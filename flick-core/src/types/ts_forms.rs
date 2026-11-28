@@ -7,9 +7,12 @@
 
 use std::mem;
 
+use flick_plugin::AttributeTarget;
+
 use super::Checker;
 use crate::diagnostics::codes;
-use crate::syntax::cst::{Node, Token};
+use crate::syntax::attr::attr_parts;
+use crate::syntax::cst::Node;
 use crate::syntax::heads::{CHECKED_BY, INVARIANT_OF};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::ts_mark::{self, Mark};
@@ -18,10 +21,62 @@ const CORE_ATTRS_BEFORE_BACKEND: &[&str] =
     &["lang", "derive", "maker", "cell", "label", "owner", "sync"];
 const CORE_ATTRS_AFTER_BACKEND: &[&str] = &["stores", "implicit", "when", "export"];
 
+pub(crate) fn is_reserved_core_attribute(name: &str) -> bool {
+    CORE_ATTRS_BEFORE_BACKEND.contains(&name)
+        || CORE_ATTRS_AFTER_BACKEND.contains(&name)
+        || name == "native"
+}
+
 fn is_core_attribute(name: &str) -> bool {
     CORE_ATTRS_BEFORE_BACKEND.contains(&name)
         || CORE_ATTRS_AFTER_BACKEND.contains(&name)
         || ((CHECKED_BY.ends_with(name) || INVARIANT_OF.ends_with(name)) && name.contains('$'))
+}
+
+fn attribute_target(parent_kind: K, next_kind: Option<K>) -> Option<AttributeTarget> {
+    match parent_kind {
+        K::RecordTypeField => Some(AttributeTarget::RecordField),
+        K::Variant => Some(AttributeTarget::Variant),
+        K::SourceFile | K::Members
+            if matches!(
+                next_kind,
+                Some(
+                    K::TypeDecl
+                        | K::ErrorDecl
+                        | K::LetDecl
+                        | K::Signature
+                        | K::ClassDecl
+                        | K::InstanceDecl
+                        | K::ServiceDecl
+                        | K::ForeignDecl
+                        | K::KindDecl
+                        | K::ModuleTypeDecl
+                        | K::InlineModuleDecl
+                        | K::PluginDecl
+                )
+            ) =>
+        {
+            Some(AttributeTarget::Declaration)
+        }
+        _ => None,
+    }
+}
+
+pub(crate) fn describe_targets(targets: &[AttributeTarget]) -> String {
+    let labels: Vec<&str> = targets
+        .iter()
+        .map(|t| match t {
+            AttributeTarget::Declaration => "a declaration",
+            AttributeTarget::Variant => "a variant",
+            AttributeTarget::RecordField => "a record field",
+        })
+        .collect();
+    match labels.as_slice() {
+        [] => "nothing".to_owned(),
+        [only] => (*only).to_owned(),
+        [a, b] => format!("{a} or {b}"),
+        [rest @ .., last] => format!("{}, or {last}", rest.join(", ")),
+    }
 }
 
 impl Checker<'_> {
@@ -49,27 +104,27 @@ impl Checker<'_> {
                     .skip(index + 1)
                     .copied()
                     .find(|n| n.kind != K::Attribute);
-                self.check_attribute(child, next);
+                self.check_attribute(node.kind, child, next);
             }
             self.walk_attributes(child);
         }
     }
 
-    fn check_attribute(&mut self, node: &Node, next: Option<&Node>) {
-        let words: Vec<Token> = node.child_tokens().filter(|t| t.kind == K::Ident).collect();
-        let Some(name_tok) = words.first() else {
+    fn check_attribute(&mut self, parent_kind: K, node: &Node, next: Option<&Node>) {
+        let Some(parts) = attr_parts(node, self.text) else {
             return;
         };
-        let name = name_tok.text(self.text);
-        if is_core_attribute(name) {
+        let name = parts.name;
+        if !parts.namespaced && is_core_attribute(name) {
             return;
         }
         let next_kind = next.map(|n| n.kind);
-        if self
-            .options
-            .foreign_backend
-            .type_form_attribute(name)
-            .is_some()
+        if !parts.namespaced
+            && self
+                .options
+                .foreign_backend
+                .type_form_attribute(name)
+                .is_some()
         {
             if name == "ts" {
                 match ts_mark::read(node, self.text) {
@@ -89,9 +144,8 @@ impl Checker<'_> {
             } else {
                 let tokens: Vec<(K, &str)> = node
                     .child_tokens()
-                    .filter(|t| matches!(t.kind, K::Ident | K::String))
+                    .filter(|t| t.start >= parts.name_end)
                     .map(|t| (t.kind, t.text(self.text)))
-                    .skip(1)
                     .collect();
                 let syntax_ok = matches!(
                     tokens.as_slice(),
@@ -120,9 +174,30 @@ impl Checker<'_> {
             }
             return;
         }
+        if let Some(declared) = self
+            .options
+            .plugin_attributes
+            .iter()
+            .find(|a| a.spec.name == name)
+        {
+            let site = attribute_target(parent_kind, next_kind);
+            if !site.is_some_and(|t| declared.spec.targets.contains(&t)) {
+                let allowed = describe_targets(&declared.spec.targets);
+                self.error(
+                    codes::S014,
+                    self.span(node),
+                    format!("`@{name}` belongs on {allowed}"),
+                );
+            }
+            return;
+        }
         if !self.options.validate_foreign_metadata {
             return;
         }
+        self.report_unknown_attribute(node, name);
+    }
+
+    fn report_unknown_attribute(&mut self, node: &Node, name: &str) {
         let mut known: Vec<String> = CORE_ATTRS_BEFORE_BACKEND
             .iter()
             .map(|a| format!("`@{a}`"))
@@ -131,6 +206,9 @@ impl Checker<'_> {
             known.push(format!("`@{}`", attr.name));
         }
         known.extend(CORE_ATTRS_AFTER_BACKEND.iter().map(|a| format!("`@{a}`")));
+        for attr in self.options.plugin_attributes {
+            known.push(format!("`@{}`", attr.spec.name));
+        }
         let listed = match known.split_last() {
             Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
             Some((only, _)) => only.clone(),

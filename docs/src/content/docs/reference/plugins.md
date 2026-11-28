@@ -77,7 +77,7 @@ needs is imported by the user. Its names are its own:
 
 ## What a plugin gives
 
-A plugin is a WebAssembly component of the world `flick:plugin` (`0.5.0`) in
+A plugin is a WebAssembly component of the world `flick:plugin` (`0.6.0`) in
 [`flick-plugin/wit/plugin.wit`](https://github.com/bondiano/flick-lang/blob/main/flick-plugin/wit/plugin.wit),
 or a Rust value of the `Plugin` trait of the `flick-plugin` crate linked
 into the compiler. It declares static metadata and expands blocks through pure calls:
@@ -86,6 +86,7 @@ into the compiler. It declares static metadata and expands blocks through pure c
   - `heads`: syntactic classification (`HeadSpec`) for each block head the plugin owns — its `module`, whether it may appear `bare` in expression position without `{ … }`, second-word `declarations` keywords (such as `fn` in `route fn`), `named` declarations (`widget banner = …`), `top`-level-only heads, and `bracket_args` (`[ … ]`). External heads still require `import M exposing (plugin head)`; once imported, the parser uses the declared `HeadSpec` identically across CLI, formatter, and LSP;
   - `watch`: module values, services, or tags (`Module.name`, `*.name`, `Module.Service`, `@maker`, `@cell`) whose call sites are passed to `check-calls`, merged with any `[package] watch` entries in `flick.toml`;
   - `derives`: qualified class names the plugin derives (such as `Meta.Codec`);
+  - `attributes`: custom `@attributes` (`AttributeSpec { name, targets, doc }`) accepted on `AttributeTarget::Declaration`, `Variant`, and/or `RecordField` — either plain (`@rename`) or namespaced (`@pkg.prefix`). Unknown or misplaced attributes fail with `FLICK-S014` at the exact attribute span, and collisions with core/backend/`std`/other-plugin attributes fail with `FLICK-P044` (malformed specs with `FLICK-P036`). Hovering a plugin attribute in the editor displays its `doc`, owning package, and allowed targets;
   - `own_codes`: reserved for `std`'s compiler-owned diagnostic codes; external plugins declaring `own_codes`, colliding with `result` or `std` heads, conflicting with another plugin's syntax for the same head, or supplying malformed specs are rejected (`FLICK-P036` / `FLICK-P044`);
 - `collect(blocks)` learns from all its blocks of a group (the project's
   sources, its tests, or a package), in the order of their modules' names
@@ -351,26 +352,32 @@ The protocol gives each constructor field, alias, GADT result, and wrapped type 
 Read `Written.kind` (`Con`, `Var`, `Record`, `Tuple`, `Unit`, `Arrow`, `Captured`,
 `Forall` with `vars`/`constraints`/`body`, `StringLit`, `None`, `Other`) instead of
 re-parsing `Block.tokens`. Each field of `WrittenKind::Record` is a `RecordField`
-(`name`, `name_span`, `span`, `ty`, `docs`, `source_index`): fields are ordered
-canonically by UTF-16 label for deterministic caching while `source_index` preserves
-0-based source declaration order. Parameter kinds are token-normalized strings, so
-`Type->Type` and `Type -> Type` are both `Type -> Type`. Derive caching keys
-deterministically on all metadata fields (annotations, `///` docs, visibility,
-field types, module summary, state, and protocol version). Spans remain relative
-to the declaration or signature for diagnostics and holes. Rebuild native plugins
-and WASM components with `flick:plugin@0.5.0`; a component built for another
-version is rejected with `FLICK-P035`.
+(`name`, `name_span`, `span`, `ty`, `docs`, `source_index`, `attributes`): fields
+are ordered canonically by UTF-16 label for deterministic caching while
+`source_index` preserves 0-based source declaration order and `attributes` carries
+each field's `@name args...` metadata with exact spans relative to the declaration.
+Parameter kinds are token-normalized strings, so `Type->Type` and `Type -> Type`
+are both `Type -> Type`. Derive caching keys deterministically on all metadata
+fields (declaration, variant, and record-field attributes, `///` docs, visibility,
+field types, module summary, state, and protocol version), and module check caches
+also key on the active declared plugin attributes. Spans remain relative to the
+declaration or signature for diagnostics and holes. Rebuild native plugins and
+WASM components with `flick:plugin@0.6.0`; a component built for another version
+is rejected with `FLICK-P035`.
 
 This deterministic metadata is sufficient for third-party derives without exposing
 compiler internals (see [W5 #471](https://github.com/bondiano/flick-lang/issues/471)
 for the broader plugin/reflection roadmap):
 
-- **Configurable codec derive:** read field options (`rename`, `skip`, `default`) from
-  `args` and type attributes from `target.attributes`, emit field diagnostics at exact
-  `field.ty.span` / `field.span`, and inspect `target.visibility` plus `module` to refuse
-  leaking `Opaque` or `Private` types.
-- **CLI / form derive:** read `target.decl.docs`, `case.docs`, `case.attributes`,
-  `case.constraints`, and `field.docs`, sorting record fields by `field.source_index`
+- **Configurable codec derive:** declare `@tag` / `@meta.prefix` (declarations) and
+  `@rename`, `@skip`, `@default` (record fields) in `metadata().attributes`, read
+  them directly from `target.attributes` and `field.attributes` (as well as optional
+  `args`), emit diagnostics at exact `attr.span` / `field.ty.span` / `field.span`,
+  and inspect `target.visibility` plus `module` to refuse leaking `Opaque` or
+  `Private` types.
+- **CLI / form derive:** declare `@alias` (variants) and `@rename` (record fields),
+  read `target.decl.docs`, `case.docs`, `case.attributes`, `case.constraints`,
+  `field.docs`, and `field.attributes`, sorting record fields by `field.source_index`
   so generated `--flag` help and argument parsers follow the author's declaration order.
 
 The plugin gives declarations, an instance and what goes with it, which

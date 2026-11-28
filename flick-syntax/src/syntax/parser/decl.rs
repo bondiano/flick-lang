@@ -327,20 +327,36 @@ fn variant(p: &mut Parser, refinable: bool) {
     p.complete(m, K::Variant);
 }
 
-/// `@name argument…`: an attribute of the declaration on the next line,
-/// or of the constructor after it. Its arguments are lowercase words, so a
-/// keyword such as `none` reads as one.
-fn attribute(p: &mut Parser) {
+/// `@name argument…` or `@ns.name argument…`: an attribute of a declaration,
+/// a constructor variant, or a record type field. Its arguments are words,
+/// strings, and numbers (including negative numbers such as `-1`).
+pub(super) fn attribute(p: &mut Parser) {
     let m = p.start();
     p.bump();
     if p.at(K::Ident) || p.current().is_keyword() {
         p.bump_as(K::Ident);
+        if p.raw().kind == K::Dot
+            && p.adjacent()
+            && let Some(next) = p.toks.get(p.pos + 1)
+            && next.start == p.raw().end
+            && (next.kind == K::Ident || next.kind.is_keyword())
+        {
+            p.bump();
+            p.bump_as(K::Ident);
+        }
     } else {
         p.expect(K::Ident);
     }
-    // words, and the strings of a form: `@ts "ReadonlyArray<{0}>"`
+    // words, strings, and numbers: `@ts "ReadonlyArray<{0}>"`, `@default -1`
     loop {
-        if p.at(K::String) {
+        // Inline record field label (`{ @skip x : Int }`) starts the field, not an argument.
+        if (p.at(K::Ident) || p.at_record_label()) && p.nth(1) == K::Colon {
+            break;
+        }
+        if matches!(p.current(), K::String | K::Number | K::BigInt) {
+            p.bump();
+        } else if p.at(K::Minus) && matches!(p.nth(1), K::Number | K::BigInt) {
+            p.bump();
             p.bump();
         } else if p.at(K::Ident) || p.current().is_keyword() {
             p.bump_as(K::Ident);

@@ -44,7 +44,8 @@ pub use flick_backend::command;
 pub use flick_plugin_macros::flick;
 pub use literal::{literal_text, string_value};
 pub use metadata::{
-    AttributeMeta, CaseTarget, DeriveTarget, HeadSpec, LiteralValue, PluginMetadata, Visibility,
+    AttributeMeta, AttributeSpec, AttributeTarget, CaseTarget, DeriveTarget, HeadSpec,
+    LiteralValue, PluginMetadata, Visibility,
 };
 pub use reach::{ReachError, Request, Response};
 #[doc(hidden)]
@@ -57,7 +58,7 @@ pub use written::{
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.5.0";
+pub const VERSION: &str = "0.6.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -533,6 +534,7 @@ mod tests {
     fn the_version_is_the_one_of_the_interface() {
         for (name, wit) in [
             ("plugin", include_str!("../wit/plugin.wit")),
+            ("world", include_str!("../wit/world.wit")),
             ("compiler", include_str!("../wit/compiler.wit")),
             ("written", include_str!("../wit/written.wit")),
         ] {

@@ -21,6 +21,7 @@ pub fn metadata() -> PluginMetadata {
         watch: vec!["*.parse".into()],
         derives: Vec::new(),
         own_codes: vec!["D006".into()],
+        attributes: Vec::new(),
     }
 }
 

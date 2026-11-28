@@ -14,6 +14,7 @@
 //! nothing else, or it is refused, both where it is written and where an
 //! interface is read.
 
+use super::attr::attr_parts;
 use super::cst::Node;
 use super::kind::SyntaxKind as K;
 
@@ -78,13 +79,15 @@ pub struct Form {
 /// What the attribute `node` says, if it is a `@ts`; why it says nothing
 /// that reads.
 pub fn read(node: &Node, text: &str) -> Option<Result<Mark, String>> {
-    let mut words = (node.child_tokens())
-        .filter(|t| matches!(t.kind, K::Ident | K::String))
-        .map(|t| (t.kind, t.text(text)));
-    if words.next() != Some((K::Ident, TAG)) {
+    let parts = attr_parts(node, text)?;
+    if parts.namespaced || parts.name != TAG {
         return None;
     }
-    let rest: Vec<(K, &str)> = words.collect();
+    let rest: Vec<(K, &str)> = node
+        .child_tokens()
+        .filter(|t| t.start >= parts.name_end)
+        .map(|t| (t.kind, t.text(text)))
+        .collect();
     Some(mark(&rest))
 }
 
@@ -452,5 +455,34 @@ mod tests {
         assert!(form(&s(&["0", "$X", "mod"])).is_err());
         // nor does it name the runtime, as an interface of an older version did
         assert!(form(&s(&["1", "$Option<{0}>", "<runtime>", "Option"])).is_err());
+    }
+
+    #[test]
+    fn namespaced_ts_attributes_are_ignored_by_read() {
+        use crate::source::FileId;
+        use crate::syntax::parse;
+
+        for src in [
+            "@ts.none\ntype T = T\n",
+            "@ts.import \"dayjs\" \"Dayjs\"\ntype T = T\n",
+        ] {
+            let parsed = parse(src, FileId::new(0));
+            assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+            let attr = parsed
+                .tree
+                .nodes()
+                .find(|n| n.kind == K::Attribute)
+                .expect("attribute");
+            assert_eq!(read(attr, src), None, "{src}");
+        }
+
+        let plain = "@ts none\ntype T = T\n";
+        let parsed = parse(plain, FileId::new(0));
+        let attr = parsed
+            .tree
+            .nodes()
+            .find(|n| n.kind == K::Attribute)
+            .expect("attribute");
+        assert_eq!(read(attr, plain), Some(Ok(Mark::None)));
     }
 }

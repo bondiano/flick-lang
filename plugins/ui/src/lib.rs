@@ -59,5 +59,6 @@ pub fn metadata() -> PluginMetadata {
             "T037".into(),
             "T038".into(),
         ],
+        attributes: Vec::new(),
     }
 }

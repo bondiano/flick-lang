@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 
-use flick_plugin::{HeadSpec, PluginMetadata};
+use flick_plugin::{AttributeSpec, HeadSpec, PluginMetadata};
 
 use super::first_party;
 use crate::diagnostics::codes::{self, Code};
@@ -14,6 +14,7 @@ use crate::source::FileId;
 use crate::syntax::HeadCatalog;
 use crate::syntax::kind::SyntaxKind;
 use crate::syntax::lexer::lex;
+use crate::types::is_reserved_core_attribute;
 
 /// A single validation problem in a plugin's [`PluginMetadata`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,7 +94,94 @@ pub fn validate(
         }
     }
 
+    let mut seen_attributes = HashSet::new();
+    for spec in &metadata.attributes {
+        validate_attribute(package, is_std, spec, &mut seen_attributes, &mut issues);
+    }
+
     issues
+}
+
+fn validate_attribute<'a>(
+    package: &str,
+    is_std: bool,
+    spec: &'a AttributeSpec,
+    seen_attributes: &mut HashSet<&'a str>,
+    issues: &mut Vec<MetadataIssue>,
+) {
+    if !is_valid_attribute_name(&spec.name) {
+        issues.push(MetadataIssue {
+            code: codes::P036,
+            message: format!(
+                "plugin `{package}` declared invalid attribute `@{}`: expected `name` or `namespace.name` of lowercase identifiers",
+                spec.name
+            ),
+        });
+        return;
+    }
+    if is_reserved_core_attribute(&spec.name) {
+        issues.push(MetadataIssue {
+            code: codes::P044,
+            message: format!(
+                "plugin `{package}` cannot declare attribute `@{}`: `@{}` is a built-in compiler attribute",
+                spec.name, spec.name
+            ),
+        });
+        return;
+    }
+    if !is_std
+        && first_party::metadata()
+            .attributes
+            .iter()
+            .any(|a| a.name == spec.name)
+    {
+        issues.push(MetadataIssue {
+            code: codes::P044,
+            message: format!(
+                "`@{}` is an attribute of `{}`'s plugin, which every module has, so the plugin of `{package}` cannot declare it",
+                spec.name,
+                first_party::PACKAGE
+            ),
+        });
+        return;
+    }
+    if !seen_attributes.insert(spec.name.as_str()) {
+        issues.push(MetadataIssue {
+            code: codes::P036,
+            message: format!(
+                "plugin `{package}` declared duplicate attribute `@{}` in metadata",
+                spec.name
+            ),
+        });
+    }
+    if spec.targets.is_empty() {
+        issues.push(MetadataIssue {
+            code: codes::P036,
+            message: format!(
+                "plugin `{package}` declared attribute `@{}` with no targets",
+                spec.name
+            ),
+        });
+    } else {
+        let mut seen_targets = HashSet::new();
+        if spec.targets.iter().any(|t| !seen_targets.insert(*t)) {
+            issues.push(MetadataIssue {
+                code: codes::P036,
+                message: format!(
+                    "plugin `{package}` declared attribute `@{}` with duplicate targets",
+                    spec.name
+                ),
+            });
+        }
+    }
+}
+
+/// Whether `name` is `ident` or `namespace.ident`, each segment a valid lowercase word.
+fn is_valid_attribute_name(name: &str) -> bool {
+    match name.split_once('.') {
+        Some((ns, attr)) => !attr.contains('.') && is_valid_word(ns) && is_valid_word(attr),
+        None => is_valid_word(name),
+    }
 }
 
 fn validate_head<'a>(
@@ -240,7 +328,7 @@ pub fn is_watched(watched: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use flick_plugin::{HeadSpec, PluginMetadata};
+    use flick_plugin::{AttributeSpec, AttributeTarget, HeadSpec, PluginMetadata};
 
     use super::validate;
     use crate::diagnostics::codes;
@@ -257,6 +345,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn external_plugin_rejects_own_codes_conflicts_and_malformed_specs() {
         let bad = PluginMetadata {
             heads: vec![
@@ -286,6 +375,43 @@ mod tests {
             watch: vec!["not_valid".into()],
             derives: vec!["Unqualified".into()],
             own_codes: vec!["U001".into()],
+            attributes: vec![
+                AttributeSpec {
+                    name: "BadCap".into(),
+                    targets: vec![AttributeTarget::Declaration],
+                    doc: String::new(),
+                },
+                AttributeSpec {
+                    name: "a.b.c".into(),
+                    targets: vec![AttributeTarget::Declaration],
+                    doc: String::new(),
+                },
+                AttributeSpec {
+                    name: "cell".into(),
+                    targets: vec![AttributeTarget::Declaration],
+                    doc: String::new(),
+                },
+                AttributeSpec {
+                    name: "empty_targets".into(),
+                    targets: Vec::new(),
+                    doc: String::new(),
+                },
+                AttributeSpec {
+                    name: "dup_targets".into(),
+                    targets: vec![AttributeTarget::RecordField, AttributeTarget::RecordField],
+                    doc: String::new(),
+                },
+                AttributeSpec {
+                    name: "dup_attr".into(),
+                    targets: vec![AttributeTarget::RecordField],
+                    doc: String::new(),
+                },
+                AttributeSpec {
+                    name: "dup_attr".into(),
+                    targets: vec![AttributeTarget::Variant],
+                    doc: String::new(),
+                },
+            ],
         };
         let issues = validate("ext", &bad, first_party::head_catalog());
         assert!(
@@ -322,6 +448,36 @@ mod tests {
             issues
                 .iter()
                 .any(|i| i.code == codes::P036 && i.message.contains("invalid derive class"))
+        );
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.code == codes::P036 && i.message.contains("`@BadCap`"))
+        );
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.code == codes::P036 && i.message.contains("`@a.b.c`"))
+        );
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.code == codes::P044 && i.message.contains("`@cell`"))
+        );
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.code == codes::P036 && i.message.contains("no targets"))
+        );
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.code == codes::P036 && i.message.contains("duplicate targets"))
+        );
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.code == codes::P036 && i.message.contains("duplicate attribute"))
         );
     }
 }

@@ -1,6 +1,7 @@
 //! Parsing helper for the neutral `@export "name"` attribute on top-level
 //! functions.
 
+use super::attr::attr_parts;
 use super::cst::Node;
 use super::kind::SyntaxKind as K;
 use super::literal::string_value;
@@ -21,9 +22,7 @@ pub struct ExportAttr {
 
 /// Whether `node` is an `@export` attribute (regardless of argument validity).
 pub fn is_export(node: &Node, text: &str) -> bool {
-    node.child_tokens()
-        .find(|t| t.kind == K::Ident)
-        .is_some_and(|t| t.text(text) == TAG)
+    attr_parts(node, text).is_some_and(|parts| !parts.namespaced && parts.name == TAG)
 }
 
 /// Reads the raw string token of an `@export "<name>"` attribute without
@@ -32,13 +31,11 @@ pub fn is_export(node: &Node, text: &str) -> bool {
 /// Returns `None` if `node` is not an `@export` attribute, or `Some(Err(..))`
 /// if its argument is missing, non-string, or followed by extra arguments.
 pub fn read_raw<'a>(node: &Node, text: &'a str) -> Option<Result<&'a str, &'static str>> {
-    let mut tokens = node
-        .child_tokens()
-        .filter(|t| matches!(t.kind, K::Ident | K::String));
-    let head = tokens.next()?;
-    if head.kind != K::Ident || head.text(text) != TAG {
+    let parts = attr_parts(node, text)?;
+    if parts.namespaced || parts.name != TAG {
         return None;
     }
+    let mut tokens = node.child_tokens().filter(|t| t.start >= parts.name_end);
     let Some(arg) = tokens.next() else {
         return Some(Err(USAGE));
     };
@@ -109,5 +106,23 @@ mod tests {
             !parsed.diagnostics.is_empty(),
             "expected syntax error inside block"
         );
+    }
+
+    #[test]
+    fn namespaced_export_attribute_is_not_treated_as_export() {
+        for src in [
+            "@export.csv\nlet f x = x\n",
+            "@export.csv \"out\"\nlet f x = x\n",
+        ] {
+            let parsed = parse(src, FileId::new(0));
+            assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+            let attr = parsed
+                .tree
+                .nodes()
+                .find(|n| n.kind == K::Attribute)
+                .expect("attribute");
+            assert!(!is_export(attr, src), "{src}");
+            assert_eq!(read(attr, src), None, "{src}");
+        }
     }
 }

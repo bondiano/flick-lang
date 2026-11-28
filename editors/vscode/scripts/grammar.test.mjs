@@ -230,6 +230,9 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor('foreign module inline "const k = 1;"', '"const k = 1;"').includes("string.quoted.double.flick"));
   assert.ok(scopesFor('@export "addNumbers"', "@export").includes("entity.other.attribute-name.flick"));
   assert.ok(scopesFor('@export "addNumbers"', '"addNumbers"').includes("string.quoted.double.flick"));
+  assert.ok(scopesFor('@meta.prefix "v1"', "@meta.prefix").includes("entity.other.attribute-name.flick"));
+  assert.ok(scopesFor('  @rename "user_id" userName : String', "@rename").includes("entity.other.attribute-name.flick"));
+  assert.ok(scopesFor('  @default -1 retries : Int', "@default").includes("entity.other.attribute-name.flick"));
 });
 
 test("await keeps its control scope except in method names", () => {

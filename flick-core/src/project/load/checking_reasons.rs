@@ -103,7 +103,11 @@ impl Key {
                     || self.virtual_capture != current.virtual_capture,
                 "module arguments",
             ),
-            (self.watching != current.watching, "plugin inputs"),
+            (
+                self.watching != current.watching
+                    || self.plugin_attributes != current.plugin_attributes,
+                "plugin inputs",
+            ),
         ];
         labels.extend((flags.iter()).filter(|(differs, _)| *differs).map(|(_, l)| (*l).to_owned()));
         if self.imports.len() == current.imports.len() {
@@ -176,6 +180,7 @@ impl Checking<'_> {
             watching: (self.watching.iter())
                 .map(|w| w.plugin.id().to_owned())
                 .collect(),
+            plugin_attributes: Arc::clone(self.plugin_attributes),
         }
     }
 }

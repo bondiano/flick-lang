@@ -6,6 +6,22 @@
 #[doc(hidden)]
 macro_rules! wit_metadata_conversions {
     () => {
+        fn to_attribute_target(t: $crate::AttributeTarget) -> w::AttributeTarget {
+            match t {
+                $crate::AttributeTarget::Declaration => w::AttributeTarget::Declaration,
+                $crate::AttributeTarget::Variant => w::AttributeTarget::Variant,
+                $crate::AttributeTarget::RecordField => w::AttributeTarget::RecordField,
+            }
+        }
+
+        fn from_attribute_target(t: w::AttributeTarget) -> $crate::AttributeTarget {
+            match t {
+                w::AttributeTarget::Declaration => $crate::AttributeTarget::Declaration,
+                w::AttributeTarget::Variant => $crate::AttributeTarget::Variant,
+                w::AttributeTarget::RecordField => $crate::AttributeTarget::RecordField,
+            }
+        }
+
         pub fn to_metadata(m: &$crate::PluginMetadata) -> w::PluginMetadata {
             w::PluginMetadata {
                 heads: m
@@ -24,6 +40,15 @@ macro_rules! wit_metadata_conversions {
                 watch: m.watch.clone(),
                 derives: m.derives.clone(),
                 own_codes: m.own_codes.clone(),
+                attributes: m
+                    .attributes
+                    .iter()
+                    .map(|a| w::AttributeSpec {
+                        name: a.name.clone(),
+                        targets: a.targets.iter().copied().map(to_attribute_target).collect(),
+                        doc: a.doc.clone(),
+                    })
+                    .collect(),
             }
         }
 
@@ -45,6 +70,15 @@ macro_rules! wit_metadata_conversions {
                 watch: m.watch,
                 derives: m.derives,
                 own_codes: m.own_codes,
+                attributes: m
+                    .attributes
+                    .into_iter()
+                    .map(|a| $crate::AttributeSpec {
+                        name: a.name,
+                        targets: a.targets.into_iter().map(from_attribute_target).collect(),
+                        doc: a.doc,
+                    })
+                    .collect(),
             }
         }
 
@@ -226,6 +260,22 @@ macro_rules! wit_metadata_conversions {
             }
         }
 
+        fn to_written_attribute(a: $crate::AttributeMeta) -> w::WrittenAttribute {
+            w::WrittenAttribute {
+                name: a.name,
+                args: a.args,
+                span: to_written_span(a.span),
+            }
+        }
+
+        fn from_written_attribute(a: w::WrittenAttribute) -> $crate::AttributeMeta {
+            $crate::AttributeMeta {
+                name: a.name,
+                args: a.args,
+                span: from_written_span(a.span),
+            }
+        }
+
         fn to_written(t: &$crate::Written) -> w::Written {
             t.flatten()
                 .into_iter()
@@ -250,6 +300,11 @@ macro_rules! wit_metadata_conversions {
                                         ty: f.ty,
                                         docs: f.docs,
                                         source_index: f.source_index,
+                                        attributes: f
+                                            .attributes
+                                            .into_iter()
+                                            .map(to_written_attribute)
+                                            .collect(),
                                     })
                                     .collect(),
                                 open,
@@ -322,6 +377,11 @@ macro_rules! wit_metadata_conversions {
                                     ty: f.ty,
                                     docs: f.docs,
                                     source_index: f.source_index,
+                                    attributes: f
+                                        .attributes
+                                        .into_iter()
+                                        .map(from_written_attribute)
+                                        .collect(),
                                 })
                                 .collect(),
                             open: r.open,

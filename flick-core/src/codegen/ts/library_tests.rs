@@ -37,6 +37,7 @@ fn check_module(name: &str, text: &str) -> (Typing, Interface) {
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
         native_overrides: None,
+        plugin_attributes: &[],
     };
     let (more, typing) = types::check_typed(&module, &builtin, builtins, options, &mut interface);
     diagnostics.extend(more);

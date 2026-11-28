@@ -303,12 +303,15 @@ fn find_field(
 /// A written field: its type as the source writes it, its comment, and the
 /// innermost declaration or constructor around it.
 fn written(module: &str, path: &[&Node], field: &Node, text: &str) -> Declared {
-    let written = field.nodes().next().map_or_else(String::new, |t| {
-        t.text(text)
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ")
-    });
+    let written = field
+        .nodes()
+        .find(|n| n.kind != K::Attribute)
+        .map_or_else(String::new, |t| {
+            t.text(text)
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        });
     let doc = path
         .iter()
         .rev()

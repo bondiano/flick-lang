@@ -1,3 +1,58 @@
+/// An operator whose operand type is checked once inference settles it.
+#[derive(Debug, Clone)]
+struct Operator {
+    ty: Type,
+    span: Span,
+    op: &'static str,
+    domain: Domain,
+    /// The class constraints in scope where it is written.
+    givens: Vec<Type>,
+}
+
+/// The operand types an operator accepts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Domain {
+    /// The numeric types: arithmetic.
+    Numeric,
+    /// The numeric types and `String`: comparisons.
+    Ordered,
+    /// `String` and any list: `++`.
+    Concat,
+}
+
+impl Domain {
+    /// The built-in types it accepts; `List` means any list. An operand
+    /// type nothing determined becomes the first.
+    fn names(self) -> Vec<Lang> {
+        let numeric = Num::ALL.into_iter().map(Num::lang);
+        match self {
+            Domain::Numeric => numeric.collect(),
+            Domain::Ordered => numeric.chain([Lang::String]).collect(),
+            Domain::Concat => vec![Lang::String, Lang::List],
+        }
+    }
+
+    fn allows(self, head: &Type) -> bool {
+        self.names().into_iter().any(|item| head.is_lang(item))
+    }
+}
+
+/// A number literal, whose type is any numeric type, a `Float` one when it
+/// has a fraction: the one inference settles, else `Int` or `Float`.
+#[derive(Debug, Clone)]
+struct NumLiteral {
+    ty: Type,
+    span: Span,
+    /// The integer it spells; `None` when the digits do not fit 128 bits
+    /// or it has a fraction.
+    value: Option<i128>,
+    fractional: bool,
+    /// A literal pattern, which a type variable cannot match.
+    pattern: bool,
+    /// The class constraints in scope where it is written.
+    givens: Vec<Type>,
+}
+
 struct Checker<'a> {
     static_witnesses: &'a [Interface],
     file: FileId,

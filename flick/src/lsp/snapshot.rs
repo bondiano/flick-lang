@@ -518,6 +518,7 @@ pub(super) fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
         foreign_backend: types::ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
         native_overrides: None,
+        plugin_attributes: &[],
     };
     let (checked, typing) =
         types::check_builtin_typed(&module, &imported, dependencies, options, &mut interface);
@@ -540,6 +541,7 @@ pub(super) fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
             compilation: Compilation::default(),
             diagnostics,
             foreign_backend: types::ForeignBackendSpec::js(),
+            plugin_attributes: Arc::from([]),
         },
         sources,
         root: path.parent().expect("source directory").to_path_buf(),

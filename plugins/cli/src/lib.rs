@@ -31,6 +31,7 @@ pub fn metadata() -> PluginMetadata {
         watch: Vec::new(),
         derives: vec!["Cli.Value".into()],
         own_codes: Vec::new(),
+        attributes: Vec::new(),
     }
 }
 

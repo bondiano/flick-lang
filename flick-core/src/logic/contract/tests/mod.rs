@@ -228,6 +228,7 @@ fn check_and_lower(path: &str, source: &str) -> (Typing, flick_ir::Module) {
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
         native_overrides: None,
+        plugin_attributes: &[],
     };
     let (diags, typing) = check_typed(&module, &imported, builtins, options, &mut iface);
     let errors: Vec<_> = diags

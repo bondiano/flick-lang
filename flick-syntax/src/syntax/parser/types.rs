@@ -1,6 +1,6 @@
 //! Types, rows, capture qualifiers and kinds (kinds share the type grammar).
 
-use super::{Ctx, Done, K, Parser, expr};
+use super::{Ctx, Done, K, Parser, Sep, decl, expr};
 use crate::diagnostics::{Diagnostic, Edit, codes};
 
 /// `forall a b. T`, `C => T` or an arrow type.
@@ -72,11 +72,18 @@ fn arrow(p: &mut Parser) -> Option<Done> {
     Some(p.complete(m, K::ArrowType))
 }
 
-/// Whether the `{` here opens a record type, `{ f : T; … }`: a row never
-/// starts `name :`.
-fn record_ahead(p: &Parser) -> bool {
+/// Whether the token at `offset` starts a record type field (`name :` or `@attr`):
+/// a row type never starts with `@` or `name :`.
+fn is_record_start(p: &Parser, offset: usize) -> bool {
     let at = |i: usize| p.toks[(p.pos + i).min(p.toks.len() - 1)].kind;
-    (at(1) == K::Ident || at(1).is_record_label()) && at(2) == K::Colon
+    let first = at(offset);
+    first == K::At || ((first == K::Ident || first.is_record_label()) && at(offset + 1) == K::Colon)
+}
+
+/// Whether the `{` here opens a record type, `{ f : T; … }`: a row never
+/// starts `name :` or `@attr`.
+fn record_ahead(p: &Parser) -> bool {
+    is_record_start(p, 1)
 }
 
 /// `a ->{ f : T }`, meant as an arrow to a record: reported with the space
@@ -278,12 +285,11 @@ fn brace_type(p: &mut Parser) -> K {
     let opener = p.raw();
     p.bump();
     let first = p.raw();
-    let next = p.toks[(p.pos + 1).min(p.toks.len() - 1)];
     if first.kind == K::RBrace {
         p.bump();
         return K::RowType;
     }
-    let record = (first.kind == K::Ident || first.kind.is_record_label()) && next.kind == K::Colon;
+    let record = is_record_start(p, 0);
     if record {
         p.push(Ctx::Aligned { col: p.col() });
         p.items(record_type_field, true, |p| {
@@ -308,6 +314,12 @@ fn record_type_field(p: &mut Parser) {
         return tail(p);
     }
     let m = p.start();
+    while p.at(K::At) {
+        decl::attribute(p);
+        if p.sep() == Some(Sep::Next) {
+            p.sep_taken = Some(p.pos);
+        }
+    }
     let ok = if p.at_record_label() {
         p.bump_as(K::Ident);
         true

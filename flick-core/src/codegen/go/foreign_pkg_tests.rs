@@ -48,6 +48,7 @@ fn lower_go(text: &str) -> Module {
         foreign_backend: &go_spec,
         validate_foreign_metadata: true,
         native_overrides: None,
+        plugin_attributes: &[],
     };
     let (more, typing) = types::check_typed(&module, &builtin, builtins, options, &mut interface);
     diagnostics.extend(parse.diagnostics);
@@ -468,6 +469,7 @@ fn malformed_go_type_form_with_numeric_args_is_rejected_with_s014() {
             foreign_backend: &go_spec,
             validate_foreign_metadata: true,
             native_overrides: None,
+            plugin_attributes: &[],
         };
         let (more, _) = types::check_typed(&module, &builtin, builtins, options, &mut interface);
         diagnostics.extend(parse.diagnostics);

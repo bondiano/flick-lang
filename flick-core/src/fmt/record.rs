@@ -150,11 +150,15 @@ impl<'a> Printer<'a> {
             Element::Token(t) if t.kind == K::WithKw => Some(*t),
             _ => None,
         });
+        let has_field_attr = n.kind == K::RecordType
+            && items
+                .iter()
+                .any(|i| i.kind == K::RecordTypeField && i.nodes().any(|c| c.kind == K::Attribute));
         let mut shape = Shape {
             sep: ';',
             pad: " ",
             last: " ",
-            force: lined,
+            force: lined || has_field_attr,
             fill: false,
         };
         let tails: Vec<bool> = items.iter().map(|i| i.kind == K::RowTail).collect();
@@ -187,6 +191,45 @@ impl<'a> Printer<'a> {
         };
         let head = self.elements(n, &n.children[..=eq]);
         self.body(head, Value::Block(block), n.range().1, &[])
+    }
+
+    /// `[@attr ...]* name : Type` of a record type.
+    pub fn record_type_field(&mut self, n: &'a Node) -> Doc<'a> {
+        let attrs: Vec<&'a Node> = n.nodes().filter(|c| c.kind == K::Attribute).collect();
+        if attrs.is_empty() {
+            return self.generic(n);
+        }
+        let a = self.a;
+        let first_field = n
+            .children
+            .iter()
+            .position(|c| matches!(c, Element::Token(t) if !t.kind.is_trivia()))
+            .unwrap_or(n.children.len());
+        let field_start = match n.children.get(first_field) {
+            Some(Element::Token(t)) => t.start,
+            _ => n.range().1,
+        };
+        let mut docs = Vec::with_capacity(attrs.len() * 4 + 2);
+        for (i, attr) in attrs.iter().enumerate() {
+            if i > 0 {
+                let comments = self.comments.leading(attr.range().0);
+                if !comments.is_empty() {
+                    docs.push(self.comment_lines(&comments));
+                }
+            }
+            docs.push(self.generic(attr));
+            let next_start = attrs.get(i + 1).map_or(field_start, |next| next.range().0);
+            if let Some(trailing) = self.comments.trailing(next_start, None) {
+                docs.push(docvec![a, " ", trailing]);
+            }
+            docs.push(a.line());
+        }
+        let field_comments = self.comments.leading(field_start);
+        if !field_comments.is_empty() {
+            docs.push(self.comment_lines(&field_comments));
+        }
+        docs.push(self.elements(n, &n.children[first_field..]));
+        a.concat(docs).force_break(a)
     }
 
     /// The items between `opener` and the `close` token, with the comments

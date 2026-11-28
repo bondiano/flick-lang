@@ -2,6 +2,7 @@
 //! concrete tree and its trivia-free AST view. Grammar: `docs/src/content/docs/reference/syntax.md`.
 
 pub mod ast;
+pub mod attr;
 pub mod cst;
 pub mod export_attr;
 pub mod fields;

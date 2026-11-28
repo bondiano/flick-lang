@@ -89,6 +89,7 @@ fn checked(
             foreign_backend: &backend,
             validate_foreign_metadata: true,
             native_overrides: Some(env),
+            plugin_attributes: &[],
         },
         &mut iface,
         StaticContext {

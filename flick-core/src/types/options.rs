@@ -1,9 +1,21 @@
 //! What checking a module is given besides the module and its imports: the
 //! bounds of instance resolution and the settings of the project.
 
+use flick_plugin::AttributeSpec;
+#[cfg(feature = "native-project")]
+use serde::{Deserialize, Serialize};
+
 use super::{Dict, ForeignBackendSpec, NativeOverrideEnv, Type, Watched};
 use crate::resolve::Interface;
 use crate::syntax::structure::Thresholds;
+
+/// A validated plugin-declared custom `@attribute` active in the current project.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "native-project", derive(Serialize, Deserialize))]
+pub struct PluginAttribute {
+    pub package: String,
+    pub spec: AttributeSpec,
+}
 
 /// Bounds of instance resolution for one definition; exceeding them is a
 /// diagnostic, never a success.
@@ -48,6 +60,8 @@ pub struct Options<'a> {
     /// Environment vocabulary, world model, and active tags for `@native` overrides.
     /// `None` uses [`NativeOverrideEnv::default_js`].
     pub native_overrides: Option<&'a NativeOverrideEnv>,
+    /// Custom `@attributes` declared by active plugins.
+    pub plugin_attributes: &'a [PluginAttribute],
 }
 
 impl<'a> Options<'a> {

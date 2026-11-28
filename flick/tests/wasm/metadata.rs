@@ -1,22 +1,24 @@
-//! End-to-end WASM plugin tests for `flick:plugin@0.5.0`:
-//! - Configurable-field `Meta.Codec` derive (JS & Go executable, exact field-span
-//!   diagnostics on unsupported types, refusal to leak opaque/private types).
+//! End-to-end WASM plugin tests for `flick:plugin@0.6.0`:
+//! - Configurable-field `Meta.Codec` derive using custom declaration (`@tag`,
+//!   `@meta.prefix`) and record-field (`@rename`, `@skip`, `@default`)
+//!   attributes (JS & Go executable, exact field/attribute-span diagnostics,
+//!   and refusal to leak opaque/private types).
 //! - CLI/form `Meta.CliForm` derive (`///` docs on types/variants/record fields,
-//!   declaration order via `source_index`, variant `@alias` attributes,
-//!   executable help and argument parsing).
-//! - External plugin-declared `heads` (`declarations`, `named`, `bare`) and
-//!   `watch` (with NO `watch` in `flick.toml`).
+//!   declaration order via `source_index`, variant `@alias` and field `@rename`
+//!   attributes, executable help and argument parsing).
+//! - External plugin-declared `heads`, `watch`, and custom `@attributes`
+//!   (unknown/misplaced `FLICK-S014` validation).
 //! - Derive cache hit vs invalidation on doc/attribute/visibility/type changes.
-//! - Incompatible `0.4.0` component rebuild diagnostic (`FLICK-P035`).
+//! - Incompatible `0.5.0` component rebuild diagnostic (`FLICK-P035`).
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use super::{APP, LIB, MAIN, PAIRS, component as pairs_component, flick, trace};
+use super::trace;
 use crate::common::project;
 
-const META_APP: &str = r#"schema-version = 1
+pub(super) const META_APP: &str = r#"schema-version = 1
 
 [project]
 kind = "app"
@@ -217,7 +219,7 @@ fn meta_component() -> PathBuf {
     path
 }
 
-fn meta_app(name: &str, app_toml: &str, extra_files: &[(&str, &str)]) -> PathBuf {
+pub(super) fn meta_app(name: &str, app_toml: &str, extra_files: &[(&str, &str)]) -> PathBuf {
     let mut files = vec![
         ("app/flick.toml", app_toml),
         ("meta/flick.toml", META_LIB_TOML),
@@ -229,7 +231,7 @@ fn meta_app(name: &str, app_toml: &str, extra_files: &[(&str, &str)]) -> PathBuf
     root
 }
 
-fn run_flick(root: &Path, args: &[&str]) -> Output {
+pub(super) fn run_flick(root: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_flick"))
         .args(args)
         .current_dir(root.join("app"))
@@ -248,21 +250,20 @@ fn external_codec_derive_executes_on_js_and_go_with_rename_skip_and_default() {
 import Meta
 
 /// Account payload
-@label usr
+@meta.prefix "usr"
 type User = User {
   /// Wire key renamed to user_id
-  userName : String;
+  @rename "user_id"
+  userName : String
   /// Skipped on wire, defaulted on decode
-  internalTag : String;
+  @skip
+  @default "local"
+  internalTag : String
   /// Defaulted when absent on wire
-  retries : Int;
+  @default -3
+  retries : Int
   active : Bool
-} deriving Meta.Codec {
-  rename userName "user_id";
-  skip internalTag;
-  default internalTag "local";
-  default retries 3
-}
+} deriving Meta.Codec
 
 main : Unit ->{Host.Console; AppError} Unit
 let main () =
@@ -275,7 +276,7 @@ let main () =
       | Err e -> "ERR:" ++ e
   Platform.stdout_line (wire ++ "\n" ++ summary)
 "#;
-    let expected = "usr:user_id=ada;retries=5;active=true\ngrace|local|3|false\n";
+    let expected = "usr:user_id=ada;retries=5;active=true\ngrace|local|-3|false\n";
 
     // JS execution
     let js_root = meta_app("meta-codec-js", META_APP, &[("app/src/App/Main.fl", main)]);
@@ -401,12 +402,12 @@ fn external_cli_form_derive_uses_docs_attributes_and_source_index_order() {
 import Meta
 
 /// Deployment form options
-@label form
+@tag "form"
 type Form = Form {
   /// Target environment name
-  zebra : String;
+  zebra : String
   /// Worker replica count
-  alpha : Int;
+  alpha : Int
   /// Optional release note
   middle : Option String
 } deriving Meta.CliForm
@@ -414,15 +415,17 @@ type Form = Form {
 /// CLI subcommands
 type Command =
   /// Start the HTTP server
+  @alias "s"
   Serve {
     /// Port to bind
-    port : Int;
+    @rename "bind-port"
+    port : Int
     /// Host interface
     host : String
   }
   /// Show current status
   | Status
-  deriving Meta.CliForm { alias Serve "s" }
+  deriving Meta.CliForm
 
 main : Unit ->{Host.Console; AppError} Unit
 let main () =
@@ -435,7 +438,7 @@ let main () =
         let note = Option.with_default "none" f.middle
         f.zebra ++ ":" ++ show f.alpha ++ ":" ++ note
       | Err e -> "ERR:" ++ e
-  let parsed_cmd = Meta.parse_form ["s", "--port", "8080", "--host", "127.0.0.1"]
+  let parsed_cmd = Meta.parse_form ["s", "--bind-port", "8080", "--host", "127.0.0.1"]
   let cmd_line =
     match parsed_cmd with
       | Ok (Serve cfg) -> "serve:" ++ cfg.host ++ ":" ++ show cfg.port
@@ -458,7 +461,7 @@ Form: Deployment form options
 ---
 Command: CLI subcommands
   serve (alias: s): Start the HTTP server
-    --port <Int> - Port to bind
+    --bind-port <Int> - Port to bind
     --host <String> - Host interface
   status: Show current status
 ---
@@ -479,9 +482,10 @@ route fn ping = "pong"
 widget title = "hello"
 
 /// Item doc
-@label it
+@tag "it"
 type Item = Item {
   /// Item label
+  @rename "lbl"
   label : String
 } deriving Meta.Codec, Meta.CliForm
 
@@ -507,7 +511,7 @@ let main () =
     );
     assert_eq!(
         String::from_utf8_lossy(&ran.stdout),
-        "pong|hello|App.Main.title|allowed|it:label=box\n"
+        "pong|hello|App.Main.title|allowed|it:lbl=box\n"
     );
     let initial_derives = trace(&root)
         .iter()
@@ -524,8 +528,19 @@ let main () =
         .count();
     assert_eq!(after_hit, 2, "{:?}", trace(&root));
 
-    // Editing a `///` doc comment invalidates the WASM derive cache!
-    let edited_doc = main.replace("Item doc", "Updated item doc");
+    // Editing a record-field `@rename` attribute invalidates the WASM derive cache!
+    let edited_attr = main.replace("@rename \"lbl\"", "@rename \"title\"");
+    fs::write(root.join("app/src/App/Main.fl"), &edited_attr).expect("write");
+    let checked_attr = run_flick(&root, &["check"]);
+    assert!(checked_attr.status.success(), "{checked_attr:?}");
+    let after_attr_edit = trace(&root)
+        .iter()
+        .filter(|l| l.starts_with("derive meta "))
+        .count();
+    assert_eq!(after_attr_edit, 4, "{:?}", trace(&root));
+
+    // Editing a `///` doc comment also invalidates the WASM derive cache!
+    let edited_doc = edited_attr.replace("Item doc", "Updated item doc");
     fs::write(root.join("app/src/App/Main.fl"), &edited_doc).expect("write");
     let checked2 = run_flick(&root, &["check"]);
     assert!(checked2.status.success(), "{checked2:?}");
@@ -533,7 +548,7 @@ let main () =
         .iter()
         .filter(|l| l.starts_with("derive meta "))
         .count();
-    assert_eq!(after_doc_edit, 4, "{:?}", trace(&root));
+    assert_eq!(after_doc_edit, 6, "{:?}", trace(&root));
 
     // Metadata-declared `watch = ["Meta.guarded"]` (with NO `watch` in flick.toml)
     // catches forbidden calls!
@@ -543,33 +558,4 @@ let main () =
     let stderr = String::from_utf8_lossy(&watched.stderr);
     assert!(!watched.status.success(), "{stderr}");
     assert!(stderr.contains("meta/M003"), "{stderr}");
-}
-
-#[test]
-fn incompatible_0_4_0_wasm_component_reports_p035_rebuild_diagnostic() {
-    let root = project(
-        "plugins-incompatible-0-4-0",
-        &[
-            ("app/flick.toml", APP),
-            ("app/src/App/Main.fl", MAIN),
-            ("lib/flick.toml", LIB),
-            ("lib/src/Pairs.fl", PAIRS),
-        ],
-    );
-    let mut bytes = fs::read(pairs_component()).expect("read pairs component");
-    let needle = b"flick:plugin/compiler@0.5.0";
-    let pos = bytes
-        .windows(needle.len())
-        .position(|w| w == needle)
-        .expect("component imports flick:plugin/compiler@0.5.0");
-    bytes[pos..pos + needle.len()].copy_from_slice(b"flick:plugin/compiler@0.4.0");
-    fs::write(root.join("lib/pairs.wasm"), bytes).expect("write patched component");
-
-    let out = flick(&root, &["check", "--diagnostics", "json"]);
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(!out.status.success(), "{stderr}");
-    assert!(stderr.contains("FLICK-P035"), "{stderr}");
-    assert!(stderr.contains("flick:plugin@0.4.0"), "{stderr}");
-    assert!(stderr.contains("0.5.0"), "{stderr}");
-    assert!(stderr.contains("rebuild it"), "{stderr}");
 }

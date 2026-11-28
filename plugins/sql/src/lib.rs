@@ -37,6 +37,7 @@ pub fn metadata() -> PluginMetadata {
         watch: Vec::new(),
         derives: Vec::new(),
         own_codes: Vec::new(),
+        attributes: Vec::new(),
     }
 }
 

@@ -1,4 +1,4 @@
-package flick:plugin@0.5.0;
+package flick:plugin@0.6.0;
 
 /// The types a declaration or a signature writes, as the compiler parsed
 /// them, for a derive to read without parsing tokens again.
@@ -38,6 +38,9 @@ interface written {
 
   record written-name { name: string, args: list<u32> }
 
+  /// An `@name args...` attribute attached to a written record field.
+  record written-attribute { name: string, args: string, span: written-span }
+
   /// One field of a written record type, stored in canonical UTF-16 label order
   /// with `source-index` recording 0-based declaration order.
   record written-record-field {
@@ -47,6 +50,7 @@ interface written {
     ty: u32,
     docs: string,
     source-index: u32,
+    attributes: list<written-attribute>,
   }
 
   record written-record { fields: list<written-record-field>, open: bool }

@@ -80,14 +80,54 @@ fn parse_aliases(args: Option<&Block>) -> BTreeMap<String, String> {
     out
 }
 
-fn variant_alias(case: &CaseTarget, aliases: &BTreeMap<String, String>) -> Option<String> {
-    aliases.get(&case.name).cloned().or_else(|| {
+fn parse_string_arg(text: &str) -> Option<String> {
+    let trimmed = text.trim();
+    if trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() >= 2 {
+        Some(string_value(trimmed))
+    } else {
+        None
+    }
+}
+
+fn field_flag_name(field: &RecordField) -> Result<String, Vec<Diagnostic>> {
+    if let Some(attr) = field.attributes.iter().find(|a| a.name == "rename") {
+        let Some(renamed) = parse_string_arg(&attr.args).filter(|s| !s.is_empty()) else {
+            return Err(vec![
+                Diagnostic::error(
+                    "`@rename` expects a non-empty string literal flag name",
+                    attr.span,
+                )
+                .with_code("M005"),
+            ]);
+        };
+        return Ok(renamed);
+    }
+    Ok(field.name.clone())
+}
+
+fn variant_alias(
+    case: &CaseTarget,
+    aliases: &BTreeMap<String, String>,
+) -> Result<Option<String>, Vec<Diagnostic>> {
+    if let Some(attr) = case.attributes.iter().find(|a| a.name == "alias") {
+        let Some(alias) = parse_string_arg(&attr.args).filter(|s| !s.is_empty()) else {
+            return Err(vec![
+                Diagnostic::error(
+                    "`@alias` expects a non-empty string literal, as `@alias \"s\"`",
+                    attr.span,
+                )
+                .with_code("M005"),
+            ]);
+        };
+        return Ok(Some(alias));
+    }
+    Ok(aliases.get(&case.name).cloned().or_else(|| {
         case.attributes
             .iter()
             .find(|a| a.name == "label")
             .map(|a| a.args.trim().to_owned())
             .filter(|s| !s.is_empty())
-    })
+    }))
 }
 
 fn parse_record_body(
@@ -141,8 +181,9 @@ fn parse_record_body(
             FieldTy::Bool => "Meta.flag_bool",
             FieldTy::OptionString => "Meta.flag_opt_string",
         };
+        let flag_name = field_flag_name(field)?;
         let f = b.expr(Expr::Name(helper.into()));
-        let flag = b.expr(Expr::Text(format!("--{}", field.name)));
+        let flag = b.expr(Expr::Text(format!("--{flag_name}")));
         let args_ref = b.expr(Expr::Name(args_var.to_owned()));
         let call = b.expr(Expr::Apply {
             function: f,
@@ -212,7 +253,8 @@ pub fn derive(
                     .with_code("M005"),
                 ]);
             };
-            let _ = write!(help, "\n  --{} <{ty_label}>", field.name);
+            let flag_name = field_flag_name(field)?;
+            let _ = write!(help, "\n  --{flag_name} <{ty_label}>");
             if !field.docs.is_empty() {
                 let _ = write!(help, " - {}", field.docs);
             }
@@ -233,7 +275,7 @@ pub fn derive(
 
         for case in &target.cases {
             let cmd_name = case.name.to_ascii_lowercase();
-            let alias = variant_alias(case, &aliases);
+            let alias = variant_alias(case, &aliases)?;
             let _ = write!(help, "\n  {cmd_name}");
             if let Some(a) = &alias {
                 let _ = write!(help, " (alias: {a})");
@@ -263,7 +305,8 @@ pub fn derive(
                             .with_code("M005"),
                         ]);
                     };
-                    let _ = write!(help, "\n    --{} <{ty_label}>", field.name);
+                    let flag_name = field_flag_name(field)?;
+                    let _ = write!(help, "\n    --{flag_name} <{ty_label}>");
                     if !field.docs.is_empty() {
                         let _ = write!(help, " - {}", field.docs);
                     }
@@ -274,7 +317,7 @@ pub fn derive(
         for case in target.cases.iter().rev() {
             let cmd_name = case.name.to_ascii_lowercase();
             let mut names = vec![b.expr(Expr::Text(cmd_name))];
-            if let Some(a) = variant_alias(case, &aliases) {
+            if let Some(a) = variant_alias(case, &aliases)? {
                 names.push(b.expr(Expr::Text(a)));
             }
             let names_list = b.expr(Expr::Items(names));
