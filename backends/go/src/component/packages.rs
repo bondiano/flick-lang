@@ -130,7 +130,7 @@ fn empty_packages() -> Packages {
 }
 
 /// Parses `module <name>` and `require` lines from a `go.mod` file.
-fn parse_go_mod(text: &str) -> (Option<String>, BTreeMap<String, String>) {
+pub(super) fn parse_go_mod(text: &str) -> (Option<String>, BTreeMap<String, String>) {
     let mut name = None;
     let mut requires = BTreeMap::new();
     let mut in_require = false;

@@ -458,7 +458,7 @@ fn the_backend_adds_ffi_and_a_go_project_names_who_does() {
         "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[build]\ntarget = \"go\"\n",
     )
     .expect("a Go project");
-    let out = flick(&dir, &["ffi", "check"]);
+    let out = flick(&dir, &["content-mapper"]);
     let stderr = text(&out.stderr);
     assert_eq!(out.status.code(), Some(2), "{stderr}");
     assert!(stderr.contains("FLICK-P052"), "{stderr}");

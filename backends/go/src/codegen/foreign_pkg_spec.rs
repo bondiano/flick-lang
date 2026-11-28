@@ -199,6 +199,15 @@ pub(super) fn direct_go_types(
     if f.arity != params {
         return Types::default();
     }
+    let first_is_typed_opaque = param_tys.first().is_some_and(|p| {
+        matches!(
+            GoAbiType::classify(lang, decls, p, 0),
+            Some(GoAbiType::Opaque(Some(_)))
+        )
+    });
+    if f.adapter.has_word("this") && !first_is_typed_opaque {
+        return Types::default();
+    }
     for p in &param_tys {
         if GoAbiType::classify(lang, decls, p, 0).is_none() {
             return Types::default();

@@ -202,6 +202,7 @@ fn rejects_wrong_number_of_type_arguments() {
             result_args: None,
         }],
         alias: None,
+        foreign_forms: Vec::new(),
     });
     // Add polymorphic global `id : forall a. a -> a`.
     let id_ty = t.fun(var_a.clone(), Stage::Pure, var_a.clone());
@@ -341,6 +342,7 @@ fn rejects_constructor_operand_replaced_with_string_retaining_int_annotation() {
                 result_args: None,
             }],
             alias: None,
+            foreign_forms: Vec::new(),
         });
         p
     };

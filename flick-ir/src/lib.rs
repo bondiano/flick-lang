@@ -24,7 +24,9 @@ mod ty;
 mod validate;
 mod visit;
 
-pub use data::{Constructor, ConstructorDecl, EnumLit, JsClass, Rep, TypeDecl, TypeName};
+pub use data::{
+    Constructor, ConstructorDecl, EnumLit, ForeignTypeForm, JsClass, Rep, TypeDecl, TypeName,
+};
 pub use dict::Dict;
 pub use exports::{Exported, Exports, HostExport, Reexport};
 pub use expr::{

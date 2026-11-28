@@ -234,6 +234,7 @@ fn fixed_width_primitives_handles_closures_tuples_and_opaque_aliases() {
             error: false,
             constructors: Vec::new(),
             alias: Some(TypeRef::new(IrType::Tuple(vec![var("a"), var("a")]))),
+            foreign_forms: Vec::new(),
         }],
     );
     let program = make_program(vec![app]);

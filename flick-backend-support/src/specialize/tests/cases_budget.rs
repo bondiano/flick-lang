@@ -214,6 +214,7 @@ fn polymorphic_recursion_is_statically_classified_and_never_hits_budget() {
                 },
             ],
             alias: None,
+            foreign_forms: Vec::new(),
         }],
     );
 

@@ -185,6 +185,7 @@ fn cyclic_alias_and_unboxed_cycle_handling() {
                     bare("Prelude", "Int"),
                     bare("App", "BadAlias"),
                 ]))),
+                foreign_forms: Vec::new(),
             },
             data_decl(
                 "SelfUnbox",
@@ -351,6 +352,7 @@ fn recursive_opaque_aliases_and_unboxed_stream_terminate() {
                         bare("App", "Stream"),
                     ]))],
                 )),
+                foreign_forms: Vec::new(),
             },
             data_decl(
                 "Box",
@@ -444,6 +446,7 @@ fn growing_recursive_unboxed_opaque_alias_and_empty_forall_terminate() {
                         ),
                     ]))],
                 )),
+                foreign_forms: Vec::new(),
             },
             data_decl(
                 "NonregHolder",
@@ -465,6 +468,7 @@ fn growing_recursive_unboxed_opaque_alias_and_empty_forall_terminate() {
                     constraints: Vec::new(),
                     body: bare("App", "ForallCycle"),
                 })),
+                foreign_forms: Vec::new(),
             },
         ],
     );

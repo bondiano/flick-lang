@@ -57,6 +57,7 @@ pub(super) fn data_decl(
         error: false,
         constructors,
         alias: None,
+        foreign_forms: Vec::new(),
     }
 }
 
